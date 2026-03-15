@@ -59,6 +59,8 @@ For detailed instructions, see [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) and 
 
 ## 🚀 Local Development Quick Start
 
+**⚡ Fast Development:** Test changes instantly on your machine without GitHub reviews or deployments! See [FAST_DEV_WORKFLOW.md](FAST_DEV_WORKFLOW.md) for the complete guide.
+
 ### Quick Test Without Database Setup
 
 Want to test the app immediately without setting up a database? Use the test admin account:
