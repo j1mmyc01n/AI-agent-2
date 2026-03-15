@@ -53,9 +53,22 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password required");
         }
 
-        // Check if database is available
+        // Test admin fallback for development when database is not configured
         if (!process.env.DATABASE_URL) {
-          throw new Error("Database is not configured. Please set DATABASE_URL in Netlify environment variables.");
+          const testAdminEmail = "admin@test.com";
+          const testAdminPassword = "admin123456";
+
+          if (credentials.email === testAdminEmail && credentials.password === testAdminPassword) {
+            console.log("✅ Test admin login successful (no database required)");
+            return {
+              id: "test-admin-id",
+              email: testAdminEmail,
+              name: "Test Admin",
+              image: null,
+            };
+          }
+
+          throw new Error("Database is not configured. Use test admin credentials: admin@test.com / admin123456");
         }
 
         try {

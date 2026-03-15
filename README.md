@@ -59,6 +59,15 @@ For detailed instructions, see [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) and 
 
 ## 🚀 Local Development Quick Start
 
+### Quick Test Without Database Setup
+
+Want to test the app immediately without setting up a database? Use the test admin account:
+
+**Email:** `admin@test.com`
+**Password:** `admin123456`
+
+This works when `DATABASE_URL` is not configured. See [TEST_ADMIN.md](TEST_ADMIN.md) for details.
+
 ### 1. Clone and Install
 
 ```bash
