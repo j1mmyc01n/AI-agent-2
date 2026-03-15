@@ -9,6 +9,7 @@
     "lint": "eslint",
     "postinstall": "prisma generate",
     "check-env": "node scripts/check-env.js",
+    "setup-env": "bash scripts/setup-env.sh",
     "db:push": "prisma db push",
     "db:studio": "prisma studio"
   },
