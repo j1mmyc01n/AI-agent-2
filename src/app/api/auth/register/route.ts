@@ -4,6 +4,14 @@ import { db } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
+    // Check if database is configured
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json(
+        { error: "Database is not configured. Please contact the administrator." },
+        { status: 503 }
+      );
+    }
+
     const body = await req.json();
     const { name, email, password } = body;
 
@@ -45,8 +53,28 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Registration error:", error);
+
+    // Check if it's a database connection error
+    if (error instanceof Error &&
+        (error.message.includes("Can't reach database") ||
+         error.message.includes("connection") ||
+         error.message.includes("ECONNREFUSED"))) {
+      return NextResponse.json(
+        { error: "Unable to connect to the database. Please try again later or contact support." },
+        { status: 503 }
+      );
+    }
+
+    // Check if it's a Prisma validation error
+    if (error instanceof Error && error.message.includes("Unique constraint")) {
+      return NextResponse.json(
+        { error: "An account with this email already exists" },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "An error occurred during registration" },
+      { error: "An error occurred during registration. Please try again." },
       { status: 500 }
     );
   }
