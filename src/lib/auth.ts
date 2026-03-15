@@ -8,11 +8,23 @@ import { db } from "@/lib/db";
 // Only validate environment variables at runtime, not during build
 const isBuild = process.env.NEXT_PHASE === "phase-production-build";
 
-// Warn if NEXTAUTH_SECRET is missing but don't throw
+// Provide development fallback for NEXTAUTH_SECRET if not set
+// In production, NextAuth will fail gracefully if not configured
+const nextAuthSecret = process.env.NEXTAUTH_SECRET ||
+  (process.env.NODE_ENV === "development"
+    ? "development-secret-change-in-production-min-32-chars-long"
+    : undefined);
+
 if (!isBuild && !process.env.NEXTAUTH_SECRET) {
-  console.warn("⚠️ WARNING: NEXTAUTH_SECRET environment variable is not set!");
-  console.warn("Authentication will not work properly without it.");
-  console.warn("Generate one with: openssl rand -base64 32");
+  if (process.env.NODE_ENV === "production") {
+    console.error("❌ ERROR: NEXTAUTH_SECRET environment variable is not set!");
+    console.error("Authentication will NOT work without it.");
+    console.error("Generate one with: openssl rand -base64 32");
+    console.error("Add it to your Netlify environment variables!");
+  } else {
+    console.warn("⚠️ WARNING: NEXTAUTH_SECRET not set, using development fallback.");
+    console.warn("Generate a proper secret with: openssl rand -base64 32");
+  }
 }
 
 // Warn if NEXTAUTH_URL is missing in production but don't throw
@@ -32,6 +44,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
     error: "/login",
   },
+  secret: nextAuthSecret,
   providers: [
     // Only include GitHub provider if credentials are configured
     ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
