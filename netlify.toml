@@ -1,6 +1,6 @@
 [build]
-  # Use inline DATABASE_URL for build only - Netlify UI variables will be used at runtime
-  command = "DATABASE_URL='postgresql://user:password@localhost:5432/db?schema=public' npm run build"
+  # Build without requiring environment variables - they can be set later in Netlify UI
+  command = "npm run build"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
