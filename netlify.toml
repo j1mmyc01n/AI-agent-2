@@ -1,5 +1,6 @@
 [build]
-  command = "npm run build"
+  # Use inline DATABASE_URL for build only - Netlify UI variables will be used at runtime
+  command = "DATABASE_URL='postgresql://user:password@localhost:5432/db?schema=public' npm run build"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -7,15 +8,17 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
-  # Prisma generate doesn't require a database connection, but needs a valid URL format
-  # Set a dummy URL for build time - runtime will use the real DATABASE_URL from Netlify UI
-  DATABASE_URL = "postgresql://user:password@localhost:5432/db?schema=public"
 
-# Important: Set these environment variables in Netlify UI for runtime:
-# - DATABASE_URL (PostgreSQL connection string)
-# - NEXTAUTH_URL (your site URL, e.g., https://your-site.netlify.app)
+# CRITICAL: Set these environment variables in Netlify UI for runtime
+# (DO NOT set DATABASE_URL here - it would override the runtime value)
+#
+# Required for the application to function:
+# - DATABASE_URL (PostgreSQL connection string from Neon/Supabase/Railway)
+# - NEXTAUTH_URL (your site URL, e.g., https://dobetteragent2.netlify.app)
 # - NEXTAUTH_SECRET (generate with: openssl rand -base64 32)
-# - OPENAI_API_KEY
-# - GITHUB_ID and GITHUB_SECRET (for OAuth)
-# - TAVILY_API_KEY
-# - STRIPE_SECRET_KEY and NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY
+#
+# Optional but recommended:
+# - OPENAI_API_KEY (for AI chat functionality)
+# - GITHUB_ID and GITHUB_SECRET (for GitHub OAuth login)
+# - TAVILY_API_KEY (for web search functionality)
+# - STRIPE_SECRET_KEY and NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY (for payments)
