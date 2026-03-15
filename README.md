@@ -2,6 +2,33 @@
 
 An AI-powered SaaS platform that helps you build, deploy, and manage SaaS products using natural language. Built with Next.js 16, OpenAI, and real integrations with GitHub and Vercel.
 
+## 🚨 Quick Start - First Time Setup
+
+**Are you deploying to Netlify and seeing "Application error: a server-side exception has occurred"?**
+
+👉 **[Follow the complete setup guide](SETUP_ENVIRONMENT.md)** - it will walk you through setting up all required environment variables.
+
+Or run this to check what's missing:
+```bash
+npm run check-env
+```
+
+### Quick Summary for Netlify Deployment
+
+1. **Set these 3 CRITICAL variables** in Netlify UI (Site Settings > Environment Variables):
+   - `DATABASE_URL` - Get a free PostgreSQL database from [Neon.tech](https://neon.tech)
+   - `NEXTAUTH_SECRET` - Generate with: `openssl rand -base64 32`
+   - `NEXTAUTH_URL` - Your Netlify site URL (e.g., `https://dobetteragent2.netlify.app`)
+
+2. **Initialize database** (run locally):
+   ```bash
+   DATABASE_URL="your-postgres-url" npx prisma db push
+   ```
+
+3. **Trigger a redeploy** in Netlify
+
+For detailed instructions, see [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
+
 ## ✨ Features
 
 - **🤖 AI Agent with Tool Calling** — GPT-4o powered agent that can search the web, create GitHub repos, push code, and deploy to Vercel
@@ -30,7 +57,7 @@ An AI-powered SaaS platform that helps you build, deploy, and manage SaaS produc
 | Vercel API | Deployment |
 | Stripe | Billing (ready to configure) |
 
-## 🚀 Quick Start
+## 🚀 Local Development Quick Start
 
 ### 1. Clone and Install
 
@@ -48,13 +75,28 @@ Copy `.env.example` to `.env.local` and fill in your values:
 cp .env.example .env.local
 ```
 
-### 3. Set Up the Database
-
-```bash
-npx prisma db push
+**Minimum required for local development:**
+```env
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=your-secret-min-32-chars  # Generate with: openssl rand -base64 32
+DATABASE_URL="file:./dev.db"  # SQLite for local dev
 ```
 
-### 4. Run the Development Server
+### 3. Check Environment Variables (Optional)
+
+```bash
+npm run check-env
+```
+
+This will validate all your environment variables and show what's missing.
+
+### 4. Set Up the Database
+
+```bash
+npm run db:push
+```
+
+### 5. Run the Development Server
 
 ```bash
 npm run dev
@@ -64,17 +106,35 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🔧 Environment Variables
 
+### For Local Development (SQLite)
+
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `NEXTAUTH_URL` | Your app URL (http://localhost:3000 for dev) | ✅ |
+| `NEXTAUTH_URL` | Your app URL (`http://localhost:3000` for dev) | ✅ |
 | `NEXTAUTH_SECRET` | Random secret for JWT encryption (min 32 chars) | ✅ |
-| `DATABASE_URL` | SQLite database path (`file:./dev.db`) | ✅ |
-| `OPENAI_API_KEY` | OpenAI API key (can also be set per-user in Settings) | Optional |
+| `DATABASE_URL` | SQLite path: `file:./dev.db` | ✅ |
+| `OPENAI_API_KEY` | OpenAI API key | Optional |
 | `GITHUB_ID` | GitHub OAuth App Client ID | Optional |
 | `GITHUB_SECRET` | GitHub OAuth App Client Secret | Optional |
 | `TAVILY_API_KEY` | Tavily API key for web search | Optional |
-| `STRIPE_SECRET_KEY` | Stripe secret key for billing | Optional |
+
+### For Netlify Deployment (PostgreSQL)
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | PostgreSQL connection string | ✅ |
+| `NEXTAUTH_SECRET` | Random secret for JWT (32+ chars) | ✅ |
+| `NEXTAUTH_URL` | Your Netlify site URL | ✅ |
+| `OPENAI_API_KEY` | OpenAI API key | Optional |
+| `GITHUB_ID` | GitHub OAuth App Client ID | Optional |
+| `GITHUB_SECRET` | GitHub OAuth App Client Secret | Optional |
+| `TAVILY_API_KEY` | Tavily API key for web search | Optional |
+| `STRIPE_SECRET_KEY` | Stripe secret key | Optional |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | Optional |
+
+**💡 Tip:** Run `npm run check-env` to validate your environment variables.
+
+**📚 Need help?** See [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) for detailed setup instructions.
 
 ## 🔑 Setting Up Integrations
 

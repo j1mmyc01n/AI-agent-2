@@ -14,10 +14,13 @@ This application is configured to deploy on Netlify with the following setup:
 
 2. **Required Environment Variables** - Set these in Netlify's dashboard under Site Settings > Environment Variables:
 
-```
-NEXTAUTH_URL=https://your-site.netlify.app
-NEXTAUTH_SECRET=your-secret-here-min-32-chars
+```bash
+# CRITICAL - Required for the application to start:
 DATABASE_URL=postgresql://user:password@host:5432/database?schema=public
+NEXTAUTH_SECRET=your-secret-here-min-32-chars
+NEXTAUTH_URL=https://your-site.netlify.app
+
+# Optional but recommended for full functionality:
 OPENAI_API_KEY=your-openai-api-key
 GITHUB_ID=your-github-app-id
 GITHUB_SECRET=your-github-app-secret
@@ -26,6 +29,12 @@ STRIPE_SECRET_KEY=your-stripe-secret-key
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
 ```
 
+**⚠️ CRITICAL NOTES:**
+- **DATABASE_URL**: Must be set in Netlify UI, NOT in netlify.toml (build command uses a dummy URL)
+- **NEXTAUTH_SECRET**: Generate with `openssl rand -base64 32` - must be at least 32 characters
+- **NEXTAUTH_URL**: Must match your actual Netlify site URL (e.g., https://dobetteragent2.netlify.app)
+- If these are missing, the app will show clear error messages in the logs
+
 ### Deployment Steps
 
 1. **Connect your repository to Netlify**
@@ -33,43 +42,61 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
    - Click "Add new site" > "Import an existing project"
    - Connect to your Git provider and select this repository
 
-2. **Configure Build Settings** (should be auto-detected from `netlify.toml`)
-   - Build command: `npm run build`
-   - Publish directory: `.next`
-   - The build will automatically run `prisma generate` before building
+2. **Configure Build Settings** (auto-detected from `netlify.toml`)
+   - Build command: Uses inline DATABASE_URL for Prisma generation
+   - The `@netlify/plugin-nextjs` plugin handles the publish directory automatically
+   - Build will succeed even without runtime environment variables
 
-3. **Set Environment Variables**
-   - In Netlify dashboard, go to Site Settings > Environment Variables
-   - Add all required environment variables listed above
-   - **Important**: Make sure `DATABASE_URL` points to your PostgreSQL database
+3. **Set Runtime Environment Variables** ⚠️ REQUIRED
+   - In Netlify dashboard, go to **Site Settings > Environment Variables**
+   - Add ALL THREE critical variables:
+     - `DATABASE_URL` - Your PostgreSQL connection string
+     - `NEXTAUTH_SECRET` - Generate with: `openssl rand -base64 32`
+     - `NEXTAUTH_URL` - Your Netlify site URL (check deploy logs for exact URL)
+   - Add optional variables for additional features
 
 4. **Deploy**
    - Click "Deploy site"
-   - Netlify will build and deploy your application
+   - Build will succeed
+   - **First deploy will fail at runtime** if environment variables aren't set
+   - Set the environment variables and trigger a redeploy
 
 5. **Initialize Database Schema**
-   - After first deployment, run database migrations:
+   - After setting `DATABASE_URL`, initialize your database:
    ```bash
-   # Using Netlify CLI locally with your DATABASE_URL
+   # Using your production DATABASE_URL
    DATABASE_URL=your-production-database-url npx prisma db push
    ```
    - Or use your database provider's migration tools
 
 ### Troubleshooting
 
-#### Build Fails with Database Connection Error
-- This is normal during build if the database doesn't exist yet
-- Make sure your `DATABASE_URL` is correct
-- Initialize the database schema using `prisma db push` after deployment
+#### "Application error: a server-side exception has occurred"
+This is the error you'll see if required environment variables are missing. Check the function logs:
 
-#### "Module not found: Can't resolve '@prisma/client'"
-- The build script now includes `prisma generate` which should fix this
-- If still occurring, check that `postinstall` script runs successfully
+1. Go to Netlify dashboard > Functions
+2. Check the logs for specific error messages:
+   - `❌ ERROR: DATABASE_URL environment variable is not set!`
+   - `❌ ERROR: NEXTAUTH_SECRET environment variable is not set!`
+   - `❌ ERROR: NEXTAUTH_URL environment variable is not set!`
+3. Set the missing variables in Site Settings > Environment Variables
+4. Redeploy or wait for automatic deploy
 
-#### Functions Timeout or Database Errors
-- Ensure your PostgreSQL database is accessible from Netlify
+#### Database Connection Errors at Runtime
+- Ensure your PostgreSQL database is accessible from Netlify's network
 - Check that connection string includes `?schema=public` or appropriate schema
-- Verify all required environment variables are set in Netlify
+- Verify the database exists and has the correct schema (run `prisma db push`)
+- Check Netlify function logs for specific error messages
+
+#### GitHub OAuth Not Working
+- GitHub OAuth is optional - app will work without it
+- Only includes GitHub provider if `GITHUB_ID` and `GITHUB_SECRET` are set
+- Users can still register/login with email and password
+
+#### Chat/AI Features Not Working
+- `OPENAI_API_KEY` is required for chat functionality
+- Users can also set their own API keys in Settings
+- Web search requires `TAVILY_API_KEY`
 
 ### Local Development
 

@@ -1,6 +1,6 @@
 [build]
+  # Build without requiring environment variables - they can be set later in Netlify UI
   command = "npm run build"
-  publish = ".next"
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"
@@ -9,6 +9,16 @@
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
 
-# Important: Ensure DATABASE_URL environment variable is set in Netlify UI
-# For production, use PostgreSQL or another cloud database service
-# SQLite is not compatible with Netlify's serverless architecture
+# CRITICAL: Set these environment variables in Netlify UI for runtime
+# (DO NOT set DATABASE_URL here - it would override the runtime value)
+#
+# Required for the application to function:
+# - DATABASE_URL (PostgreSQL connection string from Neon/Supabase/Railway)
+# - NEXTAUTH_URL (your site URL, e.g., https://dobetteragent2.netlify.app)
+# - NEXTAUTH_SECRET (generate with: openssl rand -base64 32)
+#
+# Optional but recommended:
+# - OPENAI_API_KEY (for AI chat functionality)
+# - GITHUB_ID and GITHUB_SECRET (for GitHub OAuth login)
+# - TAVILY_API_KEY (for web search functionality)
+# - STRIPE_SECRET_KEY and NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY (for payments)

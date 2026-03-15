@@ -5,8 +5,26 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcryptjs from "bcryptjs";
 import { db } from "@/lib/db";
 
+// Only validate environment variables at runtime, not during build
+const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+
+// Warn if NEXTAUTH_SECRET is missing but don't throw
+if (!isBuild && !process.env.NEXTAUTH_SECRET) {
+  console.warn("⚠️ WARNING: NEXTAUTH_SECRET environment variable is not set!");
+  console.warn("Authentication will not work properly without it.");
+  console.warn("Generate one with: openssl rand -base64 32");
+}
+
+// Warn if NEXTAUTH_URL is missing in production but don't throw
+if (!isBuild && process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
+  console.warn("⚠️ WARNING: NEXTAUTH_URL environment variable is not set!");
+  console.warn("OAuth redirects may not work correctly.");
+  console.warn("Set it to your Netlify site URL (e.g., https://dobetteragent2.netlify.app)");
+}
+
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(db) as NextAuthOptions["adapter"],
+  // Only use PrismaAdapter if DATABASE_URL is configured
+  adapter: process.env.DATABASE_URL ? (PrismaAdapter(db) as NextAuthOptions["adapter"]) : undefined,
   session: {
     strategy: "jwt",
   },
@@ -15,10 +33,15 @@ export const authOptions: NextAuthOptions = {
     error: "/login",
   },
   providers: [
-    GitHubProvider({
-      clientId: process.env.GITHUB_ID ?? "",
-      clientSecret: process.env.GITHUB_SECRET ?? "",
-    }),
+    // Only include GitHub provider if credentials are configured
+    ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
+      ? [
+          GitHubProvider({
+            clientId: process.env.GITHUB_ID,
+            clientSecret: process.env.GITHUB_SECRET,
+          }),
+        ]
+      : []),
     CredentialsProvider({
       name: "credentials",
       credentials: {
@@ -30,29 +53,42 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password required");
         }
 
-        const user = await db.user.findUnique({
-          where: { email: credentials.email },
-        });
-
-        if (!user || !user.password) {
-          throw new Error("No user found with this email");
+        // Check if database is available
+        if (!process.env.DATABASE_URL) {
+          throw new Error("Database is not configured. Please set DATABASE_URL in Netlify environment variables.");
         }
 
-        const isPasswordValid = await bcryptjs.compare(
-          credentials.password,
-          user.password
-        );
+        try {
+          const user = await db.user.findUnique({
+            where: { email: credentials.email },
+          });
 
-        if (!isPasswordValid) {
-          throw new Error("Invalid password");
+          if (!user || !user.password) {
+            throw new Error("No user found with this email");
+          }
+
+          const isPasswordValid = await bcryptjs.compare(
+            credentials.password,
+            user.password
+          );
+
+          if (!isPasswordValid) {
+            throw new Error("Invalid password");
+          }
+
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            image: user.image,
+          };
+        } catch (error) {
+          console.error("Auth error:", error);
+          if (error instanceof Error) {
+            throw error;
+          }
+          throw new Error("Authentication failed. Please check your database configuration.");
         }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-          image: user.image,
-        };
       },
     }),
   ],
