@@ -23,7 +23,8 @@ if (!isBuild && process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_U
 }
 
 export const authOptions: NextAuthOptions = {
-  adapter: PrismaAdapter(db) as NextAuthOptions["adapter"],
+  // Only use PrismaAdapter if DATABASE_URL is configured
+  adapter: process.env.DATABASE_URL ? (PrismaAdapter(db) as NextAuthOptions["adapter"]) : undefined,
   session: {
     strategy: "jwt",
   },
@@ -52,6 +53,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password required");
         }
 
+        // Check if database is available
+        if (!process.env.DATABASE_URL) {
+          throw new Error("Database is not configured. Please set DATABASE_URL in Netlify environment variables.");
+        }
+
         try {
           const user = await db.user.findUnique({
             where: { email: credentials.email },
@@ -78,6 +84,9 @@ export const authOptions: NextAuthOptions = {
           };
         } catch (error) {
           console.error("Auth error:", error);
+          if (error instanceof Error) {
+            throw error;
+          }
           throw new Error("Authentication failed. Please check your database configuration.");
         }
       },
