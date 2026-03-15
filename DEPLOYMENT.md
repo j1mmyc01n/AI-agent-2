@@ -14,10 +14,13 @@ This application is configured to deploy on Netlify with the following setup:
 
 2. **Required Environment Variables** - Set these in Netlify's dashboard under Site Settings > Environment Variables:
 
-```
+```bash
+# Required for runtime (set in Netlify UI)
+DATABASE_URL=postgresql://user:password@host:5432/database?schema=public
 NEXTAUTH_URL=https://your-site.netlify.app
 NEXTAUTH_SECRET=your-secret-here-min-32-chars
-DATABASE_URL=postgresql://user:password@host:5432/database?schema=public
+
+# API Keys (set in Netlify UI)
 OPENAI_API_KEY=your-openai-api-key
 GITHUB_ID=your-github-app-id
 GITHUB_SECRET=your-github-app-secret
@@ -26,6 +29,11 @@ STRIPE_SECRET_KEY=your-stripe-secret-key
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
 ```
 
+**Important Notes:**
+- The build process uses a dummy `DATABASE_URL` (configured in `netlify.toml`) since Prisma client generation doesn't require an actual database connection
+- Runtime requires the real `DATABASE_URL` to be set in Netlify UI environment variables
+- Generate `NEXTAUTH_SECRET` using: `openssl rand -base64 32`
+
 ### Deployment Steps
 
 1. **Connect your repository to Netlify**
@@ -33,43 +41,49 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
    - Click "Add new site" > "Import an existing project"
    - Connect to your Git provider and select this repository
 
-2. **Configure Build Settings** (should be auto-detected from `netlify.toml`)
+2. **Configure Build Settings** (auto-detected from `netlify.toml`)
    - Build command: `npm run build`
-   - Publish directory: `.next`
-   - The build will automatically run `prisma generate` before building
+   - The `@netlify/plugin-nextjs` plugin handles the publish directory automatically
+   - Build includes `prisma generate` which runs with the dummy DATABASE_URL
 
 3. **Set Environment Variables**
    - In Netlify dashboard, go to Site Settings > Environment Variables
-   - Add all required environment variables listed above
-   - **Important**: Make sure `DATABASE_URL` points to your PostgreSQL database
+   - Add all required runtime environment variables listed above
+   - **Critical**: Set the real `DATABASE_URL` pointing to your PostgreSQL database
+   - Set `NEXTAUTH_URL` to your actual Netlify site URL
+   - Generate and set a secure `NEXTAUTH_SECRET`
 
 4. **Deploy**
    - Click "Deploy site"
    - Netlify will build and deploy your application
+   - The build should succeed even before setting runtime environment variables
 
 5. **Initialize Database Schema**
-   - After first deployment, run database migrations:
+   - After first deployment and setting `DATABASE_URL`, initialize your database:
    ```bash
-   # Using Netlify CLI locally with your DATABASE_URL
+   # Using your production DATABASE_URL
    DATABASE_URL=your-production-database-url npx prisma db push
    ```
    - Or use your database provider's migration tools
 
 ### Troubleshooting
 
-#### Build Fails with Database Connection Error
-- This is normal during build if the database doesn't exist yet
-- Make sure your `DATABASE_URL` is correct
-- Initialize the database schema using `prisma db push` after deployment
+#### Build Succeeds but Runtime Fails
+- Verify all runtime environment variables are set in Netlify UI (Site Settings > Environment Variables)
+- Check that `DATABASE_URL` points to an accessible PostgreSQL database
+- Ensure `NEXTAUTH_SECRET` is at least 32 characters long
+- Confirm `NEXTAUTH_URL` matches your Netlify site URL
 
 #### "Module not found: Can't resolve '@prisma/client'"
-- The build script now includes `prisma generate` which should fix this
-- If still occurring, check that `postinstall` script runs successfully
+- The build script includes `prisma generate` in both postinstall and build steps
+- Check Netlify build logs to confirm `prisma generate` ran successfully
+- Verify `@prisma/client` and `prisma` packages are in dependencies (not devDependencies)
 
-#### Functions Timeout or Database Errors
-- Ensure your PostgreSQL database is accessible from Netlify
+#### Database Connection Errors at Runtime
+- Ensure your PostgreSQL database is accessible from Netlify's network
 - Check that connection string includes `?schema=public` or appropriate schema
-- Verify all required environment variables are set in Netlify
+- Verify the database exists and has the correct schema (run `prisma db push`)
+- Check Netlify function logs for specific error messages
 
 ### Local Development
 
