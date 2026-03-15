@@ -21,6 +21,17 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
+    // Check if database is available
+    if (!process.env.DATABASE_URL) {
+      return NextResponse.json(
+        {
+          error: "Database not configured. Chat history cannot be saved. To use the chat feature with conversation history, please set up a DATABASE_URL.",
+          message: "The AI chat requires a database to store conversation history. See TEST_ADMIN.md for setup instructions."
+        },
+        { status: 503 }
+      );
+    }
+
     // Get user's API keys
     const user = await db.user.findUnique({
       where: { id: userId },

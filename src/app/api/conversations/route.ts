@@ -10,19 +10,29 @@ export async function GET() {
   }
   const userId = (session.user as { id: string }).id;
 
-  const conversations = await db.conversation.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    select: {
-      id: true,
-      title: true,
-      createdAt: true,
-      updatedAt: true,
-      _count: { select: { messages: true } },
-    },
-  });
+  // If database is not configured, return empty array
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json([]);
+  }
 
-  return NextResponse.json(conversations);
+  try {
+    const conversations = await db.conversation.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: { select: { messages: true } },
+      },
+    });
+
+    return NextResponse.json(conversations);
+  } catch (error) {
+    console.error("Database error in GET /api/conversations:", error);
+    return NextResponse.json([]);
+  }
 }
 
 export async function DELETE(req: NextRequest) {
@@ -39,11 +49,27 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Conversation ID required" }, { status: 400 });
   }
 
-  const conversation = await db.conversation.findFirst({ where: { id, userId } });
-  if (!conversation) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+  // If database is not configured, cannot delete
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json(
+      { error: "Database not configured" },
+      { status: 503 }
+    );
   }
 
-  await db.conversation.delete({ where: { id } });
-  return NextResponse.json({ success: true });
+  try {
+    const conversation = await db.conversation.findFirst({ where: { id, userId } });
+    if (!conversation) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
+    }
+
+    await db.conversation.delete({ where: { id } });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Database error in DELETE /api/conversations:", error);
+    return NextResponse.json(
+      { error: "Failed to delete conversation" },
+      { status: 500 }
+    );
+  }
 }

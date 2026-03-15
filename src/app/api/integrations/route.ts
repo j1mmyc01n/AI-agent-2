@@ -16,26 +16,56 @@ export async function GET() {
   }
   const userId = (session.user as { id: string }).id;
 
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      openaiKey: true,
-      githubToken: true,
-      vercelToken: true,
-      tavilyKey: true,
-    },
-  });
+  // If database is not configured, use session-stored keys
+  if (!process.env.DATABASE_URL) {
+    const sessionData = session as any;
+    return NextResponse.json({
+      openaiKey: maskSecret(sessionData.openaiKey),
+      githubToken: maskSecret(sessionData.githubToken),
+      vercelToken: maskSecret(sessionData.vercelToken),
+      tavilyKey: maskSecret(sessionData.tavilyKey),
+      hasOpenaiKey: !!sessionData.openaiKey,
+      hasGithubToken: !!sessionData.githubToken,
+      hasVercelToken: !!sessionData.vercelToken,
+      hasTavilyKey: !!sessionData.tavilyKey,
+    });
+  }
 
-  return NextResponse.json({
-    openaiKey: maskSecret(user?.openaiKey),
-    githubToken: maskSecret(user?.githubToken),
-    vercelToken: maskSecret(user?.vercelToken),
-    tavilyKey: maskSecret(user?.tavilyKey),
-    hasOpenaiKey: !!user?.openaiKey,
-    hasGithubToken: !!user?.githubToken,
-    hasVercelToken: !!user?.vercelToken,
-    hasTavilyKey: !!user?.tavilyKey,
-  });
+  try {
+    const user = await db.user.findUnique({
+      where: { id: userId },
+      select: {
+        openaiKey: true,
+        githubToken: true,
+        vercelToken: true,
+        tavilyKey: true,
+      },
+    });
+
+    return NextResponse.json({
+      openaiKey: maskSecret(user?.openaiKey),
+      githubToken: maskSecret(user?.githubToken),
+      vercelToken: maskSecret(user?.vercelToken),
+      tavilyKey: maskSecret(user?.tavilyKey),
+      hasOpenaiKey: !!user?.openaiKey,
+      hasGithubToken: !!user?.githubToken,
+      hasVercelToken: !!user?.vercelToken,
+      hasTavilyKey: !!user?.tavilyKey,
+    });
+  } catch (error) {
+    console.error("Database error in GET /api/integrations:", error);
+    // Fallback to empty keys if database fails
+    return NextResponse.json({
+      openaiKey: null,
+      githubToken: null,
+      vercelToken: null,
+      tavilyKey: null,
+      hasOpenaiKey: false,
+      hasGithubToken: false,
+      hasVercelToken: false,
+      hasTavilyKey: false,
+    });
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -64,7 +94,25 @@ export async function POST(req: NextRequest) {
     updateData.tavilyKey = tavilyKey || null;
   }
 
-  await db.user.update({ where: { id: userId }, data: updateData });
+  // If database is not configured, we cannot persist the keys
+  // Return a message informing the user
+  if (!process.env.DATABASE_URL) {
+    return NextResponse.json({
+      success: false,
+      error: "Database not configured. API keys cannot be persisted. Please set up a DATABASE_URL to save your integrations permanently.",
+      message: "To use AI features, you'll need to set up a database. See TEST_ADMIN.md for instructions."
+    }, { status: 503 });
+  }
 
-  return NextResponse.json({ success: true });
+  try {
+    await db.user.update({ where: { id: userId }, data: updateData });
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Database error in POST /api/integrations:", error);
+    return NextResponse.json({
+      success: false,
+      error: "Failed to save integrations to database",
+      message: "Database connection failed. Please check your DATABASE_URL configuration."
+    }, { status: 500 });
+  }
 }
