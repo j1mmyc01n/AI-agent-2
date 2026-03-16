@@ -28,6 +28,7 @@ function LoginForm() {
   const [githubLoading, setGithubLoading] = useState(false);
 
   const callbackUrl = searchParams.get("callbackUrl") || "/chat";
+  const registered = searchParams.get("registered") === "true";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +43,14 @@ function LoginForm() {
       });
 
       if (result?.error) {
-        setError(result.error === "CredentialsSignin" ? "Invalid email or password" : result.error);
+        // Map generic NextAuth error to user-friendly message
+        if (result.error === "CredentialsSignin") {
+          setError("Invalid email or password. Please check your credentials and try again.");
+        } else if (result.error.includes("database") || result.error.includes("Database")) {
+          setError("Unable to connect to the server. Please try again in a moment.");
+        } else {
+          setError(result.error);
+        }
       } else {
         router.push(callbackUrl);
         router.refresh();
@@ -77,6 +85,12 @@ function LoginForm() {
             <CardDescription>Sign in to your account to continue</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {registered && (
+              <div className="bg-green-500/10 text-green-600 dark:text-green-400 text-sm p-3 rounded-md">
+                Account created successfully! Please sign in.
+              </div>
+            )}
+
             {error && (
               <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
                 {error}

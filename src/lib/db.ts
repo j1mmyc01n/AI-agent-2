@@ -35,6 +35,17 @@ function getDatabaseUrl(): string | undefined {
 
 const databaseUrl = getDatabaseUrl();
 
+// Ensure DATABASE_URL is set in process.env for Prisma internals
+// (Netlify Neon integration only sets NETLIFY_DATABASE_URL)
+if (databaseUrl && !process.env.DATABASE_URL) {
+  process.env.DATABASE_URL = databaseUrl;
+}
+
+// Also set DIRECT_URL for Prisma migrations if unpooled URL is available
+if (!process.env.DIRECT_URL && process.env.NETLIFY_DATABASE_URL_UNPOOLED) {
+  process.env.DIRECT_URL = process.env.NETLIFY_DATABASE_URL_UNPOOLED;
+}
+
 if (!isBuild && !databaseUrl) {
   console.warn("⚠️ WARNING: No database URL found!");
   console.warn("The app will not function properly without a database.");

@@ -4,16 +4,40 @@ import GitHubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcryptjs from "bcryptjs";
 import { db, getDatabaseUrl } from "@/lib/db";
+import crypto from "crypto";
 
 // Only validate environment variables at runtime, not during build
 const isBuild = process.env.NEXT_PHASE === "phase-production-build";
 
+// Auto-detect NEXTAUTH_URL from Netlify's URL env var if not explicitly set
+if (!process.env.NEXTAUTH_URL && process.env.URL) {
+  process.env.NEXTAUTH_URL = process.env.URL;
+}
+
 // Provide development fallback for NEXTAUTH_SECRET if not set
-// In production, NextAuth will fail gracefully if not configured
-const nextAuthSecret = process.env.NEXTAUTH_SECRET ||
-  (process.env.NODE_ENV === "development"
-    ? "development-secret-change-in-production-min-32-chars-long"
-    : undefined);
+// In production on Netlify, generate a deterministic secret from available stable values
+function getNextAuthSecret(): string | undefined {
+  if (process.env.NEXTAUTH_SECRET) {
+    return process.env.NEXTAUTH_SECRET;
+  }
+
+  if (process.env.NODE_ENV === "development") {
+    return "development-secret-change-in-production-min-32-chars-long";
+  }
+
+  // In production, generate a deterministic secret from stable Netlify env vars
+  // This ensures the secret is consistent across function invocations
+  const siteId = process.env.NETLIFY_SITE_ID || process.env.SITE_ID;
+  const dbUrl = getDatabaseUrl();
+  if (siteId || dbUrl) {
+    const seed = `nextauth-secret-${siteId || ""}-${dbUrl || ""}`;
+    return crypto.createHash("sha256").update(seed).digest("base64");
+  }
+
+  return undefined;
+}
+
+const nextAuthSecret = getNextAuthSecret();
 
 if (!isBuild && !process.env.NEXTAUTH_SECRET) {
   if (process.env.NODE_ENV === "production") {
@@ -115,6 +139,13 @@ export const authOptions: NextAuthOptions = {
         } catch (error) {
           console.error("Auth error:", error);
           if (error instanceof Error) {
+            // Check for database connection errors and provide a clear message
+            if (error.message.includes("Can't reach database") ||
+                error.message.includes("connection") ||
+                error.message.includes("ECONNREFUSED") ||
+                error.message.includes("connect ETIMEDOUT")) {
+              throw new Error("Unable to connect to the database. Please try again later.");
+            }
             throw error;
           }
           throw new Error("Authentication failed. Please check your database configuration.");
