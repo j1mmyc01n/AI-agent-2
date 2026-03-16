@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 import { runAgent } from "@/lib/ai/agent";
 
 export async function POST(req: NextRequest) {
@@ -19,6 +19,17 @@ export async function POST(req: NextRequest) {
 
     if (!message?.trim()) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
+    }
+
+    // Check if database is available (including Netlify variables)
+    if (!getDatabaseUrl()) {
+      return NextResponse.json(
+        {
+          error: "Database not configured. Chat history cannot be saved. To use the chat feature with conversation history, please set up a DATABASE_URL.",
+          message: "The AI chat requires a database to store conversation history. See TEST_ADMIN.md for setup instructions."
+        },
+        { status: 503 }
+      );
     }
 
     // Get user's API keys

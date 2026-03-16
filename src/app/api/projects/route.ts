@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -10,12 +10,22 @@ export async function GET() {
   }
   const userId = (session.user as { id: string }).id;
 
-  const projects = await db.project.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-  });
+  // If database is not configured (including Netlify variables), return empty array
+  if (!getDatabaseUrl()) {
+    return NextResponse.json([]);
+  }
 
-  return NextResponse.json(projects);
+  try {
+    const projects = await db.project.findMany({
+      where: { userId },
+      orderBy: { updatedAt: "desc" },
+    });
+
+    return NextResponse.json(projects);
+  } catch (error) {
+    console.error("Database error in GET /api/projects:", error);
+    return NextResponse.json([]);
+  }
 }
 
 export async function POST(req: NextRequest) {
@@ -32,17 +42,36 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Project name is required" }, { status: 400 });
   }
 
-  const project = await db.project.create({
-    data: {
-      name,
-      description,
-      type: type || "saas",
-      githubRepo,
-      vercelUrl,
-      userId,
-      status: "active",
-    },
-  });
+  // If database is not configured (including Netlify variables), cannot save project
+  if (!getDatabaseUrl()) {
+    return NextResponse.json(
+      {
+        error: "Database not configured. Projects cannot be saved.",
+        message: "To save projects, please set up a DATABASE_URL. See TEST_ADMIN.md for instructions."
+      },
+      { status: 503 }
+    );
+  }
 
-  return NextResponse.json(project, { status: 201 });
+  try {
+    const project = await db.project.create({
+      data: {
+        name,
+        description,
+        type: type || "saas",
+        githubRepo,
+        vercelUrl,
+        userId,
+        status: "active",
+      },
+    });
+
+    return NextResponse.json(project, { status: 201 });
+  } catch (error) {
+    console.error("Database error in POST /api/projects:", error);
+    return NextResponse.json(
+      { error: "Failed to save project" },
+      { status: 500 }
+    );
+  }
 }

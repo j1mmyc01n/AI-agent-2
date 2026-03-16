@@ -3,16 +3,28 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcryptjs from "bcryptjs";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 
 // Only validate environment variables at runtime, not during build
 const isBuild = process.env.NEXT_PHASE === "phase-production-build";
 
-// Warn if NEXTAUTH_SECRET is missing but don't throw
+// Provide development fallback for NEXTAUTH_SECRET if not set
+// In production, NextAuth will fail gracefully if not configured
+const nextAuthSecret = process.env.NEXTAUTH_SECRET ||
+  (process.env.NODE_ENV === "development"
+    ? "development-secret-change-in-production-min-32-chars-long"
+    : undefined);
+
 if (!isBuild && !process.env.NEXTAUTH_SECRET) {
-  console.warn("⚠️ WARNING: NEXTAUTH_SECRET environment variable is not set!");
-  console.warn("Authentication will not work properly without it.");
-  console.warn("Generate one with: openssl rand -base64 32");
+  if (process.env.NODE_ENV === "production") {
+    console.error("❌ ERROR: NEXTAUTH_SECRET environment variable is not set!");
+    console.error("Authentication will NOT work without it.");
+    console.error("Generate one with: openssl rand -base64 32");
+    console.error("Add it to your Netlify environment variables!");
+  } else {
+    console.warn("⚠️ WARNING: NEXTAUTH_SECRET not set, using development fallback.");
+    console.warn("Generate a proper secret with: openssl rand -base64 32");
+  }
 }
 
 // Warn if NEXTAUTH_URL is missing in production but don't throw
@@ -23,8 +35,8 @@ if (!isBuild && process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_U
 }
 
 export const authOptions: NextAuthOptions = {
-  // Only use PrismaAdapter if DATABASE_URL is configured
-  adapter: process.env.DATABASE_URL ? (PrismaAdapter(db) as NextAuthOptions["adapter"]) : undefined,
+  // Only use PrismaAdapter if database URL is configured (including Netlify variables)
+  adapter: getDatabaseUrl() ? (PrismaAdapter(db) as NextAuthOptions["adapter"]) : undefined,
   session: {
     strategy: "jwt",
   },
@@ -32,6 +44,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
     error: "/login",
   },
+  secret: nextAuthSecret,
   providers: [
     // Only include GitHub provider if credentials are configured
     ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
@@ -53,14 +66,31 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password required");
         }
 
-        // Check if database is available
-        if (!process.env.DATABASE_URL) {
-          throw new Error("Database is not configured. Please set DATABASE_URL in Netlify environment variables.");
+        // Normalize email for consistent comparison
+        const normalizedEmail = credentials.email.trim().toLowerCase();
+
+        // Test admin fallback for development when database is not configured
+        if (!getDatabaseUrl()) {
+          const testAdminEmail = "admin@test.com";
+          const testAdminPassword = "admin123456";
+
+          if (normalizedEmail === testAdminEmail && credentials.password === testAdminPassword) {
+            console.log("✅ Test admin login successful (no database required)");
+            return {
+              id: "test-admin-id",
+              email: testAdminEmail,
+              name: "Test Admin",
+              image: null,
+            };
+          }
+
+          throw new Error("Database is not configured. Use test admin credentials: admin@test.com / admin123456");
         }
 
         try {
+          // Use normalized email for lookup
           const user = await db.user.findUnique({
-            where: { email: credentials.email },
+            where: { email: normalizedEmail },
           });
 
           if (!user || !user.password) {
