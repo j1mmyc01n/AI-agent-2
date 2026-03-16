@@ -6,7 +6,20 @@ An AI-powered SaaS platform that helps you build, deploy, and manage SaaS produc
 
 **Are you seeing "Database is not configured" or "Login details missing from database"?**
 
-👉 **[Follow the complete database setup guide](DATABASE_SETUP.md)** - it will walk you through setting up a PostgreSQL database.
+### For Netlify Deployments (Easiest!)
+
+If you're deploying to Netlify, use the **Netlify Neon Integration** - it's automatic:
+
+1. Go to your Netlify site → **Integrations** → Enable **Neon**
+2. Initialize database: `DATABASE_URL="<from-netlify-env>" npx prisma db push`
+3. Set `NEXTAUTH_SECRET` and `NEXTAUTH_URL` in Netlify environment variables
+4. Redeploy - done! 🎉
+
+The app automatically detects `NETLIFY_DATABASE_URL`. See [NETLIFY_NEON_INTEGRATION.md](NETLIFY_NEON_INTEGRATION.md)
+
+### For Local Development
+
+👉 **[Follow the complete database setup guide](DATABASE_SETUP.md)** - it will walk you through setting up PostgreSQL.
 
 Or check what's missing:
 ```bash
@@ -16,7 +29,8 @@ npm run check-env
 ### Quick Summary for Getting Started
 
 1. **Set up a PostgreSQL database** (required):
-   - **Easy option**: Get a free database from [Neon.tech](https://neon.tech)
+   - **Netlify**: Use the Neon integration (automatic!)
+   - **Local**: Get a free database from [Neon.tech](https://neon.tech)
    - See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed instructions
 
 2. **Create `.env.local` file**:
@@ -39,7 +53,10 @@ npm run check-env
    npm run dev
    ```
 
-For Netlify deployment, see [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
+For more details:
+- Netlify setup: [NETLIFY_NEON_INTEGRATION.md](NETLIFY_NEON_INTEGRATION.md)
+- General setup: [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md)
+- Deployment: [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ## ✨ Features
 

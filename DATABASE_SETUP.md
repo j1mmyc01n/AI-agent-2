@@ -13,9 +13,43 @@ The application requires a PostgreSQL database to store user accounts and authen
 
 ## Solution: Set Up PostgreSQL Database
 
-You have several options for getting a PostgreSQL database:
+### ⚡ EASIEST: Netlify Neon Integration (Recommended for Production)
 
-### Option 1: Neon (Recommended for Development)
+**If deploying to Netlify, this is by far the easiest option** - the database is created and configured automatically!
+
+1. Go to your Netlify site dashboard
+2. Navigate to **Integrations** tab
+3. Search for and install the **Neon** integration
+4. Netlify will automatically:
+   - Create a free Neon PostgreSQL database
+   - Set `NETLIFY_DATABASE_URL` and `NETLIFY_DATABASE_URL_UNPOOLED` environment variables
+   - Configure the database for all deploy contexts
+
+5. Initialize the database schema (run once locally):
+   ```bash
+   # Get the NETLIFY_DATABASE_URL from your Netlify environment variables
+   # Then run:
+   DATABASE_URL="your-netlify-database-url" npx prisma db push
+   ```
+
+6. Redeploy your site - **it will now connect to the database automatically!**
+
+**That's it!** The application automatically detects `NETLIFY_DATABASE_URL` and uses it.
+
+**How it works:** The application checks for database URLs in this priority order:
+1. `DATABASE_URL` (standard, manually set)
+2. `NETLIFY_DATABASE_URL` (Netlify Neon integration - pooled connection)
+3. `NETLIFY_DATABASE_URL_UNPOOLED` (Netlify Neon integration - direct connection)
+
+For more details, see [NETLIFY_NEON_INTEGRATION.md](NETLIFY_NEON_INTEGRATION.md)
+
+---
+
+### Other Options
+
+You have several other options if not using Netlify or for local development:
+
+#### Option 1: Neon (Manual Setup for Local Development)
 
 [Neon](https://neon.tech) provides a generous free tier with serverless PostgreSQL.
 
@@ -29,7 +63,7 @@ You have several options for getting a PostgreSQL database:
    echo 'DATABASE_URL="postgresql://your-connection-string"' > .env.local
    ```
 
-### Option 2: Supabase
+#### Option 2: Supabase
 
 [Supabase](https://supabase.com) offers free PostgreSQL databases with additional features.
 
@@ -42,7 +76,7 @@ You have several options for getting a PostgreSQL database:
    DATABASE_URL="postgresql://your-connection-string"
    ```
 
-### Option 3: Railway
+#### Option 3: Railway
 
 [Railway](https://railway.app) provides easy PostgreSQL hosting.
 
@@ -55,7 +89,7 @@ You have several options for getting a PostgreSQL database:
    DATABASE_URL="postgresql://your-connection-string"
    ```
 
-### Option 4: Local PostgreSQL
+#### Option 4: Local PostgreSQL
 
 If you prefer running PostgreSQL locally:
 
