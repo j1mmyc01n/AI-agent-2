@@ -4,30 +4,42 @@ An AI-powered SaaS platform that helps you build, deploy, and manage SaaS produc
 
 ## 🚨 Quick Start - First Time Setup
 
-**Are you deploying to Netlify and seeing "Application error: a server-side exception has occurred"?**
+**Are you seeing "Database is not configured" or "Login details missing from database"?**
 
-👉 **[Follow the complete setup guide](SETUP_ENVIRONMENT.md)** - it will walk you through setting up all required environment variables.
+👉 **[Follow the complete database setup guide](DATABASE_SETUP.md)** - it will walk you through setting up a PostgreSQL database.
 
-Or run this to check what's missing:
+Or check what's missing:
 ```bash
 npm run check-env
 ```
 
-### Quick Summary for Netlify Deployment
+### Quick Summary for Getting Started
 
-1. **Set these 3 CRITICAL variables** in Netlify UI (Site Settings > Environment Variables):
-   - `DATABASE_URL` - Get a free PostgreSQL database from [Neon.tech](https://neon.tech)
-   - `NEXTAUTH_SECRET` - Generate with: `openssl rand -base64 32`
-   - `NEXTAUTH_URL` - Your Netlify site URL (e.g., `https://dobetteragent2.netlify.app`)
+1. **Set up a PostgreSQL database** (required):
+   - **Easy option**: Get a free database from [Neon.tech](https://neon.tech)
+   - See [DATABASE_SETUP.md](DATABASE_SETUP.md) for detailed instructions
 
-2. **Initialize database** (run locally):
+2. **Create `.env.local` file**:
    ```bash
-   DATABASE_URL="your-postgres-url" npx prisma db push
+   cp .env.example .env.local
    ```
 
-3. **Trigger a redeploy** in Netlify
+3. **Add these 3 CRITICAL variables** to `.env.local`:
+   - `DATABASE_URL` - Your PostgreSQL connection string
+   - `NEXTAUTH_SECRET` - Generate with: `openssl rand -base64 32`
+   - `NEXTAUTH_URL` - `http://localhost:3000` for local dev
 
-For detailed instructions, see [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
+4. **Apply database schema**:
+   ```bash
+   npm run db:push
+   ```
+
+5. **Start development**:
+   ```bash
+   npm run dev
+   ```
+
+For Netlify deployment, see [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) and [DEPLOYMENT.md](DEPLOYMENT.md).
 
 ## ✨ Features
 
@@ -50,7 +62,7 @@ For detailed instructions, see [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) and 
 | Tailwind CSS | Styling |
 | shadcn/ui | UI components |
 | OpenAI SDK | AI agent (GPT-4o) |
-| Prisma + SQLite | Database ORM |
+| Prisma + PostgreSQL | Database ORM |
 | NextAuth.js | Authentication |
 | Tavily API | Web search |
 | GitHub API | Repository management |
@@ -90,8 +102,10 @@ cp .env.example .env.local
 ```env
 NEXTAUTH_URL=http://localhost:3000
 NEXTAUTH_SECRET=your-secret-min-32-chars  # Generate with: openssl rand -base64 32
-DATABASE_URL="file:./dev.db"  # SQLite for local dev
+DATABASE_URL="postgresql://user:password@host:5432/database"  # PostgreSQL required
 ```
+
+**🔥 Important:** You need a PostgreSQL database. Get a free one from [Neon.tech](https://neon.tech) - see [DATABASE_SETUP.md](DATABASE_SETUP.md) for step-by-step instructions.
 
 ### 3. Check Environment Variables (Optional)
 
@@ -117,35 +131,30 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 🔧 Environment Variables
 
-### For Local Development (SQLite)
+### Required for All Environments
 
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `NEXTAUTH_URL` | Your app URL (`http://localhost:3000` for dev) | ✅ |
 | `NEXTAUTH_SECRET` | Random secret for JWT encryption (min 32 chars) | ✅ |
-| `DATABASE_URL` | SQLite path: `file:./dev.db` | ✅ |
-| `OPENAI_API_KEY` | OpenAI API key | Optional |
-| `GITHUB_ID` | GitHub OAuth App Client ID | Optional |
-| `GITHUB_SECRET` | GitHub OAuth App Client Secret | Optional |
-| `TAVILY_API_KEY` | Tavily API key for web search | Optional |
-
-### For Netlify Deployment (PostgreSQL)
-
-| Variable | Description | Required |
-|----------|-------------|----------|
 | `DATABASE_URL` | PostgreSQL connection string | ✅ |
-| `NEXTAUTH_SECRET` | Random secret for JWT (32+ chars) | ✅ |
-| `NEXTAUTH_URL` | Your Netlify site URL | ✅ |
-| `OPENAI_API_KEY` | OpenAI API key | Optional |
-| `GITHUB_ID` | GitHub OAuth App Client ID | Optional |
-| `GITHUB_SECRET` | GitHub OAuth App Client Secret | Optional |
-| `TAVILY_API_KEY` | Tavily API key for web search | Optional |
-| `STRIPE_SECRET_KEY` | Stripe secret key | Optional |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key | Optional |
+
+### Optional Variables
+
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | OpenAI API key for AI features |
+| `GITHUB_ID` | GitHub OAuth App Client ID |
+| `GITHUB_SECRET` | GitHub OAuth App Client Secret |
+| `TAVILY_API_KEY` | Tavily API key for web search |
+| `STRIPE_SECRET_KEY` | Stripe secret key for payments |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Stripe publishable key |
 
 **💡 Tip:** Run `npm run check-env` to validate your environment variables.
 
-**📚 Need help?** See [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md) for detailed setup instructions.
+**📚 Need help?**
+- Database setup: [DATABASE_SETUP.md](DATABASE_SETUP.md)
+- General environment setup: [SETUP_ENVIRONMENT.md](SETUP_ENVIRONMENT.md)
 
 ## 🔑 Setting Up Integrations
 
