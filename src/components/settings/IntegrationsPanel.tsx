@@ -22,6 +22,8 @@ import {
   ExternalLink,
   Loader2,
   Save,
+  Database,
+  Cloud,
 } from "lucide-react";
 
 interface IntegrationStatus {
@@ -29,16 +31,25 @@ interface IntegrationStatus {
   hasGithubToken: boolean;
   hasVercelToken: boolean;
   hasTavilyKey: boolean;
+  hasNeonKey: boolean;
+  hasNetlifyToken: boolean;
   openaiKey: string | null;
   githubToken: string | null;
   vercelToken: string | null;
   tavilyKey: string | null;
+  neonKey: string | null;
+  netlifyToken: string | null;
 }
 
 interface Integration {
   id: keyof Pick<
     Record<string, string>,
-    "openaiKey" | "githubToken" | "vercelToken" | "tavilyKey"
+    | "openaiKey"
+    | "githubToken"
+    | "vercelToken"
+    | "tavilyKey"
+    | "neonKey"
+    | "netlifyToken"
   >;
   title: string;
   description: string;
@@ -48,8 +59,14 @@ interface Integration {
   helpText: string;
   statusKey: keyof Pick<
     IntegrationStatus,
-    "hasOpenaiKey" | "hasGithubToken" | "hasVercelToken" | "hasTavilyKey"
+    | "hasOpenaiKey"
+    | "hasGithubToken"
+    | "hasVercelToken"
+    | "hasTavilyKey"
+    | "hasNeonKey"
+    | "hasNetlifyToken"
   >;
+  category: "ai-models" | "integrations" | "connectivity";
 }
 
 const integrations: Integration[] = [
@@ -62,6 +79,7 @@ const integrations: Integration[] = [
     helpUrl: "https://platform.openai.com/api-keys",
     helpText: "Get your API key from OpenAI Platform",
     statusKey: "hasOpenaiKey",
+    category: "ai-models",
   },
   {
     id: "githubToken",
@@ -72,6 +90,7 @@ const integrations: Integration[] = [
     helpUrl: "https://github.com/settings/tokens",
     helpText: "Create a Personal Access Token with repo scope",
     statusKey: "hasGithubToken",
+    category: "integrations",
   },
   {
     id: "vercelToken",
@@ -82,6 +101,18 @@ const integrations: Integration[] = [
     helpUrl: "https://vercel.com/account/tokens",
     helpText: "Generate an API token from your Vercel account",
     statusKey: "hasVercelToken",
+    category: "integrations",
+  },
+  {
+    id: "netlifyToken",
+    title: "Netlify",
+    description: "Deploy and host your projects on Netlify.",
+    icon: <Cloud className="h-5 w-5" />,
+    placeholder: "...",
+    helpUrl: "https://app.netlify.com/user/applications",
+    helpText: "Create a personal access token in Netlify",
+    statusKey: "hasNetlifyToken",
+    category: "integrations",
   },
   {
     id: "tavilyKey",
@@ -92,16 +123,34 @@ const integrations: Integration[] = [
     helpUrl: "https://app.tavily.com/home",
     helpText: "Get your API key from Tavily",
     statusKey: "hasTavilyKey",
+    category: "integrations",
+  },
+  {
+    id: "neonKey",
+    title: "Neon",
+    description: "Serverless PostgreSQL database connectivity.",
+    icon: <Database className="h-5 w-5" />,
+    placeholder: "...",
+    helpUrl: "https://neon.tech/docs/get-started-with-neon/api-keys",
+    helpText: "Get your API key from Neon console",
+    statusKey: "hasNeonKey",
+    category: "connectivity",
   },
 ];
 
-export default function IntegrationsPanel() {
+interface IntegrationsPanelProps {
+  filter?: "ai-models" | "integrations" | "connectivity";
+}
+
+export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
   const [values, setValues] = useState<Record<string, string>>({
     openaiKey: "",
     githubToken: "",
     vercelToken: "",
     tavilyKey: "",
+    neonKey: "",
+    netlifyToken: "",
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -118,6 +167,8 @@ export default function IntegrationsPanel() {
             githubToken: data.githubToken || "",
             vercelToken: data.vercelToken || "",
             tavilyKey: data.tavilyKey || "",
+            neonKey: data.neonKey || "",
+            netlifyToken: data.netlifyToken || "",
           });
         }
       } catch (error) {
@@ -150,6 +201,8 @@ export default function IntegrationsPanel() {
           githubToken: data.githubToken || "",
           vercelToken: data.vercelToken || "",
           tavilyKey: data.tavilyKey || "",
+          neonKey: data.neonKey || "",
+          netlifyToken: data.netlifyToken || "",
         });
       }
 
@@ -176,13 +229,13 @@ export default function IntegrationsPanel() {
     );
   }
 
+  // Filter integrations based on category
+  const filteredIntegrations = filter
+    ? integrations.filter((i) => i.category === filter)
+    : integrations;
+
   const connectedCount = status
-    ? [
-        status.hasOpenaiKey,
-        status.hasGithubToken,
-        status.hasVercelToken,
-        status.hasTavilyKey,
-      ].filter(Boolean).length
+    ? filteredIntegrations.filter((integration) => status[integration.statusKey]).length
     : 0;
 
   return (
@@ -190,9 +243,9 @@ export default function IntegrationsPanel() {
       {/* Summary */}
       <div className="flex items-center gap-3">
         <div className="text-sm text-muted-foreground">
-          {connectedCount} of {integrations.length} integrations configured
+          {connectedCount} of {filteredIntegrations.length} configured
         </div>
-        {connectedCount === integrations.length && (
+        {connectedCount === filteredIntegrations.length && (
           <Badge variant="default" className="bg-green-500">
             <CheckCircle2 className="h-3 w-3 mr-1" />
             All Connected
@@ -202,7 +255,7 @@ export default function IntegrationsPanel() {
 
       {/* Integration Cards */}
       <div className="space-y-4">
-        {integrations.map((integration) => {
+        {filteredIntegrations.map((integration) => {
           const isConnected = status?.[integration.statusKey] || false;
           return (
             <Card key={integration.id}>
@@ -273,7 +326,7 @@ export default function IntegrationsPanel() {
         ) : (
           <>
             <Save className="h-4 w-4" />
-            Save Integrations
+            Save Settings
           </>
         )}
       </Button>
