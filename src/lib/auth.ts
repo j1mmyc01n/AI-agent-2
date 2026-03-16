@@ -66,12 +66,15 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Email and password required");
         }
 
+        // Normalize email for consistent comparison
+        const normalizedEmail = credentials.email.trim().toLowerCase();
+
         // Test admin fallback for development when database is not configured
         if (!process.env.DATABASE_URL) {
           const testAdminEmail = "admin@test.com";
           const testAdminPassword = "admin123456";
 
-          if (credentials.email === testAdminEmail && credentials.password === testAdminPassword) {
+          if (normalizedEmail === testAdminEmail && credentials.password === testAdminPassword) {
             console.log("✅ Test admin login successful (no database required)");
             return {
               id: "test-admin-id",
@@ -85,8 +88,9 @@ export const authOptions: NextAuthOptions = {
         }
 
         try {
+          // Use normalized email for lookup
           const user = await db.user.findUnique({
-            where: { email: credentials.email },
+            where: { email: normalizedEmail },
           });
 
           if (!user || !user.password) {
