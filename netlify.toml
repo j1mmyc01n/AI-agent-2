@@ -1,6 +1,12 @@
 [build]
-  # Build without requiring environment variables - they can be set later in Netlify UI
-  command = "npm run build"
+  # Map Netlify Neon integration env vars to Prisma-expected names and push schema
+  command = """
+    if [ -z "$DATABASE_URL" ] && [ -n "$NETLIFY_DATABASE_URL" ]; then export DATABASE_URL="$NETLIFY_DATABASE_URL"; fi && \
+    if [ -z "$DIRECT_URL" ] && [ -n "$NETLIFY_DATABASE_URL_UNPOOLED" ]; then export DIRECT_URL="$NETLIFY_DATABASE_URL_UNPOOLED"; fi && \
+    npx prisma generate && \
+    npx prisma db push --skip-generate --accept-data-loss && \
+    next build
+  """
 
 [[plugins]]
   package = "@netlify/plugin-nextjs"

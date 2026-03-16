@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,7 +44,21 @@ export default function RegisterPage() {
         return;
       }
 
-      router.push("/login?registered=true");
+      // Auto-sign in after successful registration
+      const signInResult = await signIn("credentials", {
+        email,
+        password,
+        redirect: false,
+      });
+
+      if (signInResult?.error) {
+        // If auto-sign-in fails, redirect to login page with success message
+        router.push("/login?registered=true");
+      } else {
+        // Successfully signed in, go to main chat interface
+        router.push("/chat");
+        router.refresh();
+      }
     } catch {
       setError("An error occurred. Please try again.");
     } finally {
