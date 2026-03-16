@@ -37,11 +37,6 @@ export default function ChatInterface({
     string | undefined
   >(initialConversationId);
 
-  useEffect(() => {
-    setMessages(initialMessages);
-    setCurrentConversationId(initialConversationId);
-  }, [initialConversationId, initialMessages]);
-
   const sendMessage = useCallback(
     async (content: string) => {
       if (isLoading) return;
