@@ -4,9 +4,9 @@ import { Providers } from "./providers";
 import { Toaster } from "@/components/ui/toaster";
 
 export const metadata: Metadata = {
-  title: "AgentForge - AI SaaS Builder",
+  title: "DoBetter Viber - AI Agent",
   description:
-    "Build SaaS products and MVPs with AI. Search the web, create GitHub repos, and deploy to Vercel — all from a single chat interface.",
+    "Your AI vibe coding agent and task executioner. Build SaaS products with Claude, GPT-4, and Grok — all from a single interface.",
 };
 
 export default function RootLayout({

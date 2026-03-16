@@ -179,7 +179,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center max-w-md">
           <Bot className="h-16 w-16 text-primary/30 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Welcome to AgentForge</h2>
+          <h2 className="text-2xl font-bold mb-2">Welcome to DoBetter Viber</h2>
           <p className="text-muted-foreground mb-6">
             Your AI-powered SaaS builder. Describe what you want to build and I&apos;ll
             help you design, code, and deploy it.

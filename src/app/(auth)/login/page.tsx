@@ -68,7 +68,7 @@ function LoginForm() {
       <div className="w-full max-w-md">
         <div className="flex items-center justify-center gap-2 mb-8">
           <Bot className="h-8 w-8 text-primary" />
-          <span className="text-2xl font-bold">AgentForge</span>
+          <span className="text-2xl font-bold">DoBetter Viber</span>
         </div>
 
         <Card>

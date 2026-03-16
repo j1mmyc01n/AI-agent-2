@@ -61,7 +61,7 @@ export default async function ProjectsPage() {
               <FolderOpen className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
               <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
               <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                Start a chat with AgentForge and ask it to build a SaaS product
+                Start a chat with DoBetter Viber and ask it to build a SaaS product
                 or MVP. Projects will appear here once created.
               </p>
               <Link href="/chat">

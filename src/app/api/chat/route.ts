@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, getDatabaseUrl } from "@/lib/db";
-import { runAgent } from "@/lib/ai/agent";
+import { runAgent, type AIProvider } from "@/lib/ai/agent";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -15,18 +15,25 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { message, conversationId } = body;
+    const { message, conversationId, model, provider } = body as {
+      message: string;
+      conversationId?: string;
+      model?: string;
+      provider?: AIProvider;
+    };
 
     if (!message?.trim()) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
-    // Check if database is available (including Netlify variables)
+    // Check if database is available
     if (!getDatabaseUrl()) {
       return NextResponse.json(
         {
-          error: "Database not configured. Chat history cannot be saved. To use the chat feature with conversation history, please set up a DATABASE_URL.",
-          message: "The AI chat requires a database to store conversation history. See TEST_ADMIN.md for setup instructions."
+          error:
+            "Database not configured. Chat history cannot be saved. To use the chat feature with conversation history, please set up a DATABASE_URL.",
+          message:
+            "The AI chat requires a database to store conversation history. See TEST_ADMIN.md for setup instructions.",
         },
         { status: 503 }
       );
@@ -37,17 +44,36 @@ export async function POST(req: NextRequest) {
       where: { id: userId },
       select: {
         openaiKey: true,
+        anthropicKey: true,
+        grokKey: true,
         githubToken: true,
         vercelToken: true,
         tavilyKey: true,
       },
     });
 
-    const openaiKey = user?.openaiKey || process.env.OPENAI_API_KEY;
+    const activeProvider: AIProvider = provider || "openai";
 
-    if (!openaiKey) {
+    // Validate that the relevant API key exists
+    const openaiKey = user?.openaiKey || process.env.OPENAI_API_KEY;
+    const anthropicKey = user?.anthropicKey || process.env.ANTHROPIC_API_KEY;
+    const grokKey = user?.grokKey || process.env.GROK_API_KEY;
+
+    if (activeProvider === "openai" && !openaiKey) {
       return NextResponse.json(
-        { error: "No OpenAI API key configured. Please add one in Settings > Integrations." },
+        { error: "No OpenAI API key configured. Please add one in Settings > AI Models." },
+        { status: 400 }
+      );
+    }
+    if (activeProvider === "anthropic" && !anthropicKey) {
+      return NextResponse.json(
+        { error: "No Anthropic API key configured. Please add one in Settings > AI Models." },
+        { status: 400 }
+      );
+    }
+    if (activeProvider === "grok" && !grokKey) {
+      return NextResponse.json(
+        { error: "No Grok API key configured. Please add one in Settings > AI Models." },
         { status: 400 }
       );
     }
@@ -81,24 +107,24 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Update conversation title if it's still the default
-    if (conversation.title === "New Conversation" && conversation.messages?.length === 0) {
+    // Update title if default
+    if (
+      conversation.title === "New Conversation" &&
+      (!conversation.messages || conversation.messages.length === 0)
+    ) {
       await db.conversation.update({
         where: { id: conversation.id },
         data: { title: message.slice(0, 60) + (message.length > 60 ? "..." : "") },
       });
     }
 
-    // Build message history for OpenAI
+    // Build message history
     const history = (conversation.messages || []).map((m) => ({
       role: m.role as "user" | "assistant" | "system" | "tool",
       content: m.content,
     }));
-
-    // Add the new user message
     history.push({ role: "user", content: message });
 
-    // Create the streaming response
     const encoder = new TextEncoder();
     let fullResponse = "";
     const toolCallsData: { name: string; args: Record<string, unknown>; result: string }[] = [];
@@ -107,28 +133,29 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           await runAgent(
-            history, // Full history including the current user message
+            history,
             {
-              openaiKey,
+              openaiKey: openaiKey || undefined,
+              anthropicKey: anthropicKey || undefined,
+              grokKey: grokKey || undefined,
               githubToken: user?.githubToken || undefined,
               vercelToken: user?.vercelToken || undefined,
               tavilyKey: user?.tavilyKey || undefined,
               userId,
               conversationId: conversation.id,
+              model,
+              provider: activeProvider,
             },
-            // onChunk
             (chunk) => {
               fullResponse += chunk;
               const data = JSON.stringify({ type: "text", content: chunk });
               controller.enqueue(encoder.encode(`data: ${data}\n\n`));
             },
-            // onToolCall
             (toolName, args) => {
               toolCallsData.push({ name: toolName, args, result: "" });
               const data = JSON.stringify({ type: "tool_call", toolName, toolArgs: args });
               controller.enqueue(encoder.encode(`data: ${data}\n\n`));
             },
-            // onToolResult
             (toolName, result) => {
               const tc = toolCallsData.find((t) => t.name === toolName && !t.result);
               if (tc) tc.result = result;
@@ -137,7 +164,7 @@ export async function POST(req: NextRequest) {
             }
           );
 
-          // Save assistant message to DB
+          // Save assistant message
           await db.message.create({
             data: {
               conversationId: conversation.id,

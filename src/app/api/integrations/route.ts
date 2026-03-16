@@ -16,17 +16,20 @@ export async function GET() {
   }
   const userId = (session.user as { id: string }).id;
 
-  // If database is not configured (including Netlify variables), use session-stored keys
   if (!getDatabaseUrl()) {
-    const sessionData = session as any;
+    const sessionData = session as unknown as Record<string, unknown>;
     return NextResponse.json({
-      openaiKey: maskSecret(sessionData.openaiKey),
-      githubToken: maskSecret(sessionData.githubToken),
-      vercelToken: maskSecret(sessionData.vercelToken),
-      tavilyKey: maskSecret(sessionData.tavilyKey),
-      neonKey: maskSecret(sessionData.neonKey),
-      netlifyToken: maskSecret(sessionData.netlifyToken),
+      openaiKey: maskSecret(sessionData.openaiKey as string),
+      anthropicKey: maskSecret(sessionData.anthropicKey as string),
+      grokKey: maskSecret(sessionData.grokKey as string),
+      githubToken: maskSecret(sessionData.githubToken as string),
+      vercelToken: maskSecret(sessionData.vercelToken as string),
+      tavilyKey: maskSecret(sessionData.tavilyKey as string),
+      neonKey: maskSecret(sessionData.neonKey as string),
+      netlifyToken: maskSecret(sessionData.netlifyToken as string),
       hasOpenaiKey: !!sessionData.openaiKey,
+      hasAnthropicKey: !!sessionData.anthropicKey,
+      hasGrokKey: !!sessionData.grokKey,
       hasGithubToken: !!sessionData.githubToken,
       hasVercelToken: !!sessionData.vercelToken,
       hasTavilyKey: !!sessionData.tavilyKey,
@@ -40,6 +43,8 @@ export async function GET() {
       where: { id: userId },
       select: {
         openaiKey: true,
+        anthropicKey: true,
+        grokKey: true,
         githubToken: true,
         vercelToken: true,
         tavilyKey: true,
@@ -50,12 +55,16 @@ export async function GET() {
 
     return NextResponse.json({
       openaiKey: maskSecret(user?.openaiKey),
+      anthropicKey: maskSecret(user?.anthropicKey),
+      grokKey: maskSecret(user?.grokKey),
       githubToken: maskSecret(user?.githubToken),
       vercelToken: maskSecret(user?.vercelToken),
       tavilyKey: maskSecret(user?.tavilyKey),
       neonKey: maskSecret(user?.neonKey),
       netlifyToken: maskSecret(user?.netlifyToken),
       hasOpenaiKey: !!user?.openaiKey,
+      hasAnthropicKey: !!user?.anthropicKey,
+      hasGrokKey: !!user?.grokKey,
       hasGithubToken: !!user?.githubToken,
       hasVercelToken: !!user?.vercelToken,
       hasTavilyKey: !!user?.tavilyKey,
@@ -64,15 +73,18 @@ export async function GET() {
     });
   } catch (error) {
     console.error("Database error in GET /api/integrations:", error);
-    // Fallback to empty keys if database fails
     return NextResponse.json({
       openaiKey: null,
+      anthropicKey: null,
+      grokKey: null,
       githubToken: null,
       vercelToken: null,
       tavilyKey: null,
       neonKey: null,
       netlifyToken: null,
       hasOpenaiKey: false,
+      hasAnthropicKey: false,
+      hasGrokKey: false,
       hasGithubToken: false,
       hasVercelToken: false,
       hasTavilyKey: false,
@@ -90,38 +102,32 @@ export async function POST(req: NextRequest) {
   const userId = (session.user as { id: string }).id;
 
   const body = await req.json();
-  const { openaiKey, githubToken, vercelToken, tavilyKey, neonKey, netlifyToken } = body;
+  const { openaiKey, anthropicKey, grokKey, githubToken, vercelToken, tavilyKey, neonKey, netlifyToken } = body as Record<string, string | undefined>;
 
   const updateData: Record<string, string | null> = {};
 
-  // Only update fields that were explicitly provided (not masked values)
-  if (openaiKey !== undefined && !openaiKey.includes("••••")) {
-    updateData.openaiKey = openaiKey || null;
-  }
-  if (githubToken !== undefined && !githubToken.includes("••••")) {
-    updateData.githubToken = githubToken || null;
-  }
-  if (vercelToken !== undefined && !vercelToken.includes("••••")) {
-    updateData.vercelToken = vercelToken || null;
-  }
-  if (tavilyKey !== undefined && !tavilyKey.includes("••••")) {
-    updateData.tavilyKey = tavilyKey || null;
-  }
-  if (neonKey !== undefined && !neonKey.includes("••••")) {
-    updateData.neonKey = neonKey || null;
-  }
-  if (netlifyToken !== undefined && !netlifyToken.includes("••••")) {
-    updateData.netlifyToken = netlifyToken || null;
-  }
+  const shouldUpdate = (val: string | undefined) => val !== undefined && !val.includes("••••");
 
-  // If database is not configured (including Netlify variables), we cannot persist the keys
-  // Return a message informing the user
+  if (shouldUpdate(openaiKey)) updateData.openaiKey = openaiKey || null;
+  if (shouldUpdate(anthropicKey)) updateData.anthropicKey = anthropicKey || null;
+  if (shouldUpdate(grokKey)) updateData.grokKey = grokKey || null;
+  if (shouldUpdate(githubToken)) updateData.githubToken = githubToken || null;
+  if (shouldUpdate(vercelToken)) updateData.vercelToken = vercelToken || null;
+  if (shouldUpdate(tavilyKey)) updateData.tavilyKey = tavilyKey || null;
+  if (shouldUpdate(neonKey)) updateData.neonKey = neonKey || null;
+  if (shouldUpdate(netlifyToken)) updateData.netlifyToken = netlifyToken || null;
+
   if (!getDatabaseUrl()) {
-    return NextResponse.json({
-      success: false,
-      error: "Database not configured. API keys cannot be persisted. Please set up a DATABASE_URL to save your integrations permanently.",
-      message: "To use AI features, you'll need to set up a database. See TEST_ADMIN.md for instructions."
-    }, { status: 503 });
+    return NextResponse.json(
+      {
+        success: false,
+        error:
+          "Database not configured. API keys cannot be persisted. Please set up a DATABASE_URL to save your integrations permanently.",
+        message:
+          "To use AI features, you'll need to set up a database. See TEST_ADMIN.md for instructions.",
+      },
+      { status: 503 }
+    );
   }
 
   try {
@@ -129,10 +135,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Database error in POST /api/integrations:", error);
-    return NextResponse.json({
-      success: false,
-      error: "Failed to save integrations to database",
-      message: "Database connection failed. Please check your DATABASE_URL configuration."
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        success: false,
+        error: "Failed to save integrations to database",
+        message: "Database connection failed. Please check your DATABASE_URL configuration.",
+      },
+      { status: 500 }
+    );
   }
 }

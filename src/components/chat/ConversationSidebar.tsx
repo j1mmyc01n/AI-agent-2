@@ -153,12 +153,12 @@ export default function ConversationSidebar({
   };
 
   return (
-    <div className="flex flex-col h-full bg-muted/30 border-r">
+    <div className="flex flex-col h-full bg-background border-r shadow-sm">
       {/* Header */}
       <div className={`p-3 border-b ${collapsed ? "px-2" : ""}`}>
         <Link href="/" className={`flex items-center gap-2 px-2 py-1 mb-2 ${collapsed ? "justify-center" : ""}`}>
           <Bot className="h-6 w-6 text-primary flex-shrink-0" />
-          {!collapsed && <span className="font-semibold text-lg truncate">AgentForge</span>}
+          {!collapsed && <span className="font-bold text-lg truncate bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">DoBetter Viber</span>}
         </Link>
         {!collapsed && (
           <Link href="/chat">

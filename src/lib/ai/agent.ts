@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import Anthropic from "@anthropic-ai/sdk";
 import type { ChatCompletionMessageFunctionToolCall } from "openai/resources/chat/completions";
 import { tools } from "./tools";
 import { SYSTEM_PROMPT } from "./prompts";
@@ -11,13 +12,19 @@ import {
 import { createProject as createVercelProject } from "@/lib/integrations/vercel";
 import { db } from "@/lib/db";
 
+export type AIProvider = "openai" | "anthropic" | "grok";
+
 interface AgentConfig {
-  openaiKey: string;
+  openaiKey?: string;
+  anthropicKey?: string;
+  grokKey?: string;
   githubToken?: string;
   vercelToken?: string;
   tavilyKey?: string;
   userId: string;
   conversationId: string;
+  model?: string;
+  provider?: AIProvider;
 }
 
 interface MessageParam {
@@ -27,20 +34,32 @@ interface MessageParam {
   tool_calls?: ChatCompletionMessageFunctionToolCall[];
 }
 
-export async function runAgent(
+// Convert OpenAI-style tools to Anthropic tools
+function toAnthropicTools(): Anthropic.Tool[] {
+  return tools
+    .filter((tool): tool is { type: "function"; function: { name: string; description?: string; parameters?: Record<string, unknown> } } =>
+      tool.type === "function" && "function" in tool && typeof (tool as { function?: unknown }).function === "object"
+    )
+    .map((tool) => ({
+      name: tool.function.name,
+      description: tool.function.description || "",
+      input_schema: (tool.function.parameters || {}) as Anthropic.Tool.InputSchema,
+    }));
+}
+
+async function runOpenAIAgent(
   messages: MessageParam[],
   config: AgentConfig,
   onChunk: (chunk: string) => void,
   onToolCall: (toolName: string, args: Record<string, unknown>) => void,
-  onToolResult: (toolName: string, result: string) => void
+  onToolResult: (toolName: string, result: string) => void,
+  apiKey: string,
+  baseURL?: string
 ): Promise<string> {
-  const openai = new OpenAI({ apiKey: config.openaiKey });
+  const openai = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
+  const model = config.model || (baseURL ? "grok-2-latest" : "gpt-4o");
 
-  const systemMessage: MessageParam = {
-    role: "system",
-    content: SYSTEM_PROMPT,
-  };
-
+  const systemMessage: MessageParam = { role: "system", content: SYSTEM_PROMPT };
   const allMessages: MessageParam[] = [systemMessage, ...messages];
 
   let finalResponse = "";
@@ -48,7 +67,7 @@ export async function runAgent(
 
   while (continueLoop) {
     const stream = await openai.chat.completions.create({
-      model: "gpt-4o",
+      model,
       messages: allMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
       tools,
       tool_choice: "auto",
@@ -58,10 +77,7 @@ export async function runAgent(
 
     let currentContent = "";
     let toolCalls: ChatCompletionMessageFunctionToolCall[] = [];
-    const toolCallAccumulator: Record<
-      number,
-      { id: string; name: string; arguments: string }
-    > = {};
+    const toolCallAccumulator: Record<number, { id: string; name: string; arguments: string }> = {};
 
     for await (const chunk of stream) {
       const delta = chunk.choices[0]?.delta;
@@ -73,25 +89,14 @@ export async function runAgent(
       }
 
       if (delta?.tool_calls) {
-        for (const toolCallDelta of delta.tool_calls) {
-          const idx = toolCallDelta.index;
+        for (const tc of delta.tool_calls) {
+          const idx = tc.index;
           if (!toolCallAccumulator[idx]) {
-            toolCallAccumulator[idx] = {
-              id: toolCallDelta.id ?? "",
-              name: toolCallDelta.function?.name ?? "",
-              arguments: "",
-            };
+            toolCallAccumulator[idx] = { id: tc.id ?? "", name: tc.function?.name ?? "", arguments: "" };
           }
-          if (toolCallDelta.id) {
-            toolCallAccumulator[idx].id = toolCallDelta.id;
-          }
-          if (toolCallDelta.function?.name) {
-            toolCallAccumulator[idx].name = toolCallDelta.function.name;
-          }
-          if (toolCallDelta.function?.arguments) {
-            toolCallAccumulator[idx].arguments +=
-              toolCallDelta.function.arguments;
-          }
+          if (tc.id) toolCallAccumulator[idx].id = tc.id;
+          if (tc.function?.name) toolCallAccumulator[idx].name = tc.function.name;
+          if (tc.function?.arguments) toolCallAccumulator[idx].arguments += tc.function.arguments;
         }
       }
 
@@ -104,14 +109,8 @@ export async function runAgent(
       }
     }
 
-    // Add assistant message to history
-    const assistantMessage: MessageParam = {
-      role: "assistant",
-      content: currentContent,
-    };
-    if (toolCalls.length > 0) {
-      assistantMessage.tool_calls = toolCalls;
-    }
+    const assistantMessage: MessageParam = { role: "assistant", content: currentContent };
+    if (toolCalls.length > 0) assistantMessage.tool_calls = toolCalls;
     allMessages.push(assistantMessage);
 
     if (toolCalls.length === 0) {
@@ -120,35 +119,135 @@ export async function runAgent(
       for (const toolCall of toolCalls) {
         const toolName = toolCall.function.name;
         let args: Record<string, unknown> = {};
-
-        try {
-          args = JSON.parse(toolCall.function.arguments);
-        } catch {
-          args = {};
-        }
+        try { args = JSON.parse(toolCall.function.arguments); } catch { args = {}; }
 
         onToolCall(toolName, args);
-
         let toolResult = "";
-
-        try {
-          toolResult = await executeToolCall(toolName, args, config);
-        } catch (error) {
+        try { toolResult = await executeToolCall(toolName, args, config); } catch (error) {
           toolResult = `Error executing ${toolName}: ${error instanceof Error ? error.message : "Unknown error"}`;
         }
-
         onToolResult(toolName, toolResult);
-
-        allMessages.push({
-          role: "tool",
-          content: toolResult,
-          tool_call_id: toolCall.id,
-        });
+        allMessages.push({ role: "tool", content: toolResult, tool_call_id: toolCall.id });
       }
     }
   }
 
   return finalResponse;
+}
+
+async function runAnthropicAgent(
+  messages: MessageParam[],
+  config: AgentConfig,
+  onChunk: (chunk: string) => void,
+  onToolCall: (toolName: string, args: Record<string, unknown>) => void,
+  onToolResult: (toolName: string, result: string) => void,
+  apiKey: string
+): Promise<string> {
+  const anthropic = new Anthropic({ apiKey });
+  const model = config.model || "claude-3-5-sonnet-20241022";
+  const anthropicTools = toAnthropicTools();
+
+  type AnthropicMessage = Anthropic.MessageParam;
+  const allMessages: AnthropicMessage[] = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.content })) as AnthropicMessage[];
+
+  let finalResponse = "";
+  let continueLoop = true;
+
+  while (continueLoop) {
+    const stream = await anthropic.messages.create({
+      model,
+      system: SYSTEM_PROMPT,
+      messages: allMessages,
+      tools: anthropicTools,
+      max_tokens: 4096,
+      stream: true,
+    });
+
+    let currentContent = "";
+    const toolUses: { id: string; name: string; input: Record<string, unknown> }[] = [];
+    let currentToolUse: { id: string; name: string; inputJson: string } | null = null;
+
+    for await (const event of stream) {
+      if (event.type === "content_block_start") {
+        if (event.content_block.type === "tool_use") {
+          currentToolUse = { id: event.content_block.id, name: event.content_block.name, inputJson: "" };
+        }
+      } else if (event.type === "content_block_delta") {
+        if (event.delta.type === "text_delta") {
+          currentContent += event.delta.text;
+          onChunk(event.delta.text);
+          finalResponse += event.delta.text;
+        } else if (event.delta.type === "input_json_delta" && currentToolUse) {
+          currentToolUse.inputJson += event.delta.partial_json;
+        }
+      } else if (event.type === "content_block_stop") {
+        if (currentToolUse) {
+          let input: Record<string, unknown> = {};
+          try { input = JSON.parse(currentToolUse.inputJson); } catch { input = {}; }
+          toolUses.push({ id: currentToolUse.id, name: currentToolUse.name, input });
+          currentToolUse = null;
+        }
+      }
+    }
+
+    // Add assistant turn
+    const assistantContent: Anthropic.MessageParam["content"] = [];
+    if (currentContent) (assistantContent as { type: string; text: string }[]).push({ type: "text", text: currentContent });
+    for (const tu of toolUses) {
+      (assistantContent as { type: string; id: string; name: string; input: Record<string, unknown> }[]).push({ type: "tool_use", id: tu.id, name: tu.name, input: tu.input });
+    }
+    allMessages.push({ role: "assistant", content: assistantContent });
+
+    if (toolUses.length === 0) {
+      continueLoop = false;
+    } else {
+      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      for (const tu of toolUses) {
+        onToolCall(tu.name, tu.input);
+        let result = "";
+        try { result = await executeToolCall(tu.name, tu.input, config); } catch (error) {
+          result = `Error executing ${tu.name}: ${error instanceof Error ? error.message : "Unknown error"}`;
+        }
+        onToolResult(tu.name, result);
+        toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: result });
+      }
+      allMessages.push({ role: "user", content: toolResults });
+    }
+  }
+
+  return finalResponse;
+}
+
+export async function runAgent(
+  messages: MessageParam[],
+  config: AgentConfig,
+  onChunk: (chunk: string) => void,
+  onToolCall: (toolName: string, args: Record<string, unknown>) => void,
+  onToolResult: (toolName: string, result: string) => void
+): Promise<string> {
+  const provider = config.provider || "openai";
+
+  if (provider === "anthropic") {
+    if (!config.anthropicKey) {
+      throw new Error("No Anthropic API key configured. Please add one in Settings > AI Models.");
+    }
+    return runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, config.anthropicKey);
+  }
+
+  if (provider === "grok") {
+    if (!config.grokKey) {
+      throw new Error("No Grok API key configured. Please add one in Settings > AI Models.");
+    }
+    return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
+  }
+
+  // Default: OpenAI
+  if (!config.openaiKey) {
+    throw new Error("No OpenAI API key configured. Please add one in Settings > AI Models.");
+  }
+  return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.openaiKey);
 }
 
 async function executeToolCall(
