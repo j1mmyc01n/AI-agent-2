@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 
 function maskSecret(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -16,8 +16,8 @@ export async function GET() {
   }
   const userId = (session.user as { id: string }).id;
 
-  // If database is not configured, use session-stored keys
-  if (!process.env.DATABASE_URL) {
+  // If database is not configured (including Netlify variables), use session-stored keys
+  if (!getDatabaseUrl()) {
     const sessionData = session as any;
     return NextResponse.json({
       openaiKey: maskSecret(sessionData.openaiKey),
@@ -94,9 +94,9 @@ export async function POST(req: NextRequest) {
     updateData.tavilyKey = tavilyKey || null;
   }
 
-  // If database is not configured, we cannot persist the keys
+  // If database is not configured (including Netlify variables), we cannot persist the keys
   // Return a message informing the user
-  if (!process.env.DATABASE_URL) {
+  if (!getDatabaseUrl()) {
     return NextResponse.json({
       success: false,
       error: "Database not configured. API keys cannot be persisted. Please set up a DATABASE_URL to save your integrations permanently.",

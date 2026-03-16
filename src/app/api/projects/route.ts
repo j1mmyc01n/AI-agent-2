@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -10,8 +10,8 @@ export async function GET() {
   }
   const userId = (session.user as { id: string }).id;
 
-  // If database is not configured, return empty array
-  if (!process.env.DATABASE_URL) {
+  // If database is not configured (including Netlify variables), return empty array
+  if (!getDatabaseUrl()) {
     return NextResponse.json([]);
   }
 
@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Project name is required" }, { status: 400 });
   }
 
-  // If database is not configured, cannot save project
-  if (!process.env.DATABASE_URL) {
+  // If database is not configured (including Netlify variables), cannot save project
+  if (!getDatabaseUrl()) {
     return NextResponse.json(
       {
         error: "Database not configured. Projects cannot be saved.",

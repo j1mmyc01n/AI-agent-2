@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcryptjs from "bcryptjs";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 
 export async function POST(req: NextRequest) {
   try {
-    // Check if database is configured
-    if (!process.env.DATABASE_URL) {
+    // Check if database is configured (including Netlify variables)
+    if (!getDatabaseUrl()) {
       return NextResponse.json(
         { error: "Database is not configured. Please contact the administrator." },
         { status: 503 }

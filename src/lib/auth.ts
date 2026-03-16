@@ -3,7 +3,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import bcryptjs from "bcryptjs";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 
 // Only validate environment variables at runtime, not during build
 const isBuild = process.env.NEXT_PHASE === "phase-production-build";
@@ -35,8 +35,8 @@ if (!isBuild && process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_U
 }
 
 export const authOptions: NextAuthOptions = {
-  // Only use PrismaAdapter if DATABASE_URL is configured
-  adapter: process.env.DATABASE_URL ? (PrismaAdapter(db) as NextAuthOptions["adapter"]) : undefined,
+  // Only use PrismaAdapter if database URL is configured (including Netlify variables)
+  adapter: getDatabaseUrl() ? (PrismaAdapter(db) as NextAuthOptions["adapter"]) : undefined,
   session: {
     strategy: "jwt",
   },
@@ -70,7 +70,7 @@ export const authOptions: NextAuthOptions = {
         const normalizedEmail = credentials.email.trim().toLowerCase();
 
         // Test admin fallback for development when database is not configured
-        if (!process.env.DATABASE_URL) {
+        if (!getDatabaseUrl()) {
           const testAdminEmail = "admin@test.com";
           const testAdminPassword = "admin123456";
 

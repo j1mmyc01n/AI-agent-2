@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 
 export async function GET(
   _req: NextRequest,
@@ -14,8 +14,8 @@ export async function GET(
   const userId = (session.user as { id: string }).id;
   const { id } = await params;
 
-  // If database is not configured, return not found
-  if (!process.env.DATABASE_URL) {
+  // If database is not configured (including Netlify variables), return not found
+  if (!getDatabaseUrl()) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
@@ -47,8 +47,8 @@ export async function DELETE(
   const userId = (session.user as { id: string }).id;
   const { id } = await params;
 
-  // If database is not configured, cannot delete
-  if (!process.env.DATABASE_URL) {
+  // If database is not configured (including Netlify variables), cannot delete
+  if (!getDatabaseUrl()) {
     return NextResponse.json(
       { error: "Database not configured" },
       { status: 503 }
