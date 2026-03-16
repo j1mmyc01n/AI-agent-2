@@ -33,10 +33,12 @@ interface Conversation {
 
 interface ConversationSidebarProps {
   currentConversationId?: string;
+  collapsed?: boolean;
 }
 
 export default function ConversationSidebar({
   currentConversationId,
+  collapsed = false,
 }: ConversationSidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -153,86 +155,104 @@ export default function ConversationSidebar({
   return (
     <div className="flex flex-col h-full bg-muted/30 border-r">
       {/* Header */}
-      <div className="p-3 border-b">
-        <Link href="/" className="flex items-center gap-2 px-2 py-1 mb-2">
-          <Bot className="h-6 w-6 text-primary" />
-          <span className="font-semibold text-lg">AgentForge</span>
+      <div className={`p-3 border-b ${collapsed ? "px-2" : ""}`}>
+        <Link href="/" className={`flex items-center gap-2 px-2 py-1 mb-2 ${collapsed ? "justify-center" : ""}`}>
+          <Bot className="h-6 w-6 text-primary flex-shrink-0" />
+          {!collapsed && <span className="font-semibold text-lg truncate">AgentForge</span>}
         </Link>
-        <Link href="/chat">
-          <Button variant="outline" className="w-full justify-start gap-2">
-            <MessageSquarePlus className="h-4 w-4" />
-            New Chat
-          </Button>
-        </Link>
+        {!collapsed && (
+          <Link href="/chat">
+            <Button variant="outline" className="w-full justify-start gap-2">
+              <MessageSquarePlus className="h-4 w-4 flex-shrink-0" />
+              New Chat
+            </Button>
+          </Link>
+        )}
+        {collapsed && (
+          <Link href="/chat">
+            <Button variant="outline" size="icon" className="w-full">
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Conversations */}
-      <ScrollArea className="flex-1 py-2">
-        {loading ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            Loading...
-          </div>
-        ) : conversations.length === 0 ? (
-          <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-            No conversations yet.
-            <br />
-            Start a new chat!
-          </div>
-        ) : (
-          <div>
-            {renderConversationGroup("Today", today)}
-            {renderConversationGroup("Yesterday", yesterday)}
-            {renderConversationGroup("Older", older)}
-          </div>
-        )}
-      </ScrollArea>
+      {!collapsed && (
+        <ScrollArea className="flex-1 py-2">
+          {loading ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              Loading...
+            </div>
+          ) : conversations.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+              No conversations yet.
+              <br />
+              Start a new chat!
+            </div>
+          ) : (
+            <div>
+              {renderConversationGroup("Today", today)}
+              {renderConversationGroup("Yesterday", yesterday)}
+              {renderConversationGroup("Older", older)}
+            </div>
+          )}
+        </ScrollArea>
+      )}
 
       {/* Main Navigation */}
-      <div className="px-3 py-2 border-b">
+      <div className={`px-3 py-2 border-b ${collapsed ? "px-2" : ""}`}>
         <div className="space-y-1">
           <Link href="/workspace">
             <Button
               variant="ghost"
-              className={`w-full justify-start gap-2 ${
+              className={`w-full gap-2 ${
                 pathname === "/workspace" ? "bg-accent" : ""
-              }`}
+              } ${collapsed ? "justify-center px-2" : "justify-start"}`}
+              size={collapsed ? "icon" : "default"}
             >
-              <LayoutDashboard className="h-4 w-4" />
-              Workspace
+              <LayoutDashboard className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">Workspace</span>}
             </Button>
           </Link>
           <Link href="/projects">
             <Button
               variant="ghost"
-              className={`w-full justify-start gap-2 ${
+              className={`w-full gap-2 ${
                 pathname === "/projects" ? "bg-accent" : ""
-              }`}
+              } ${collapsed ? "justify-center px-2" : "justify-start"}`}
+              size={collapsed ? "icon" : "default"}
             >
-              <FolderOpen className="h-4 w-4" />
-              Projects
+              <FolderOpen className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">Projects</span>}
             </Button>
           </Link>
         </div>
       </div>
 
       {/* Footer Nav */}
-      <div className="p-3 border-t space-y-1">
+      <div className={`p-3 border-t space-y-1 ${collapsed ? "px-2" : ""}`}>
         <Link href="/settings">
           <Button
             variant="ghost"
-            className={`w-full justify-start gap-2 ${
+            className={`w-full gap-2 ${
               pathname === "/settings" ? "bg-accent" : ""
-            }`}
+            } ${collapsed ? "justify-center px-2" : "justify-start"}`}
+            size={collapsed ? "icon" : "default"}
           >
-            <Settings className="h-4 w-4" />
-            Settings
+            <Settings className="h-4 w-4 flex-shrink-0" />
+            {!collapsed && <span className="truncate">Settings</span>}
           </Button>
         </Link>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="w-full justify-start gap-2">
-              <User className="h-4 w-4" />
-              Profile
+            <Button
+              variant="ghost"
+              className={`w-full gap-2 ${collapsed ? "justify-center px-2" : "justify-start"}`}
+              size={collapsed ? "icon" : "default"}
+            >
+              <User className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">Profile</span>}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
