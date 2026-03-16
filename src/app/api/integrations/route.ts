@@ -24,10 +24,14 @@ export async function GET() {
       githubToken: maskSecret(sessionData.githubToken),
       vercelToken: maskSecret(sessionData.vercelToken),
       tavilyKey: maskSecret(sessionData.tavilyKey),
+      neonKey: maskSecret(sessionData.neonKey),
+      netlifyToken: maskSecret(sessionData.netlifyToken),
       hasOpenaiKey: !!sessionData.openaiKey,
       hasGithubToken: !!sessionData.githubToken,
       hasVercelToken: !!sessionData.vercelToken,
       hasTavilyKey: !!sessionData.tavilyKey,
+      hasNeonKey: !!sessionData.neonKey,
+      hasNetlifyToken: !!sessionData.netlifyToken,
     });
   }
 
@@ -39,6 +43,8 @@ export async function GET() {
         githubToken: true,
         vercelToken: true,
         tavilyKey: true,
+        neonKey: true,
+        netlifyToken: true,
       },
     });
 
@@ -47,10 +53,14 @@ export async function GET() {
       githubToken: maskSecret(user?.githubToken),
       vercelToken: maskSecret(user?.vercelToken),
       tavilyKey: maskSecret(user?.tavilyKey),
+      neonKey: maskSecret(user?.neonKey),
+      netlifyToken: maskSecret(user?.netlifyToken),
       hasOpenaiKey: !!user?.openaiKey,
       hasGithubToken: !!user?.githubToken,
       hasVercelToken: !!user?.vercelToken,
       hasTavilyKey: !!user?.tavilyKey,
+      hasNeonKey: !!user?.neonKey,
+      hasNetlifyToken: !!user?.netlifyToken,
     });
   } catch (error) {
     console.error("Database error in GET /api/integrations:", error);
@@ -60,10 +70,14 @@ export async function GET() {
       githubToken: null,
       vercelToken: null,
       tavilyKey: null,
+      neonKey: null,
+      netlifyToken: null,
       hasOpenaiKey: false,
       hasGithubToken: false,
       hasVercelToken: false,
       hasTavilyKey: false,
+      hasNeonKey: false,
+      hasNetlifyToken: false,
     });
   }
 }
@@ -76,7 +90,7 @@ export async function POST(req: NextRequest) {
   const userId = (session.user as { id: string }).id;
 
   const body = await req.json();
-  const { openaiKey, githubToken, vercelToken, tavilyKey } = body;
+  const { openaiKey, githubToken, vercelToken, tavilyKey, neonKey, netlifyToken } = body;
 
   const updateData: Record<string, string | null> = {};
 
@@ -92,6 +106,12 @@ export async function POST(req: NextRequest) {
   }
   if (tavilyKey !== undefined && !tavilyKey.includes("••••")) {
     updateData.tavilyKey = tavilyKey || null;
+  }
+  if (neonKey !== undefined && !neonKey.includes("••••")) {
+    updateData.neonKey = neonKey || null;
+  }
+  if (netlifyToken !== undefined && !netlifyToken.includes("••••")) {
+    updateData.netlifyToken = netlifyToken || null;
   }
 
   // If database is not configured (including Netlify variables), we cannot persist the keys

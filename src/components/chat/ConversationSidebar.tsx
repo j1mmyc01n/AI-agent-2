@@ -21,6 +21,7 @@ import {
   Bot,
   LogOut,
   User,
+  LayoutDashboard,
 } from "lucide-react";
 
 interface Conversation {
@@ -186,19 +187,36 @@ export default function ConversationSidebar({
         )}
       </ScrollArea>
 
+      {/* Main Navigation */}
+      <div className="px-3 py-2 border-b">
+        <div className="space-y-1">
+          <Link href="/workspace">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                pathname === "/workspace" ? "bg-accent" : ""
+              }`}
+            >
+              <LayoutDashboard className="h-4 w-4" />
+              Workspace
+            </Button>
+          </Link>
+          <Link href="/projects">
+            <Button
+              variant="ghost"
+              className={`w-full justify-start gap-2 ${
+                pathname === "/projects" ? "bg-accent" : ""
+              }`}
+            >
+              <FolderOpen className="h-4 w-4" />
+              Projects
+            </Button>
+          </Link>
+        </div>
+      </div>
+
       {/* Footer Nav */}
       <div className="p-3 border-t space-y-1">
-        <Link href="/projects">
-          <Button
-            variant="ghost"
-            className={`w-full justify-start gap-2 ${
-              pathname === "/projects" ? "bg-accent" : ""
-            }`}
-          >
-            <FolderOpen className="h-4 w-4" />
-            Projects
-          </Button>
-        </Link>
         <Link href="/settings">
           <Button
             variant="ghost"
@@ -214,10 +232,16 @@ export default function ConversationSidebar({
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" className="w-full justify-start gap-2">
               <User className="h-4 w-4" />
-              Account
+              Profile
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+            <DropdownMenuItem asChild>
+              <Link href="/profile" className="flex items-center cursor-pointer">
+                <User className="mr-2 h-4 w-4" />
+                View Profile
+              </Link>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>
               <LogOut className="mr-2 h-4 w-4" />
               Sign out

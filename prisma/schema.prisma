@@ -20,6 +20,8 @@ model User {
   vercelToken      String?
   openaiKey        String?
   tavilyKey        String?
+  neonKey          String?
+  netlifyToken     String?
   stripeCustomerId String?
   accounts         Account[]
   sessions         Session[]
