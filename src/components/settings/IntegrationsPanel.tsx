@@ -24,16 +24,21 @@ import {
   Save,
   Database,
   Cloud,
+  Cpu,
 } from "lucide-react";
 
 interface IntegrationStatus {
   hasOpenaiKey: boolean;
+  hasAnthropicKey: boolean;
+  hasGrokKey: boolean;
   hasGithubToken: boolean;
   hasVercelToken: boolean;
   hasTavilyKey: boolean;
   hasNeonKey: boolean;
   hasNetlifyToken: boolean;
   openaiKey: string | null;
+  anthropicKey: string | null;
+  grokKey: string | null;
   githubToken: string | null;
   vercelToken: string | null;
   tavilyKey: string | null;
@@ -41,31 +46,37 @@ interface IntegrationStatus {
   netlifyToken: string | null;
 }
 
+type StatusKey = keyof Pick<
+  IntegrationStatus,
+  | "hasOpenaiKey"
+  | "hasAnthropicKey"
+  | "hasGrokKey"
+  | "hasGithubToken"
+  | "hasVercelToken"
+  | "hasTavilyKey"
+  | "hasNeonKey"
+  | "hasNetlifyToken"
+>;
+
+type ValueKey =
+  | "openaiKey"
+  | "anthropicKey"
+  | "grokKey"
+  | "githubToken"
+  | "vercelToken"
+  | "tavilyKey"
+  | "neonKey"
+  | "netlifyToken";
+
 interface Integration {
-  id: keyof Pick<
-    Record<string, string>,
-    | "openaiKey"
-    | "githubToken"
-    | "vercelToken"
-    | "tavilyKey"
-    | "neonKey"
-    | "netlifyToken"
-  >;
+  id: ValueKey;
   title: string;
   description: string;
   icon: React.ReactNode;
   placeholder: string;
   helpUrl: string;
   helpText: string;
-  statusKey: keyof Pick<
-    IntegrationStatus,
-    | "hasOpenaiKey"
-    | "hasGithubToken"
-    | "hasVercelToken"
-    | "hasTavilyKey"
-    | "hasNeonKey"
-    | "hasNetlifyToken"
-  >;
+  statusKey: StatusKey;
   category: "ai-models" | "integrations" | "connectivity";
 }
 
@@ -73,12 +84,34 @@ const integrations: Integration[] = [
   {
     id: "openaiKey",
     title: "OpenAI",
-    description: "Powers the AI agent. Required for all AI features.",
+    description: "Powers GPT-4o, GPT-4 Turbo, and GPT-3.5. Required for OpenAI models.",
     icon: <Bot className="h-5 w-5" />,
     placeholder: "sk-...",
     helpUrl: "https://platform.openai.com/api-keys",
     helpText: "Get your API key from OpenAI Platform",
     statusKey: "hasOpenaiKey",
+    category: "ai-models",
+  },
+  {
+    id: "anthropicKey",
+    title: "Anthropic (Claude)",
+    description: "Powers Claude 3.5 Sonnet, Claude 3 Opus and Haiku models.",
+    icon: <Cpu className="h-5 w-5" />,
+    placeholder: "sk-ant-...",
+    helpUrl: "https://console.anthropic.com/settings/keys",
+    helpText: "Get your API key from Anthropic Console",
+    statusKey: "hasAnthropicKey",
+    category: "ai-models",
+  },
+  {
+    id: "grokKey",
+    title: "xAI (Grok)",
+    description: "Powers Grok 2 and Grok Beta from xAI.",
+    icon: <Zap className="h-5 w-5" />,
+    placeholder: "xai-...",
+    helpUrl: "https://console.x.ai/",
+    helpText: "Get your API key from xAI Console",
+    statusKey: "hasGrokKey",
     category: "ai-models",
   },
   {
@@ -138,20 +171,24 @@ const integrations: Integration[] = [
   },
 ];
 
+const emptyValues: Record<ValueKey, string> = {
+  openaiKey: "",
+  anthropicKey: "",
+  grokKey: "",
+  githubToken: "",
+  vercelToken: "",
+  tavilyKey: "",
+  neonKey: "",
+  netlifyToken: "",
+};
+
 interface IntegrationsPanelProps {
   filter?: "ai-models" | "integrations" | "connectivity";
 }
 
 export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
   const [status, setStatus] = useState<IntegrationStatus | null>(null);
-  const [values, setValues] = useState<Record<string, string>>({
-    openaiKey: "",
-    githubToken: "",
-    vercelToken: "",
-    tavilyKey: "",
-    neonKey: "",
-    netlifyToken: "",
-  });
+  const [values, setValues] = useState<Record<ValueKey, string>>(emptyValues);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -164,6 +201,8 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
           setStatus(data);
           setValues({
             openaiKey: data.openaiKey || "",
+            anthropicKey: data.anthropicKey || "",
+            grokKey: data.grokKey || "",
             githubToken: data.githubToken || "",
             vercelToken: data.vercelToken || "",
             tavilyKey: data.tavilyKey || "",
@@ -191,13 +230,14 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
 
       if (!res.ok) throw new Error("Failed to save");
 
-      // Refresh status
       const statusRes = await fetch("/api/integrations");
       if (statusRes.ok) {
         const data = await statusRes.json();
         setStatus(data);
         setValues({
           openaiKey: data.openaiKey || "",
+          anthropicKey: data.anthropicKey || "",
+          grokKey: data.grokKey || "",
           githubToken: data.githubToken || "",
           vercelToken: data.vercelToken || "",
           tavilyKey: data.tavilyKey || "",
@@ -207,13 +247,13 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
       }
 
       toast({
-        title: "Integrations saved",
+        title: "Settings saved",
         description: "Your API keys have been securely saved.",
       });
     } catch {
       toast({
         title: "Error",
-        description: "Failed to save integrations. Please try again.",
+        description: "Failed to save settings. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -229,13 +269,12 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
     );
   }
 
-  // Filter integrations based on category
   const filteredIntegrations = filter
     ? integrations.filter((i) => i.category === filter)
     : integrations;
 
   const connectedCount = status
-    ? filteredIntegrations.filter((integration) => status[integration.statusKey]).length
+    ? filteredIntegrations.filter((i) => status[i.statusKey]).length
     : 0;
 
   return (
@@ -245,7 +284,7 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
         <div className="text-sm text-muted-foreground">
           {connectedCount} of {filteredIntegrations.length} configured
         </div>
-        {connectedCount === filteredIntegrations.length && (
+        {connectedCount === filteredIntegrations.length && filteredIntegrations.length > 0 && (
           <Badge variant="default" className="bg-green-500">
             <CheckCircle2 className="h-3 w-3 mr-1" />
             All Connected
@@ -262,9 +301,7 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-muted">
-                      {integration.icon}
-                    </div>
+                    <div className="p-2 rounded-lg bg-muted">{integration.icon}</div>
                     <div>
                       <CardTitle className="text-base">{integration.title}</CardTitle>
                       <CardDescription className="text-xs mt-0.5">
@@ -272,7 +309,10 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
                       </CardDescription>
                     </div>
                   </div>
-                  <Badge variant={isConnected ? "default" : "outline"} className={isConnected ? "bg-green-500" : ""}>
+                  <Badge
+                    variant={isConnected ? "default" : "outline"}
+                    className={isConnected ? "bg-green-500" : ""}
+                  >
                     {isConnected ? (
                       <>
                         <CheckCircle2 className="h-3 w-3 mr-1" />
@@ -294,10 +334,7 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
                   placeholder={isConnected ? "••••••••••••" : integration.placeholder}
                   value={values[integration.id]}
                   onChange={(e) =>
-                    setValues((prev) => ({
-                      ...prev,
-                      [integration.id]: e.target.value,
-                    }))
+                    setValues((prev) => ({ ...prev, [integration.id]: e.target.value }))
                   }
                   className="font-mono text-sm"
                 />
@@ -331,10 +368,9 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
         )}
       </Button>
 
-      {/* Info */}
       <p className="text-xs text-muted-foreground text-center">
-        Your API keys are encrypted and stored securely. They are only used to
-        make API calls on your behalf.
+        Your API keys are encrypted and stored securely. They are only used to make API calls on
+        your behalf.
       </p>
     </div>
   );

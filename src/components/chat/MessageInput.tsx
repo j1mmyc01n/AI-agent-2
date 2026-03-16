@@ -4,27 +4,39 @@ import { useRef, useState, KeyboardEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { SendHorizonal } from "lucide-react";
+import ModelSelector, { AIModel, DEFAULT_MODEL } from "./ModelSelector";
 
 interface MessageInputProps {
-  onSend: (message: string) => void;
+  onSend: (message: string, model: AIModel) => void;
   isLoading?: boolean;
   disabled?: boolean;
   placeholder?: string;
+  selectedModel?: AIModel;
+  onModelChange?: (model: AIModel) => void;
 }
 
 export default function MessageInput({
   onSend,
   isLoading = false,
   disabled = false,
-  placeholder = "Message AgentForge... (Enter to send, Shift+Enter for new line)",
+  placeholder = "Message DoBetter Viber... (Enter to send, Shift+Enter for new line)",
+  selectedModel,
+  onModelChange,
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
+  const [internalModel, setInternalModel] = useState<AIModel>(DEFAULT_MODEL);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const activeModel = selectedModel ?? internalModel;
+  const handleModelChange = (model: AIModel) => {
+    setInternalModel(model);
+    onModelChange?.(model);
+  };
 
   const handleSend = () => {
     const trimmed = message.trim();
     if (!trimmed || isLoading || disabled) return;
-    onSend(trimmed);
+    onSend(trimmed, activeModel);
     setMessage("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
@@ -49,29 +61,36 @@ export default function MessageInput({
   return (
     <div className="border-t bg-background p-4">
       <div className="max-w-3xl mx-auto">
-        <div className="flex gap-2 items-end bg-muted/50 border rounded-xl p-2">
-          <Textarea
-            ref={textareaRef}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onInput={handleInput}
-            placeholder={placeholder}
-            disabled={isLoading || disabled}
-            rows={1}
-            className="flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] max-h-[200px] py-2 px-1 text-sm"
-          />
-          <Button
-            onClick={handleSend}
-            disabled={!message.trim() || isLoading || disabled}
-            size="icon"
-            className="h-9 w-9 shrink-0 rounded-lg"
-          >
-            <SendHorizonal className="h-4 w-4" />
-          </Button>
+        <div className="flex flex-col bg-muted/50 border rounded-xl p-2 gap-2">
+          {/* Model selector row */}
+          <div className="flex items-center gap-2 px-1">
+            <ModelSelector selectedModel={activeModel} onSelect={handleModelChange} />
+          </div>
+          {/* Input row */}
+          <div className="flex gap-2 items-end">
+            <Textarea
+              ref={textareaRef}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onInput={handleInput}
+              placeholder={placeholder}
+              disabled={isLoading || disabled}
+              rows={1}
+              className="flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] max-h-[200px] py-2 px-1 text-sm"
+            />
+            <Button
+              onClick={handleSend}
+              disabled={!message.trim() || isLoading || disabled}
+              size="icon"
+              className="h-9 w-9 shrink-0 rounded-lg"
+            >
+              <SendHorizonal className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground text-center mt-2">
-          AgentForge can make mistakes. Verify important information.
+          DoBetter Viber can make mistakes. Verify important information.
         </p>
       </div>
     </div>

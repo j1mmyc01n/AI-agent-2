@@ -22,6 +22,8 @@ model User {
   tavilyKey        String?
   neonKey          String?
   netlifyToken     String?
+  anthropicKey     String?
+  grokKey          String?
   stripeCustomerId String?
   accounts         Account[]
   sessions         Session[]
