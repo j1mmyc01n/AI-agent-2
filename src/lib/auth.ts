@@ -2,36 +2,64 @@ import { NextAuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import GitHubProvider from "next-auth/providers/github";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { createHash } from "crypto";
 import bcryptjs from "bcryptjs";
 import { db, getDatabaseUrl } from "@/lib/db";
 
 // Only validate environment variables at runtime, not during build
 const isBuild = process.env.NEXT_PHASE === "phase-production-build";
 
-// Provide development fallback for NEXTAUTH_SECRET if not set
-// In production, NextAuth will fail gracefully if not configured
-const nextAuthSecret = process.env.NEXTAUTH_SECRET ||
-  (process.env.NODE_ENV === "development"
-    ? "development-secret-change-in-production-min-32-chars-long"
-    : undefined);
-
-if (!isBuild && !process.env.NEXTAUTH_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    console.error("❌ ERROR: NEXTAUTH_SECRET environment variable is not set!");
-    console.error("Authentication will NOT work without it.");
-    console.error("Generate one with: openssl rand -base64 32");
-    console.error("Add it to your Netlify environment variables!");
-  } else {
-    console.warn("⚠️ WARNING: NEXTAUTH_SECRET not set, using development fallback.");
-    console.warn("Generate a proper secret with: openssl rand -base64 32");
+/**
+ * Derive a stable NEXTAUTH_SECRET from available Netlify environment variables.
+ * This ensures auth works even when NEXTAUTH_SECRET is not explicitly set,
+ * by generating a deterministic secret from the site's unique identifiers.
+ */
+function getNextAuthSecret(): string | undefined {
+  if (process.env.NEXTAUTH_SECRET) {
+    return process.env.NEXTAUTH_SECRET;
   }
+
+  if (process.env.NODE_ENV === "development" || (!isBuild && !process.env.NODE_ENV)) {
+    return "development-secret-change-in-production-min-32-chars-long";
+  }
+
+  // Derive a stable secret from Netlify environment variables
+  const siteId = process.env.SITE_ID;
+  const dbUrl = getDatabaseUrl();
+  if (siteId) {
+    const seed = `nextauth-secret-${siteId}-${dbUrl || "no-db"}`;
+    return createHash("sha256").update(seed).digest("hex");
+  }
+
+  return undefined;
 }
 
-// Warn if NEXTAUTH_URL is missing in production but don't throw
-if (!isBuild && process.env.NODE_ENV === "production" && !process.env.NEXTAUTH_URL) {
-  console.warn("⚠️ WARNING: NEXTAUTH_URL environment variable is not set!");
-  console.warn("OAuth redirects may not work correctly.");
-  console.warn("Set it to your Netlify site URL (e.g., https://dobetteragent2.netlify.app)");
+const nextAuthSecret = getNextAuthSecret();
+
+if (!isBuild && !nextAuthSecret) {
+  console.warn("⚠️ WARNING: NEXTAUTH_SECRET could not be determined.");
+  console.warn("Set NEXTAUTH_SECRET in your Netlify environment variables.");
+  console.warn("Generate one with: openssl rand -base64 32");
+}
+
+/**
+ * Auto-detect the site URL from Netlify environment variables.
+ * Priority: NEXTAUTH_URL > URL > DEPLOY_PRIME_URL > DEPLOY_URL
+ */
+function getNextAuthUrl(): string | undefined {
+  return (
+    process.env.NEXTAUTH_URL ||
+    process.env.URL ||
+    process.env.DEPLOY_PRIME_URL ||
+    process.env.DEPLOY_URL
+  );
+}
+
+const nextAuthUrl = getNextAuthUrl();
+
+// Set NEXTAUTH_URL in the environment so NextAuth can pick it up
+if (nextAuthUrl && !process.env.NEXTAUTH_URL) {
+  process.env.NEXTAUTH_URL = nextAuthUrl;
 }
 
 export const authOptions: NextAuthOptions = {
