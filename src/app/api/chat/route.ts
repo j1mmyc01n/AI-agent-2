@@ -76,7 +76,6 @@ export async function POST(req: NextRequest) {
       name?: string | null;
       openaiKey?: string | null;
       anthropicKey?: string | null;
-      grokKey?: string | null;
       githubToken?: string | null;
       vercelToken?: string | null;
       tavilyKey?: string | null;
@@ -102,7 +101,6 @@ export async function POST(req: NextRequest) {
             name: true,
             openaiKey: true,
             anthropicKey: true,
-            grokKey: true,
             githubToken: true,
             vercelToken: true,
             tavilyKey: true,
@@ -142,7 +140,6 @@ export async function POST(req: NextRequest) {
           user = {
             openaiKey: blobKeys.openaiKey || null,
             anthropicKey: blobKeys.anthropicKey || null,
-            grokKey: blobKeys.grokKey || null,
             githubToken: blobKeys.githubToken || null,
             vercelToken: blobKeys.vercelToken || null,
             tavilyKey: blobKeys.tavilyKey || null,
@@ -164,25 +161,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve API keys - check user settings, then env vars (Netlify AI Gateway auto-injects these)
+    // Resolve API keys - Netlify AI Gateway auto-injects these env vars, no user keys needed
     const openaiKey = user?.openaiKey || process.env.OPENAI_API_KEY;
     const anthropicKey = user?.anthropicKey || process.env.ANTHROPIC_API_KEY;
-    const grokKey = user?.grokKey || process.env.GROK_API_KEY;
 
-    // Auto-detect best available provider: prefer requested, then fallback to whatever is available
+    // Auto-detect best available provider: prefer requested, then fallback
     let activeProvider: AIProvider = provider || "anthropic";
     if (activeProvider === "openai" && !openaiKey) {
-      activeProvider = anthropicKey ? "anthropic" : grokKey ? "grok" : "openai";
+      activeProvider = anthropicKey ? "anthropic" : "openai";
     } else if (activeProvider === "anthropic" && !anthropicKey) {
-      activeProvider = openaiKey ? "openai" : grokKey ? "grok" : "anthropic";
-    } else if (activeProvider === "grok" && !grokKey) {
-      activeProvider = anthropicKey ? "anthropic" : openaiKey ? "openai" : "grok";
+      activeProvider = openaiKey ? "openai" : "anthropic";
     }
 
-    // Final check - at least one provider must be available
-    if (!openaiKey && !anthropicKey && !grokKey) {
+    // Netlify AI Gateway provides keys automatically - only error if truly nothing available
+    if (!openaiKey && !anthropicKey) {
       return NextResponse.json(
-        { error: "No AI provider configured. Netlify AI Gateway should provide Claude automatically. If this persists, add an API key in Settings > AI Models." },
+        { error: "No AI provider available. Netlify AI Gateway should provide Claude and GPT automatically. If this persists, the site may need a production deploy to activate AI Gateway." },
         { status: 400 }
       );
     }
@@ -316,7 +310,6 @@ export async function POST(req: NextRequest) {
             {
               openaiKey: openaiKey || undefined,
               anthropicKey: anthropicKey || undefined,
-              grokKey: grokKey || undefined,
               githubToken: user?.githubToken || undefined,
               vercelToken: user?.vercelToken || undefined,
               tavilyKey: user?.tavilyKey || undefined,

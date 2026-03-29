@@ -97,7 +97,8 @@ function getAgentStatusFromToolCalls(streamingToolCalls: { name: string; args: R
   switch (lastTool) {
     case "web_search": return "searching";
     case "create_github_repo":
-    case "push_code_to_github": return "coding";
+    case "push_code_to_github":
+    case "save_artifact": return "coding";
     case "create_vercel_project": return "deploying";
     case "create_project_record": return "saving";
     default: return "thinking";
@@ -143,6 +144,7 @@ export default function ChatInterface({
   const [agentStatus, setAgentStatus] = useState<AgentStatus>("idle");
   const [chatMode, setChatMode] = useState<ChatMode>("chat");
   const [workflowTodos, setWorkflowTodos] = useState<TodoItem[]>([]);
+  const [agentTodos, setAgentTodos] = useState<TodoItem[]>([]);
   const [defaultModelLoaded, setDefaultModelLoaded] = useState(false);
   const streamingContentRef = useRef("");
 
@@ -155,7 +157,6 @@ export default function ChatInterface({
         if (!res.ok) return;
         const data = await res.json();
 
-        // Check for saved default model preference
         if (data.defaultModel && data.defaultProvider) {
           const provider = AI_PROVIDERS.find(p => p.id === data.defaultProvider);
           const model = provider?.models.find(m => m.id === data.defaultModel);
@@ -166,15 +167,11 @@ export default function ChatInterface({
           }
         }
 
-        // Auto-detect: pick the first provider that has a key configured
         if (data.hasAnthropicKey) {
           setSelectedModel(AI_PROVIDERS.find(p => p.id === "anthropic")!.models[0]);
         } else if (data.hasOpenaiKey) {
           setSelectedModel(AI_PROVIDERS.find(p => p.id === "openai")!.models[0]);
-        } else if (data.hasGrokKey) {
-          setSelectedModel(AI_PROVIDERS.find(p => p.id === "grok")!.models[0]);
         }
-        // If none configured, keep default (Anthropic - available via Netlify AI Gateway)
       } catch {
         // Ignore - use default
       }
@@ -183,21 +180,21 @@ export default function ChatInterface({
     loadDefaultModel();
   }, [defaultModelLoaded]);
 
-  // Auto-switch to code/preview tab when code is generated in build mode
+  // Extract code blocks and todos from messages
   const codeBlocks = extractCodeBlocks(messages);
   const chatTodos = extractTodos(messages);
-  // Merge workflow todos with chat-extracted todos
-  const todos = workflowTodos.length > 0 ? workflowTodos : chatTodos;
+  // Merge: agent-generated activity todos + workflow parsed todos + chat-extracted todos
+  const todos = agentTodos.length > 0 ? agentTodos : workflowTodos.length > 0 ? workflowTodos : chatTodos;
   const hasPreviewableCode = codeBlocks.some(
     (b) => b.language === "html" || b.language === "css" || b.language === "javascript" || b.language === "js"
   );
   const prevCodeCount = useRef(0);
 
+  // Auto-switch panels when code appears in build mode
   useEffect(() => {
     if (codeBlocks.length > 0 && codeBlocks.length !== prevCodeCount.current) {
       prevCodeCount.current = codeBlocks.length;
       if (chatMode === "build") {
-        // In build mode, auto-switch to code panel, then preview when previewable
         if (hasPreviewableCode) {
           setActivePanel("preview");
         } else {
@@ -206,13 +203,6 @@ export default function ChatInterface({
       }
     }
   }, [codeBlocks.length, hasPreviewableCode, chatMode]);
-
-  // Auto-switch to tasks when they appear in build mode
-  useEffect(() => {
-    if (chatMode === "build" && todos.length > 0 && activePanel === "chat" && codeBlocks.length === 0) {
-      setActivePanel("todo");
-    }
-  }, [chatMode, todos.length, activePanel, codeBlocks.length]);
 
   // Parse streaming content for workflow tasks in real-time
   const parseWorkflowTasks = useCallback((content: string) => {
@@ -239,6 +229,78 @@ export default function ChatInterface({
     }
   }, []);
 
+  // Generate activity-based tasks from agent status changes
+  const updateAgentTasks = useCallback((status: AgentStatus, toolName?: string, content?: string) => {
+    setAgentTodos(prev => {
+      const tasks = [...prev];
+
+      // Auto-generate tasks based on what the agent is doing
+      if (status === "thinking" && tasks.length === 0 && content) {
+        // First thinking phase - create initial tasks
+        return [
+          { id: "agent-1", title: "Analyzing your request", status: "in-progress" },
+          { id: "agent-2", title: "Planning implementation", status: "pending" },
+          { id: "agent-3", title: "Generating code", status: "pending" },
+          { id: "agent-4", title: "Saving project files", status: "pending" },
+        ];
+      }
+
+      if (status === "searching") {
+        // Mark analysis done, add search task
+        const updated = tasks.map(t => {
+          if (t.id === "agent-1") return { ...t, status: "done" as const };
+          return t;
+        });
+        const hasSearch = updated.some(t => t.title.includes("Searching"));
+        if (!hasSearch) {
+          const insertIdx = updated.findIndex(t => t.status === "pending");
+          if (insertIdx >= 0) {
+            updated.splice(insertIdx, 0, { id: `agent-search-${Date.now()}`, title: "Searching the web for context", status: "in-progress" });
+          }
+        }
+        return updated;
+      }
+
+      if (status === "coding") {
+        return tasks.map(t => {
+          if (t.title.includes("Searching")) return { ...t, status: "done" as const };
+          if (t.title.includes("Analyzing")) return { ...t, status: "done" as const };
+          if (t.title.includes("Planning")) return { ...t, status: "done" as const };
+          if (t.title.includes("Generating code")) return { ...t, status: "in-progress" as const };
+          return t;
+        });
+      }
+
+      if (status === "saving") {
+        return tasks.map(t => {
+          if (t.title.includes("Generating code")) return { ...t, status: "done" as const };
+          if (t.title.includes("Saving")) return { ...t, status: "in-progress" as const };
+          return t;
+        });
+      }
+
+      if (status === "idle") {
+        // Complete all tasks
+        return tasks.map(t => ({ ...t, status: "done" as const }));
+      }
+
+      // When we detect code blocks in streaming content, update code task
+      if (content && content.includes("```")) {
+        const codeBlockCount = (content.match(/```\w/g) || []).length;
+        if (codeBlockCount > 0) {
+          return tasks.map(t => {
+            if (t.title.includes("Analyzing")) return { ...t, status: "done" as const };
+            if (t.title.includes("Planning")) return { ...t, status: "done" as const };
+            if (t.title.includes("Generating code")) return { ...t, status: "in-progress" as const, description: `${codeBlockCount} file${codeBlockCount > 1 ? "s" : ""} generated` };
+            return t;
+          });
+        }
+      }
+
+      return tasks;
+    });
+  }, []);
+
   const sendMessage = useCallback(
     async (content: string, model: AIModel) => {
       if (isLoading) return;
@@ -254,10 +316,10 @@ export default function ChatInterface({
       setIsLoading(true);
       setAgentStatus("thinking");
       streamingContentRef.current = "";
-
-      // In build mode, immediately switch to tasks panel
+      // Reset agent todos for new messages in build mode
       if (shouldBuild) {
-        setActivePanel("todo");
+        setAgentTodos([]);
+        setWorkflowTodos([]);
       }
 
       try {
@@ -298,6 +360,11 @@ export default function ChatInterface({
         ]);
         setIsLoading(false);
 
+        // In build mode, start tracking tasks immediately
+        if (shouldBuild) {
+          updateAgentTasks("thinking", undefined, content);
+        }
+
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -334,15 +401,8 @@ export default function ChatInterface({
                 // Parse tasks in real-time during build mode
                 if (shouldBuild) {
                   parseWorkflowTasks(streamingContentRef.current);
-                }
-
-                // Auto-switch to code panel when code blocks start appearing
-                if (shouldBuild && chunk.content.includes("```") && activePanel === "todo") {
-                  // Check if we now have code blocks
-                  const currentContent = streamingContentRef.current;
-                  if (currentContent.split("```").length > 2) {
-                    setActivePanel("code");
-                  }
+                  // Update agent tasks based on streaming content
+                  updateAgentTasks("thinking", undefined, streamingContentRef.current);
                 }
               } else if (chunk.type === "tool_call") {
                 const newTc = { name: chunk.toolName, args: chunk.toolArgs };
@@ -350,6 +410,11 @@ export default function ChatInterface({
 
                 const status = getAgentStatusFromToolCalls([newTc]);
                 setAgentStatus(status);
+
+                // Update tasks based on tool calls
+                if (shouldBuild) {
+                  updateAgentTasks(status, chunk.toolName);
+                }
 
                 setMessages((prev) =>
                   prev.map((m) =>
@@ -374,6 +439,12 @@ export default function ChatInterface({
                 setCurrentConversationId(chunk.conversationId);
                 if (chunk.previewUrl) setPreviewUrl(chunk.previewUrl);
                 setAgentStatus("idle");
+
+                // Complete all agent tasks
+                if (shouldBuild) {
+                  updateAgentTasks("idle");
+                }
+
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMessageId
@@ -426,6 +497,11 @@ export default function ChatInterface({
         setAgentStatus("idle");
         setMessages((prev) => prev.filter((m) => !m.isStreaming));
 
+        // Clear agent tasks on error
+        if (chatMode === "build") {
+          setAgentTodos([]);
+        }
+
         const errorMsg = error instanceof Error ? error.message : "An error occurred";
         toast({
           title: "Error",
@@ -434,7 +510,7 @@ export default function ChatInterface({
         });
       }
     },
-    [isLoading, currentConversationId, initialConversationId, projectId, messages, chatMode, activePanel, parseWorkflowTasks]
+    [isLoading, currentConversationId, initialConversationId, projectId, messages, chatMode, parseWorkflowTasks, updateAgentTasks]
   );
 
   const panelTabs = [
@@ -537,7 +613,7 @@ export default function ChatInterface({
               placeholder={
                 chatMode === "build"
                   ? "Describe what you want to build... (code will appear in Code & Preview tabs)"
-                  : "Chat about your project, ask questions, suggest features..."
+                  : "Chat about your project, ask questions, or describe what to build..."
               }
             />
           </div>
@@ -545,7 +621,6 @@ export default function ChatInterface({
         {activePanel === "code" && (
           <div className="flex flex-col h-full min-h-0">
             <CodePanel codeBlocks={codeBlocks} />
-            {/* Input at bottom of code panel too for build mode */}
             <MessageInput
               onSend={sendMessage}
               isLoading={isLoading}
@@ -558,7 +633,7 @@ export default function ChatInterface({
         {activePanel === "todo" && (
           <div className="flex flex-col h-full min-h-0">
             <div className="flex-1 min-h-0 overflow-hidden">
-              <TodoPanel todos={todos} />
+              <TodoPanel todos={todos} agentStatus={agentStatus} />
             </div>
             <MessageInput
               onSend={sendMessage}

@@ -13,7 +13,7 @@ import { createProject as createVercelProject } from "@/lib/integrations/vercel"
 import { db, getDatabaseUrl } from "@/lib/db";
 import { getStore } from "@netlify/blobs";
 
-export type AIProvider = "openai" | "anthropic" | "grok";
+export type AIProvider = "openai" | "anthropic";
 
 interface ProjectContext {
   projects?: { id: string; name: string; description?: string | null; type: string; status: string; githubRepo?: string | null; vercelUrl?: string | null }[];
@@ -28,7 +28,6 @@ interface ProjectContext {
 interface AgentConfig {
   openaiKey?: string;
   anthropicKey?: string;
-  grokKey?: string;
   githubToken?: string;
   vercelToken?: string;
   tavilyKey?: string;
@@ -62,7 +61,7 @@ function toAnthropicTools(): Anthropic.Tool[] {
 /**
  * Detect available AI provider based on environment variables.
  * Netlify AI Gateway auto-injects ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL
- * and OPENAI_API_KEY/OPENAI_BASE_URL.
+ * and OPENAI_API_KEY/OPENAI_BASE_URL — no user API keys required.
  */
 function detectAvailableProvider(config: AgentConfig): { provider: AIProvider; apiKey?: string; baseURL?: string } | null {
   // Check Anthropic (preferred - available via Netlify AI Gateway)
@@ -71,15 +70,10 @@ function detectAvailableProvider(config: AgentConfig): { provider: AIProvider; a
     return { provider: "anthropic", apiKey: anthropicKey, baseURL: process.env.ANTHROPIC_BASE_URL };
   }
 
-  // Check OpenAI
+  // Check OpenAI (also available via Netlify AI Gateway)
   const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
   if (openaiKey) {
     return { provider: "openai", apiKey: openaiKey, baseURL: process.env.OPENAI_BASE_URL };
-  }
-
-  // Check Grok
-  if (config.grokKey) {
-    return { provider: "grok", apiKey: config.grokKey, baseURL: "https://api.x.ai/v1" };
   }
 
   return null;
@@ -94,16 +88,16 @@ async function runOpenAIAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use zero-config constructor if env vars are set (Netlify AI Gateway),
-  // otherwise pass explicit credentials
+  // Use zero-config constructor for Netlify AI Gateway (env vars auto-injected),
+  // otherwise pass explicit credentials for user-provided keys
   const envKey = process.env.OPENAI_API_KEY;
   const envBase = process.env.OPENAI_BASE_URL;
-  const openai = (envKey && envBase && apiKey === envKey)
+  const useGateway = !!(envKey && envBase && apiKey === envKey);
+  const openai = useGateway
     ? new OpenAI()
     : new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
-  // For Grok, use grok model; otherwise use the configured or default OpenAI model
-  const model = config.model || (config.provider === "grok" ? "grok-2-latest" : "gpt-4o");
+  const model = config.model || "gpt-4o";
 
   const systemPrompt = buildSystemPrompt(config.projectContext);
   const systemMessage: MessageParam = { role: "system", content: systemPrompt };
@@ -191,11 +185,12 @@ async function runAnthropicAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use zero-config constructor if env vars are set (Netlify AI Gateway),
-  // otherwise pass explicit credentials
+  // Use zero-config constructor for Netlify AI Gateway (env vars auto-injected),
+  // otherwise pass explicit credentials for user-provided keys
   const envKey = process.env.ANTHROPIC_API_KEY;
   const envBase = process.env.ANTHROPIC_BASE_URL;
-  const anthropic = (envKey && envBase && apiKey === envKey)
+  const useGateway = !!(envKey && envBase && apiKey === envKey);
+  const anthropic = useGateway
     ? new Anthropic()
     : new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
@@ -301,18 +296,12 @@ export async function runAgent(
         return await runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, openaiKey, process.env.OPENAI_BASE_URL);
       }
     }
-
-    if (requestedProvider === "grok") {
-      if (config.grokKey) {
-        return await runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
-      }
-    }
   } catch (error) {
     console.error(`Failed with requested provider ${requestedProvider}:`, error);
     // Fall through to auto-detect
   }
 
-  // Auto-detect available provider as fallback
+  // Auto-detect available provider as fallback (Netlify AI Gateway injects keys automatically)
   const detected = detectAvailableProvider(config);
   if (detected) {
     try {
@@ -327,8 +316,8 @@ export async function runAgent(
   }
 
   throw new Error(
-    "No AI provider configured. The platform uses Netlify AI Gateway which provides Claude automatically. " +
-    "If you need a different provider, add API keys in Settings > AI Models."
+    "No AI provider available. Netlify AI Gateway provides Claude and GPT automatically — no API keys needed. " +
+    "If this error persists, the site may need a production deploy to activate AI Gateway."
   );
 }
 

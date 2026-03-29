@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ListTodo, CheckCircle2, Circle, Clock, SkipForward, X, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import { ListTodo, CheckCircle2, Circle, Clock, SkipForward, X, ChevronDown, ChevronUp, Loader2, Brain, Code2, Sparkles } from "lucide-react";
 
 export interface TodoItem {
   id: string;
@@ -13,8 +13,11 @@ export interface TodoItem {
   description?: string;
 }
 
+type AgentStatus = "idle" | "thinking" | "coding" | "searching" | "deploying" | "saving";
+
 interface TodoPanelProps {
   todos?: TodoItem[];
+  agentStatus?: AgentStatus;
 }
 
 const statusConfig = {
@@ -24,7 +27,7 @@ const statusConfig = {
   skipped: { icon: SkipForward, label: "Skipped", color: "text-yellow-500", badge: "outline" as const, bg: "" },
 };
 
-export default function TodoPanel({ todos: initialTodos = [] }: TodoPanelProps) {
+export default function TodoPanel({ todos: initialTodos = [], agentStatus = "idle" }: TodoPanelProps) {
   const [localOverrides, setLocalOverrides] = useState<Record<string, "skipped">>({});
   const [showSkipped, setShowSkipped] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -63,7 +66,55 @@ export default function TodoPanel({ todos: initialTodos = [] }: TodoPanelProps) 
     });
   };
 
+  // Show active agent status even when there are no parsed tasks
   if (initialTodos.length === 0) {
+    if (agentStatus !== "idle") {
+      // Agent is working but no tasks parsed yet - show activity indicator
+      return (
+        <ScrollArea className="h-full">
+          <div className="p-4 space-y-4">
+            <div className="rounded-lg border p-4 bg-muted/30">
+              <div className="flex items-center gap-3 mb-3">
+                {agentStatus === "thinking" && <Brain className="h-5 w-5 text-primary animate-pulse" />}
+                {agentStatus === "coding" && <Code2 className="h-5 w-5 text-primary animate-pulse" />}
+                {agentStatus === "searching" && <Sparkles className="h-5 w-5 text-primary animate-pulse" />}
+                {(agentStatus === "deploying" || agentStatus === "saving") && <Loader2 className="h-5 w-5 text-primary animate-spin" />}
+                <div>
+                  <p className="text-sm font-medium">
+                    {agentStatus === "thinking" && "Agent is analyzing your request..."}
+                    {agentStatus === "coding" && "Agent is writing code..."}
+                    {agentStatus === "searching" && "Agent is searching the web..."}
+                    {agentStatus === "deploying" && "Agent is deploying..."}
+                    {agentStatus === "saving" && "Agent is saving your project..."}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Tasks will appear here as the agent plans and executes work
+                  </p>
+                </div>
+              </div>
+              {/* Activity pulse animation */}
+              <div className="flex gap-1.5 mt-2">
+                {[0, 1, 2, 3, 4].map((i) => (
+                  <div
+                    key={i}
+                    className="h-1.5 flex-1 rounded-full bg-primary/20 overflow-hidden"
+                  >
+                    <div
+                      className="h-full bg-primary rounded-full animate-pulse"
+                      style={{
+                        animationDelay: `${i * 200}ms`,
+                        width: `${60 + Math.random() * 40}%`,
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </ScrollArea>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 p-6">
         <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">

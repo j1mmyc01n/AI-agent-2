@@ -239,8 +239,8 @@ export async function POST(req: NextRequest) {
   const openaiKey = userKeys.openaiKey ?? process.env.OPENAI_API_KEY;
   const anthropicKey = userKeys.anthropicKey ?? process.env.ANTHROPIC_API_KEY;
 
-  // Auto-detect provider: prefer requested, then fallback to available
-  let activeProvider = provider || (anthropicKey ? "anthropic" : "openai");
+  // Auto-detect provider: prefer Anthropic (always available via Netlify AI Gateway)
+  let activeProvider = provider || (anthropicKey ? "anthropic" : openaiKey ? "openai" : "anthropic");
   if (activeProvider === "openai" && !openaiKey && anthropicKey) {
     activeProvider = "anthropic";
   } else if (activeProvider === "anthropic" && !anthropicKey && openaiKey) {
@@ -257,16 +257,12 @@ export async function POST(req: NextRequest) {
     if (activeProvider === "anthropic") {
       if (!anthropicKey) {
         return NextResponse.json(
-          { error: "No AI provider configured. Netlify AI Gateway should provide Claude automatically." },
+          { error: "No AI provider available. Netlify AI Gateway should provide Claude automatically — no API keys needed." },
           { status: 400 }
         );
       }
-      // Use zero-config constructor when env vars match (Netlify AI Gateway)
-      const envKey = process.env.ANTHROPIC_API_KEY;
-      const envBase = process.env.ANTHROPIC_BASE_URL;
-      const anthropic = (envKey && envBase && anthropicKey === envKey)
-        ? new Anthropic()
-        : new Anthropic({ apiKey: anthropicKey, ...(process.env.ANTHROPIC_BASE_URL ? { baseURL: process.env.ANTHROPIC_BASE_URL } : {}) });
+      // Use zero-config constructor for Netlify AI Gateway
+      const anthropic = new Anthropic();
       usedModel = model ?? "claude-sonnet-4-5";
       const response = await anthropic.messages.create({
         model: usedModel,
@@ -283,16 +279,12 @@ export async function POST(req: NextRequest) {
       // Default: OpenAI
       if (!openaiKey) {
         return NextResponse.json(
-          { error: "No AI provider configured. Netlify AI Gateway should provide Claude automatically." },
+          { error: "No AI provider available. Netlify AI Gateway should provide models automatically — no API keys needed." },
           { status: 400 }
         );
       }
-      // Use zero-config constructor when env vars match (Netlify AI Gateway)
-      const envOaiKey = process.env.OPENAI_API_KEY;
-      const envOaiBase = process.env.OPENAI_BASE_URL;
-      const openai = (envOaiKey && envOaiBase && openaiKey === envOaiKey)
-        ? new OpenAI()
-        : new OpenAI({ apiKey: openaiKey, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) });
+      // Use zero-config constructor for Netlify AI Gateway
+      const openai = new OpenAI();
       usedModel = model ?? "gpt-4o";
       const response = await openai.chat.completions.create({
         model: usedModel,
