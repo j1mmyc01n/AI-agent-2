@@ -29,6 +29,7 @@ model User {
   sessions         Session[]
   conversations    Conversation[]
   projects         Project[]
+  generations      Generation[]
 }
 
 model Account {
@@ -86,15 +87,31 @@ model Message {
 }
 
 model Project {
-  id          String   @id @default(cuid())
+  id          String       @id @default(cuid())
   name        String
   description String?
   userId      String
-  status      String   @default("active")
+  status      String       @default("active")
   githubRepo  String?
   vercelUrl   String?
-  type        String   @default("saas")
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String       @default("saas")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  generations Generation[]
+}
+
+model Generation {
+  id         String   @id @default(cuid())
+  projectId  String?
+  userId     String
+  template   String
+  prompt     String
+  output     String   @db.Text
+  status     String   @default("completed")
+  model      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  project    Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }

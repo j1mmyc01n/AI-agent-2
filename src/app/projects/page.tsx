@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import MainLayout from "@/components/layout/MainLayout";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,10 +32,27 @@ export default async function ProjectsPage() {
 
   const userId = (session.user as { id: string }).id;
 
-  const projects = await db.project.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-  });
+  let projects: {
+    id: string;
+    name: string;
+    description: string | null;
+    type: string;
+    status: string;
+    githubRepo: string | null;
+    vercelUrl: string | null;
+    createdAt: Date;
+  }[] = [];
+
+  if (getDatabaseUrl()) {
+    try {
+      projects = await db.project.findMany({
+        where: { userId },
+        orderBy: { updatedAt: "desc" },
+      });
+    } catch (err) {
+      console.error("Projects DB error:", err);
+    }
+  }
 
   return (
     <MainLayout>

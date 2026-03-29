@@ -142,10 +142,34 @@ export const authOptions: NextAuthOptions = {
           };
         } catch (error) {
           console.error("Auth error:", error);
+
+          // Re-throw known, user-safe errors directly
           if (error instanceof Error) {
-            throw error;
+            const msg = error.message;
+            if (
+              msg === "No user found with this email" ||
+              msg === "Invalid password" ||
+              msg === "Email and password required"
+            ) {
+              throw error;
+            }
+            // Translate DB / connection errors into a safe message
+            if (
+              msg.includes("Can't reach database") ||
+              msg.includes("ECONNREFUSED") ||
+              msg.includes("connect ETIMEDOUT") ||
+              msg.includes("P1001") || // Prisma: cannot reach server
+              msg.includes("P1008") || // Prisma: operations timed out
+              msg.includes("environment variable not found") ||
+              msg.includes("datasource") ||
+              msg.includes("prisma")
+            ) {
+              throw new Error(
+                "Unable to connect to the database. Please try again or contact support."
+              );
+            }
           }
-          throw new Error("Authentication failed. Please check your database configuration.");
+          throw new Error("Authentication failed. Please try again.");
         }
       },
     }),

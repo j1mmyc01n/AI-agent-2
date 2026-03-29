@@ -2,14 +2,13 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import MainLayout from "@/components/layout/MainLayout";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import {
-  User,
   Mail,
   Calendar,
   CheckCircle2,
@@ -28,47 +27,71 @@ export default async function ProfilePage() {
   }
 
   const userId = (session.user as { id: string }).id;
+  const sessionUser = session.user as { id: string; name?: string | null; email?: string | null; image?: string | null };
 
-  // Fetch full user details
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      image: true,
-      createdAt: true,
-      openaiKey: true,
-      githubToken: true,
-      vercelToken: true,
-      tavilyKey: true,
-      _count: {
+  let user: {
+    id: string;
+    name: string | null;
+    email: string;
+    image: string | null;
+    createdAt: Date;
+    openaiKey: string | null;
+    githubToken: string | null;
+    vercelToken: string | null;
+    tavilyKey: string | null;
+    _count: { conversations: number; projects: number };
+  } | null = null;
+
+  if (getDatabaseUrl()) {
+    try {
+      user = await db.user.findUnique({
+        where: { id: userId },
         select: {
-          conversations: true,
-          projects: true,
+          id: true,
+          name: true,
+          email: true,
+          image: true,
+          createdAt: true,
+          openaiKey: true,
+          githubToken: true,
+          vercelToken: true,
+          tavilyKey: true,
+          _count: {
+            select: {
+              conversations: true,
+              projects: true,
+            },
+          },
         },
-      },
-    },
-  });
-
-  if (!user) {
-    redirect("/login");
+      });
+    } catch (err) {
+      console.error("Profile DB error:", err);
+    }
   }
 
-  const initials = user.name
-    ? user.name
+  // Fallback to session data when DB is unavailable
+  const displayName = user?.name ?? sessionUser.name ?? null;
+  const displayEmail = user?.email ?? sessionUser.email ?? "";
+  const displayImage = user?.image ?? sessionUser.image ?? null;
+  const displayCreatedAt = user?.createdAt ?? null;
+  const displayId = user?.id ?? userId;
+
+  const initials = displayName
+    ? displayName
         .split(" ")
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .join("")
         .toUpperCase()
         .slice(0, 2)
-    : user.email[0].toUpperCase();
+    : displayEmail
+    ? displayEmail[0].toUpperCase()
+    : "?";
 
   const integrations = [
-    { id: "openai", name: "OpenAI", icon: Bot, connected: !!user.openaiKey },
-    { id: "github", name: "GitHub", icon: Github, connected: !!user.githubToken },
-    { id: "vercel", name: "Vercel", icon: Zap, connected: !!user.vercelToken },
-    { id: "tavily", name: "Tavily", icon: Globe, connected: !!user.tavilyKey },
+    { id: "openai", name: "OpenAI", icon: Bot, connected: !!user?.openaiKey },
+    { id: "github", name: "GitHub", icon: Github, connected: !!user?.githubToken },
+    { id: "vercel", name: "Vercel", icon: Zap, connected: !!user?.vercelToken },
+    { id: "tavily", name: "Tavily", icon: Globe, connected: !!user?.tavilyKey },
   ];
 
   return (
@@ -88,22 +111,24 @@ export default async function ProfilePage() {
             <CardHeader>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <Avatar className="h-20 w-20 sm:h-24 sm:w-24">
-                  <AvatarImage src={user.image || undefined} alt={user.name || "User"} />
+                  <AvatarImage src={displayImage || undefined} alt={displayName || "User"} />
                   <AvatarFallback className="text-2xl">{initials}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <CardTitle className="text-xl sm:text-2xl">
-                    {user.name || "User"}
+                    {displayName || "User"}
                   </CardTitle>
                   <CardDescription className="mt-1 flex items-center gap-2 flex-wrap">
                     <span className="flex items-center gap-1">
                       <Mail className="h-3 w-3" />
-                      {user.email}
+                      {displayEmail}
                     </span>
-                    <span className="flex items-center gap-1">
-                      <Calendar className="h-3 w-3" />
-                      Joined {new Date(user.createdAt).toLocaleDateString()}
-                    </span>
+                    {displayCreatedAt && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Joined {new Date(displayCreatedAt).toLocaleDateString()}
+                      </span>
+                    )}
                   </CardDescription>
                 </div>
                 <Link href="/settings">
@@ -122,7 +147,7 @@ export default async function ProfilePage() {
               <CardHeader className="pb-3">
                 <CardDescription className="text-xs">Total Conversations</CardDescription>
                 <CardTitle className="text-3xl sm:text-4xl">
-                  {user._count.conversations}
+                  {user?._count.conversations ?? 0}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -135,7 +160,7 @@ export default async function ProfilePage() {
             <Card>
               <CardHeader className="pb-3">
                 <CardDescription className="text-xs">Total Projects</CardDescription>
-                <CardTitle className="text-3xl sm:text-4xl">{user._count.projects}</CardTitle>
+                <CardTitle className="text-3xl sm:text-4xl">{user?._count.projects ?? 0}</CardTitle>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground">
@@ -210,7 +235,7 @@ export default async function ProfilePage() {
                       Your unique identifier
                     </p>
                   </div>
-                  <code className="text-xs bg-muted px-2 py-1 rounded">{user.id}</code>
+                  <code className="text-xs bg-muted px-2 py-1 rounded">{displayId}</code>
                 </div>
 
                 <div className="flex items-start justify-between py-2 border-b">
@@ -220,7 +245,7 @@ export default async function ProfilePage() {
                       Used for login and notifications
                     </p>
                   </div>
-                  <p className="text-sm">{user.email}</p>
+                  <p className="text-sm">{displayEmail}</p>
                 </div>
 
                 <div className="flex items-start justify-between py-2 border-b">
@@ -230,7 +255,7 @@ export default async function ProfilePage() {
                       Your name shown in the app
                     </p>
                   </div>
-                  <p className="text-sm">{user.name || "Not set"}</p>
+                  <p className="text-sm">{displayName || "Not set"}</p>
                 </div>
 
                 <div className="flex items-start justify-between py-2">
@@ -241,11 +266,13 @@ export default async function ProfilePage() {
                     </p>
                   </div>
                   <p className="text-sm">
-                    {new Date(user.createdAt).toLocaleDateString("en-US", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                    })}
+                    {displayCreatedAt
+                      ? new Date(displayCreatedAt).toLocaleDateString("en-US", {
+                          year: "numeric",
+                          month: "long",
+                          day: "numeric",
+                        })
+                      : "—"}
                   </p>
                 </div>
               </div>
