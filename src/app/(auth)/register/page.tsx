@@ -53,17 +53,20 @@ export default function RegisterPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Bot className="h-8 w-8 text-primary" />
-          <span className="text-2xl font-bold">DoBetter Viber</span>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(217_91%_60%/0.06),transparent_70%)]" />
+      <div className="w-full max-w-md relative">
+        <div className="flex items-center justify-center gap-2.5 mb-8">
+          <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <Bot className="h-6 w-6 text-primary" />
+          </div>
+          <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">DoBetter Viber</span>
         </div>
 
-        <Card>
+        <Card className="border-border/50 shadow-xl shadow-primary/5">
           <CardHeader>
             <CardTitle>Create an account</CardTitle>
             <CardDescription>
-              Start building SaaS products with AI today
+              Start building products with your AI agent workspace
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -82,6 +85,8 @@ export default function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={loading}
+                  autoComplete="name"
+                  className="text-[16px] sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -94,6 +99,8 @@ export default function RegisterPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="email"
+                  className="text-[16px] sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -107,6 +114,8 @@ export default function RegisterPage() {
                   required
                   minLength={8}
                   disabled={loading}
+                  autoComplete="new-password"
+                  className="text-[16px] sm:text-sm"
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>

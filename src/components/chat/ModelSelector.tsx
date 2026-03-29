@@ -11,9 +11,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { ChevronDown, Bot, Cpu, Zap } from "lucide-react";
+import { ChevronDown, Bot, Cpu } from "lucide-react";
 
-export type AIProvider = "openai" | "anthropic" | "grok";
+export type AIProvider = "openai" | "anthropic";
 
 export interface AIModel {
   id: string;
@@ -24,33 +24,27 @@ export interface AIModel {
 
 export const AI_PROVIDERS: { id: AIProvider; name: string; icon: React.ReactNode; models: AIModel[] }[] = [
   {
-    id: "openai",
-    name: "OpenAI",
-    icon: <Bot className="h-4 w-4" />,
-    models: [
-      { id: "gpt-4o", name: "GPT-4o", provider: "openai", description: "Most capable" },
-      { id: "gpt-4o-mini", name: "GPT-4o mini", provider: "openai", description: "Fast & efficient" },
-      { id: "gpt-4-turbo", name: "GPT-4 Turbo", provider: "openai", description: "High capability" },
-      { id: "gpt-3.5-turbo", name: "GPT-3.5 Turbo", provider: "openai", description: "Fast & cheap" },
-    ],
-  },
-  {
     id: "anthropic",
     name: "Claude",
     icon: <Cpu className="h-4 w-4" />,
     models: [
-      { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet", provider: "anthropic", description: "Best for coding" },
-      { id: "claude-3-5-haiku-20241022", name: "Claude 3.5 Haiku", provider: "anthropic", description: "Fast & smart" },
-      { id: "claude-3-opus-20240229", name: "Claude 3 Opus", provider: "anthropic", description: "Most powerful" },
+      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", provider: "anthropic", description: "Best for coding" },
+      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", provider: "anthropic", description: "Fast & smart" },
+      { id: "claude-sonnet-4-0", name: "Claude Sonnet 4", provider: "anthropic", description: "Reliable" },
+      { id: "claude-opus-4-5", name: "Claude Opus 4.5", provider: "anthropic", description: "Most capable" },
+      { id: "claude-opus-4-6", name: "Claude Opus 4.6", provider: "anthropic", description: "Latest & best" },
     ],
   },
   {
-    id: "grok",
-    name: "Grok",
-    icon: <Zap className="h-4 w-4" />,
+    id: "openai",
+    name: "OpenAI",
+    icon: <Bot className="h-4 w-4" />,
     models: [
-      { id: "grok-2-latest", name: "Grok 2", provider: "grok", description: "Latest from xAI" },
-      { id: "grok-beta", name: "Grok Beta", provider: "grok", description: "Experimental" },
+      { id: "gpt-4o", name: "GPT-4o", provider: "openai", description: "Fast & capable" },
+      { id: "gpt-4o-mini", name: "GPT-4o mini", provider: "openai", description: "Fast & efficient" },
+      { id: "gpt-4.1", name: "GPT-4.1", provider: "openai", description: "Latest GPT-4" },
+      { id: "gpt-4.1-mini", name: "GPT-4.1 mini", provider: "openai", description: "Efficient" },
+      { id: "o4-mini", name: "o4-mini", provider: "openai", description: "Reasoning" },
     ],
   },
 ];

@@ -65,21 +65,30 @@ function LoginForm() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-md">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <Bot className="h-8 w-8 text-primary" />
-          <span className="text-2xl font-bold">DoBetter Viber</span>
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(217_91%_60%/0.06),transparent_70%)]" />
+      <div className="w-full max-w-md relative">
+        <div className="flex items-center justify-center gap-2.5 mb-8">
+          <div className="h-10 w-10 rounded-xl bg-primary/15 flex items-center justify-center">
+            <Bot className="h-6 w-6 text-primary" />
+          </div>
+          <span className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">DoBetter Viber</span>
         </div>
 
-        <Card>
+        <Card className="border-border/50 shadow-xl shadow-primary/5">
           <CardHeader>
             <CardTitle>Welcome back</CardTitle>
-            <CardDescription>Sign in to your account to continue</CardDescription>
+            <CardDescription>Sign in to your AI agent workspace</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {error && (
               <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
                 {error}
+              </div>
+            )}
+
+            {searchParams.get("registered") && (
+              <div className="bg-green-500/10 text-green-600 dark:text-green-400 text-sm p-3 rounded-md">
+                Account created! Please sign in.
               </div>
             )}
 
@@ -102,7 +111,7 @@ function LoginForm() {
                 <span className="w-full border-t" />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or</span>
+                <span className="bg-card px-2 text-muted-foreground">Or</span>
               </div>
             </div>
 
@@ -117,6 +126,8 @@ function LoginForm() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="email"
+                  className="text-[16px] sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -129,6 +140,8 @@ function LoginForm() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="current-password"
+                  className="text-[16px] sm:text-sm"
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>

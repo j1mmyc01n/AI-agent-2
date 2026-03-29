@@ -11,11 +11,12 @@ import {
   LayoutDashboard,
   MessageSquare,
   FolderOpen,
-  Settings,
   Bot,
   CheckCircle2,
   AlertCircle,
   Plus,
+  Database,
+  ArrowRight,
 } from "lucide-react";
 
 export default async function WorkspacePage() {
@@ -27,11 +28,11 @@ export default async function WorkspacePage() {
   const userId = (session.user as { id: string }).id;
   const hasDb = !!getDatabaseUrl();
 
-  // Default empty state for when DB is unavailable or user is test admin
   let user: {
     name: string | null;
     email: string;
     openaiKey: string | null;
+    anthropicKey: string | null;
     githubToken: string | null;
     vercelToken: string | null;
     tavilyKey: string | null;
@@ -60,6 +61,7 @@ export default async function WorkspacePage() {
           name: true,
           email: true,
           openaiKey: true,
+          anthropicKey: true,
           githubToken: true,
           vercelToken: true,
           tavilyKey: true,
@@ -90,7 +92,62 @@ export default async function WorkspacePage() {
       });
     } catch (err) {
       console.error("Workspace DB error:", err);
-      // Fall through with empty data rather than crashing
+    }
+  }
+
+  // Fallback to Blobs if no DB data loaded
+  if (!user || (recentConversations.length === 0 && recentProjects.length === 0)) {
+    try {
+      const { getStore } = await import("@netlify/blobs");
+
+      // Load conversations from Blobs
+      if (recentConversations.length === 0) {
+        try {
+          const convStore = getStore("conversations");
+          const blobConvs = await convStore.get(`user:${userId}`, { type: "json" }) as { id: string; title: string; updatedAt: string; messageCount: number }[] | null;
+          if (blobConvs && blobConvs.length > 0) {
+            recentConversations = blobConvs.slice(0, 5).map((c) => ({
+              id: c.id,
+              title: c.title,
+              updatedAt: new Date(c.updatedAt),
+              _count: { messages: c.messageCount || 0 },
+            }));
+          }
+        } catch {
+          // Blobs not available for conversations
+        }
+      }
+
+      // Load projects from Blobs
+      if (recentProjects.length === 0) {
+        try {
+          const projStore = getStore("projects");
+          const blobProjects = await projStore.get(`user:${userId}`, { type: "json" }) as { id: string; name: string; type: string; status: string }[] | null;
+          if (blobProjects && blobProjects.length > 0) {
+            recentProjects = blobProjects.slice(0, 3);
+          }
+        } catch {
+          // Blobs not available for projects
+        }
+      }
+
+      // Create a synthetic user object for display when no DB
+      if (!user) {
+        const convCount = recentConversations.length;
+        const projCount = recentProjects.length;
+        user = {
+          name: session.user.name || null,
+          email: session.user.email || "user@example.com",
+          openaiKey: null,
+          anthropicKey: null,
+          githubToken: null,
+          vercelToken: null,
+          tavilyKey: null,
+          _count: { conversations: convCount, projects: projCount },
+        };
+      }
+    } catch {
+      // Blobs import failed - continue with empty data
     }
   }
 
@@ -110,28 +167,36 @@ export default async function WorkspacePage() {
         <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
           {/* Header */}
           <div className="mb-6 sm:mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-              <LayoutDashboard className="h-6 w-6 sm:h-8 sm:w-8" />
-              Workspace
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2.5">
+              <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+                <LayoutDashboard className="h-5 w-5 text-primary" />
+              </div>
+              <span className="bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text">Workspace</span>
             </h1>
-            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base ml-[46px]">
               Overview of your AI agent development workspace
             </p>
           </div>
 
           {/* Database not configured banner */}
           {!hasDb && (
-            <Card className="mb-6 border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/20">
+            <Card className="mb-6 border-blue-500/20 bg-blue-500/5">
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
+                    <Database className="h-4 w-4 text-blue-400" />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base sm:text-lg">Database Not Configured</CardTitle>
+                    <CardTitle className="text-base sm:text-lg">Local Mode Active</CardTitle>
                     <CardDescription className="text-xs sm:text-sm">
-                      Set <code className="bg-muted px-1 rounded">DATABASE_URL</code> in your
-                      environment to persist conversations, projects, and settings.
+                      Data is stored in your browser. Set <code className="bg-muted px-1 rounded text-xs">DATABASE_URL</code> to persist conversations, projects, and settings across devices.
                     </CardDescription>
                   </div>
+                  <Link href="/settings">
+                    <Button size="sm" variant="outline" className="flex-shrink-0 border-blue-500/20 hover:bg-blue-500/10 text-blue-400">
+                      Configure
+                    </Button>
+                  </Link>
                 </div>
               </CardHeader>
             </Card>
@@ -139,10 +204,12 @@ export default async function WorkspacePage() {
 
           {/* Setup Status Banner */}
           {hasDb && !isFullySetup && (
-            <Card className="mb-6 border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20">
+            <Card className="mb-6 border-primary/20 bg-primary/5">
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" />
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                    <AlertCircle className="h-4 w-4 text-primary" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <CardTitle className="text-base sm:text-lg">Setup Required</CardTitle>
                     <CardDescription className="text-xs sm:text-sm">
@@ -152,8 +219,9 @@ export default async function WorkspacePage() {
                     </CardDescription>
                   </div>
                   <Link href="/settings">
-                    <Button size="sm" variant="outline" className="flex-shrink-0">
+                    <Button size="sm" className="flex-shrink-0 gap-1">
                       Configure
+                      <ArrowRight className="h-3 w-3" />
                     </Button>
                   </Link>
                 </div>
@@ -161,91 +229,18 @@ export default async function WorkspacePage() {
             </Card>
           )}
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Total Conversations</CardDescription>
-                <CardTitle className="text-2xl sm:text-3xl">
-                  {user?._count.conversations ?? 0}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <MessageSquare className="h-3 w-3" />
-                  <span>Chat sessions</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Active Projects</CardDescription>
-                <CardTitle className="text-2xl sm:text-3xl">
-                  {user?._count.projects ?? 0}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <FolderOpen className="h-3 w-3" />
-                  <span>Built by AI</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">Integrations</CardDescription>
-                <CardTitle className="text-2xl sm:text-3xl">
-                  {connectedIntegrations}/{totalIntegrations}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  {isFullySetup ? (
-                    <>
-                      <CheckCircle2 className="h-3 w-3 text-green-600" />
-                      <span className="text-green-600">All connected</span>
-                    </>
-                  ) : (
-                    <>
-                      <Settings className="h-3 w-3" />
-                      <span>Setup needed</span>
-                    </>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs">AI Status</CardDescription>
-                <CardTitle className="text-2xl sm:text-3xl">
-                  {user?.openaiKey ? (
-                    <span className="text-green-600">Ready</span>
-                  ) : (
-                    <span className="text-orange-600">Setup</span>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                  <Bot className="h-3 w-3" />
-                  <span>Agent power</span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Recent Conversations */}
-            <Card className="lg:col-span-2">
+            <Card className="lg:col-span-2 border-border/50">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg sm:text-xl">Recent Conversations</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                    <MessageSquare className="h-5 w-5 text-primary" />
+                    Recent Conversations
+                  </CardTitle>
                   <Link href="/chat">
-                    <Button size="sm" variant="outline" className="gap-2">
+                    <Button size="sm" className="gap-1.5">
                       <Plus className="h-3 w-3" />
                       New Chat
                     </Button>
@@ -255,9 +250,9 @@ export default async function WorkspacePage() {
               <CardContent>
                 {recentConversations.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <MessageSquare className="h-12 w-12 mx-auto mb-3 opacity-20" />
                     <p className="text-sm">No conversations yet</p>
-                    <p className="text-xs mt-1">Start a new chat to get started</p>
+                    <p className="text-xs mt-1 opacity-60">Start a new chat to get started</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -265,7 +260,7 @@ export default async function WorkspacePage() {
                       <Link
                         key={conv.id}
                         href={`/chat/${conv.id}`}
-                        className="block p-3 rounded-lg border hover:bg-accent transition-colors"
+                        className="block p-3 rounded-lg border border-border/50 hover:bg-primary/5 hover:border-primary/20 transition-all"
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
@@ -275,7 +270,7 @@ export default async function WorkspacePage() {
                               {new Date(conv.updatedAt).toLocaleDateString()}
                             </p>
                           </div>
-                          <Badge variant="outline" className="flex-shrink-0 text-xs">
+                          <Badge variant="outline" className="flex-shrink-0 text-xs border-primary/20 text-primary">
                             Active
                           </Badge>
                         </div>
@@ -287,12 +282,15 @@ export default async function WorkspacePage() {
             </Card>
 
             {/* Recent Projects */}
-            <Card>
+            <Card className="border-border/50">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg sm:text-xl">Recent Projects</CardTitle>
+                  <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                    <FolderOpen className="h-5 w-5 text-primary" />
+                    Projects
+                  </CardTitle>
                   <Link href="/projects">
-                    <Button size="sm" variant="ghost">
+                    <Button size="sm" variant="ghost" className="text-primary">
                       View all
                     </Button>
                   </Link>
@@ -301,24 +299,24 @@ export default async function WorkspacePage() {
               <CardContent>
                 {recentProjects.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
-                    <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <FolderOpen className="h-12 w-12 mx-auto mb-3 opacity-20" />
                     <p className="text-sm">No projects yet</p>
-                    <p className="text-xs mt-1">Build your first SaaS</p>
+                    <p className="text-xs mt-1 opacity-60">Build your first SaaS</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
                     {recentProjects.map((project) => (
-                      <div key={project.id} className="p-3 rounded-lg border">
+                      <Link key={project.id} href={`/chat?project=${project.id}`} className="block p-3 rounded-lg border border-border/50 hover:border-primary/20 hover:bg-primary/5 transition-all">
                         <p className="font-medium text-sm truncate">{project.name}</p>
                         <div className="flex items-center gap-2 mt-2">
-                          <Badge variant="outline" className="text-xs">
+                          <Badge variant="outline" className="text-xs border-primary/20 text-primary">
                             {project.type}
                           </Badge>
                           <Badge variant="secondary" className="text-xs">
                             {project.status}
                           </Badge>
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 )}
@@ -326,40 +324,6 @@ export default async function WorkspacePage() {
             </Card>
           </div>
 
-          {/* Quick Actions */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl">Quick Actions</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <Link href="/chat">
-                  <Button variant="outline" className="w-full justify-start gap-2">
-                    <MessageSquare className="h-4 w-4" />
-                    New Chat
-                  </Button>
-                </Link>
-                <Link href="/projects">
-                  <Button variant="outline" className="w-full justify-start gap-2">
-                    <FolderOpen className="h-4 w-4" />
-                    View Projects
-                  </Button>
-                </Link>
-                <Link href="/settings">
-                  <Button variant="outline" className="w-full justify-start gap-2">
-                    <Settings className="h-4 w-4" />
-                    Settings
-                  </Button>
-                </Link>
-                <Link href="/chat">
-                  <Button className="w-full justify-start gap-2">
-                    <Plus className="h-4 w-4" />
-                    Build New SaaS
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </MainLayout>

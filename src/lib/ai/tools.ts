@@ -114,6 +114,46 @@ export const tools: ChatCompletionTool[] = [
   {
     type: "function",
     function: {
+      name: "save_artifact",
+      description:
+        "Save generated code files as a persistent artifact. Use this after generating code to save the project files. The files will be stored and available across sessions. Always use this when building a project so the user's work is preserved.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "A descriptive title for the artifact. Example: 'Landing Page for TaskFlow'",
+          },
+          files: {
+            type: "array",
+            description: "Array of files to save",
+            items: {
+              type: "object",
+              properties: {
+                path: {
+                  type: "string",
+                  description: "File path. Example: 'index.html', 'styles.css', 'app.js'",
+                },
+                content: {
+                  type: "string",
+                  description: "Complete file content",
+                },
+              },
+              required: ["path", "content"],
+            },
+          },
+          projectId: {
+            type: "string",
+            description: "Optional project ID to associate this artifact with",
+          },
+        },
+        required: ["title", "files"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "create_project_record",
       description:
         "Save a project to the database to track what has been built. Always call this after successfully creating/deploying a project.",
