@@ -10,9 +10,10 @@ import {
   Smartphone,
   Tablet,
   Monitor,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 
 interface CodeBlock {
   language: string;
@@ -24,6 +25,7 @@ interface PreviewPanelProps {
   previewUrl?: string;
   projectName?: string;
   codeBlocks?: CodeBlock[];
+  isStreaming?: boolean;
 }
 
 type ViewportMode = "desktop" | "tablet" | "mobile";
@@ -35,17 +37,32 @@ const viewportSizes: Record<ViewportMode, { width: string; label: string }> = {
 };
 
 /** Build a full HTML document from code blocks for inline preview */
-function buildPreviewHtml(codeBlocks: CodeBlock[]): string | null {
+function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): string | null {
   if (!codeBlocks || codeBlocks.length === 0) return null;
 
-  // Check if there's already a full HTML file
-  const htmlBlock = codeBlocks.find(
+  // Find all HTML file blocks (for multi-page SaaS)
+  const htmlFileBlocks = codeBlocks.filter(
     (b) =>
       b.language === "html" &&
       (b.content.includes("<!DOCTYPE") ||
         b.content.includes("<html") ||
         b.content.includes("<body"))
   );
+
+  // If a specific page is selected, use that; otherwise use the first (or best) HTML block
+  let htmlBlock: CodeBlock | undefined;
+  if (selectedPage && htmlFileBlocks.length > 1) {
+    htmlBlock = htmlFileBlocks.find(
+      (b) => b.filename?.toLowerCase().replace(/\s*\(generating\.\.\.\)\s*/i, "").includes(selectedPage.toLowerCase())
+    );
+  }
+  if (!htmlBlock) {
+    // Prefer index.html, then dashboard.html, then the first HTML block
+    htmlBlock = htmlFileBlocks.find(b => b.filename?.toLowerCase().includes("index"))
+      || htmlFileBlocks.find(b => b.filename?.toLowerCase().includes("dashboard"))
+      || htmlFileBlocks[0];
+  }
+
   if (htmlBlock) {
     let html = htmlBlock.content;
     const cssBlocks = codeBlocks.filter(
@@ -125,30 +142,95 @@ ${js ? `<script>\n${js}\n</script>` : ""}
 </html>`;
 }
 
+/** Extract page names from HTML file blocks */
+function getPageNames(codeBlocks: CodeBlock[]): string[] {
+  return codeBlocks
+    .filter(
+      (b) =>
+        b.language === "html" &&
+        b.filename &&
+        (b.content.includes("<!DOCTYPE") ||
+          b.content.includes("<html") ||
+          b.content.includes("<body"))
+    )
+    .map((b) => {
+      const name = b.filename?.replace(/\s*\(generating\.\.\.\)\s*/i, "").replace(/\.html$/i, "") || "page";
+      return name;
+    });
+}
+
 export default function PreviewPanel({
   previewUrl,
   projectName,
   codeBlocks = [],
+  isStreaming = false,
 }: PreviewPanelProps) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [viewport, setViewport] = useState<ViewportMode>("desktop");
+  const [selectedPage, setSelectedPage] = useState<string | undefined>();
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
-  const inlineHtml = useMemo(() => buildPreviewHtml(codeBlocks), [codeBlocks]);
+  const inlineHtml = useMemo(
+    () => buildPreviewHtml(codeBlocks, selectedPage),
+    [codeBlocks, selectedPage]
+  );
+  const pageNames = useMemo(() => getPageNames(codeBlocks), [codeBlocks]);
 
   const hasDeployedPreview = !!previewUrl;
   const hasInlinePreview = !!inlineHtml;
   const hasAnyPreview = hasDeployedPreview || hasInlinePreview;
+  const isMultiPage = pageNames.length > 1;
 
-  // Auto-refresh iframe when inline HTML changes
+  // Debounced preview refresh — update at most every 800ms during streaming,
+  // but immediately when streaming stops
   const prevHtmlRef = useRef(inlineHtml);
-  useEffect(() => {
-    if (inlineHtml !== prevHtmlRef.current) {
-      prevHtmlRef.current = inlineHtml;
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingHtmlRef = useRef<string | null>(null);
+
+  const applyRefresh = useCallback(() => {
+    if (pendingHtmlRef.current !== null && pendingHtmlRef.current !== prevHtmlRef.current) {
+      prevHtmlRef.current = pendingHtmlRef.current;
       setRefreshKey((k) => k + 1);
     }
-  }, [inlineHtml]);
+    pendingHtmlRef.current = null;
+    debounceTimerRef.current = null;
+  }, []);
+
+  useEffect(() => {
+    if (inlineHtml === prevHtmlRef.current) return;
+
+    if (!isStreaming) {
+      // Not streaming — update immediately
+      prevHtmlRef.current = inlineHtml;
+      pendingHtmlRef.current = null;
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      setRefreshKey((k) => k + 1);
+    } else {
+      // Streaming — debounce updates
+      pendingHtmlRef.current = inlineHtml;
+      if (!debounceTimerRef.current) {
+        debounceTimerRef.current = setTimeout(applyRefresh, 800);
+      }
+    }
+  }, [inlineHtml, isStreaming, applyRefresh]);
+
+  // Flush any pending update when streaming stops
+  useEffect(() => {
+    if (!isStreaming && pendingHtmlRef.current !== null) {
+      applyRefresh();
+    }
+  }, [isStreaming, applyRefresh]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, []);
 
   if (!hasAnyPreview) {
     return (
@@ -168,7 +250,11 @@ export default function PreviewPanel({
     );
   }
 
-  const displayUrl = hasDeployedPreview ? previewUrl : "Inline Preview";
+  const displayUrl = hasDeployedPreview
+    ? previewUrl
+    : selectedPage
+    ? `${selectedPage}.html`
+    : "Inline Preview";
 
   return (
     <div
@@ -184,8 +270,12 @@ export default function PreviewPanel({
           )}
           <span className="truncate">{displayUrl}</span>
           {hasInlinePreview && !hasDeployedPreview && (
-            <span className="ml-auto text-[10px] text-primary font-semibold px-1.5 py-0.5 rounded-full bg-primary/10">
-              LIVE
+            <span className={`ml-auto text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+              isStreaming
+                ? "text-orange-500 bg-orange-500/10 animate-pulse"
+                : "text-primary bg-primary/10"
+            }`}>
+              {isStreaming ? "BUILDING" : "LIVE"}
             </span>
           )}
         </div>
@@ -249,6 +339,38 @@ export default function PreviewPanel({
           </a>
         )}
       </div>
+
+      {/* Multi-page tabs for SaaS projects */}
+      {isMultiPage && (
+        <div className="flex items-center gap-1 px-3 py-1.5 border-b bg-muted/20 overflow-x-auto shrink-0">
+          {pageNames.map((page) => {
+            const isActive = selectedPage === page || (!selectedPage && (page === "index" || pageNames.indexOf(page) === 0));
+            return (
+              <button
+                key={page}
+                onClick={() => setSelectedPage(page)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors whitespace-nowrap ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                }`}
+              >
+                {page}.html
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Streaming progress banner */}
+      {isStreaming && hasInlinePreview && (
+        <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border-b border-orange-500/20 shrink-0">
+          <Loader2 className="h-3 w-3 animate-spin text-orange-500" />
+          <span className="text-xs text-orange-500 font-medium">
+            Building live preview — updates every moment as code is generated...
+          </span>
+        </div>
+      )}
 
       {/* iFrame preview - fully interactive */}
       <div className="flex-1 overflow-hidden bg-white flex items-start justify-center">

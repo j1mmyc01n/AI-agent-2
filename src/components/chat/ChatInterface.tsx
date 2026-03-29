@@ -63,19 +63,35 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
 
     // For streaming messages, also extract in-progress (unclosed) code blocks
     if (includePartial && msg.isStreaming) {
-      const partialRegex = /```(\w+)?(?::([^\n]+))?\n([\s\S]+)$/g;
-      let partialMatch;
       // Only look for unclosed block if the last ``` count is odd (block still open)
       const fenceCount = (content.match(/```/g) || []).length;
       if (fenceCount % 2 === 1) {
-        while ((partialMatch = partialRegex.exec(content)) !== null) {
-          const partialContent = partialMatch[3].trim();
-          if (partialContent.length > 0) {
-            blocks.push({
-              language: partialMatch[1] || "text",
-              filename: partialMatch[2] ? `${partialMatch[2]} (generating...)` : "(generating...)",
-              content: partialContent,
-            });
+        // Find the LAST opening ``` fence (the unclosed one)
+        let lastFenceIdx = -1;
+        let searchFrom = 0;
+        let fencesSeen = 0;
+        while (true) {
+          const idx = content.indexOf("```", searchFrom);
+          if (idx === -1) break;
+          fencesSeen++;
+          // Odd-numbered fences are opening, even are closing
+          if (fencesSeen % 2 === 1) {
+            lastFenceIdx = idx;
+          }
+          searchFrom = idx + 3;
+        }
+        if (lastFenceIdx >= 0) {
+          const afterFence = content.slice(lastFenceIdx + 3);
+          const langMatch = afterFence.match(/^(\w+)?(?::([^\n]+))?\n([\s\S]+)$/);
+          if (langMatch) {
+            const partialContent = langMatch[3].trim();
+            if (partialContent.length > 0) {
+              blocks.push({
+                language: langMatch[1] || "text",
+                filename: langMatch[2] ? `${langMatch[2]} (generating...)` : "(generating...)",
+                content: partialContent,
+              });
+            }
           }
         }
       }
@@ -237,17 +253,20 @@ export default function ChatInterface({
 
   // Auto-switch panels when code appears in build mode
   useEffect(() => {
-    if (codeBlocks.length > 0 && codeBlocks.length !== prevCodeCount.current) {
-      prevCodeCount.current = codeBlocks.length;
-      if (chatMode === "build") {
+    if (codeBlocks.length > 0 && (chatMode === "build" || chatMode === "saas-upgrade")) {
+      if (codeBlocks.length !== prevCodeCount.current) {
+        prevCodeCount.current = codeBlocks.length;
         if (hasPreviewableCode) {
           setActivePanel("preview");
         } else {
           setActivePanel("code");
         }
+      } else if (hasPreviewableCode && activePanel === "code") {
+        // If code count didn't change but we now have previewable code (e.g., partial HTML became complete)
+        setActivePanel("preview");
       }
     }
-  }, [codeBlocks.length, hasPreviewableCode, chatMode]);
+  }, [codeBlocks.length, hasPreviewableCode, chatMode, activePanel]);
 
   // Parse streaming content for workflow tasks in real-time
   const parseWorkflowTasks = useCallback((content: string) => {
@@ -452,9 +471,13 @@ export default function ChatInterface({
                   )
                 );
 
-                // Auto-switch to Code tab when first code block is detected in build mode
+                // Auto-switch to Preview tab when first HTML code block is detected in build mode
                 if (shouldBuild && isInsideCodeBlock && fenceCount === 1) {
-                  setActivePanel("code");
+                  // Check if this is an HTML block by looking at what follows the opening ```
+                  const lastFenceIdx = streamingContentRef.current.lastIndexOf("```");
+                  const afterFence = streamingContentRef.current.slice(lastFenceIdx + 3, lastFenceIdx + 20);
+                  const isHtmlBlock = /^html/i.test(afterFence);
+                  setActivePanel(isHtmlBlock ? "preview" : "code");
                 }
 
                 // Parse tasks in real-time during build mode
@@ -582,7 +605,7 @@ export default function ChatInterface({
     { id: "chat" as PanelView, label: "Chat", icon: MessageSquare, count: messages.filter(m => m.role !== "system").length },
     { id: "code" as PanelView, label: "Code", icon: Code2, count: codeBlocks.length, pulsing: isStreaming && agentStatus === "coding" },
     { id: "todo" as PanelView, label: "Tasks", icon: ListTodo, count: todos.length },
-    { id: "preview" as PanelView, label: "Preview", icon: Eye, count: previewUrl ? 1 : hasPreviewableCode ? 1 : 0 },
+    { id: "preview" as PanelView, label: "Preview", icon: Eye, count: previewUrl ? 1 : hasPreviewableCode ? 1 : 0, pulsing: isStreaming && hasPreviewableCode },
   ];
 
   return (
@@ -741,6 +764,7 @@ export default function ChatInterface({
                 previewUrl={previewUrl}
                 projectName={projectName || "Current Project"}
                 codeBlocks={codeBlocks}
+                isStreaming={isStreaming}
               />
             </div>
             <MessageInput
