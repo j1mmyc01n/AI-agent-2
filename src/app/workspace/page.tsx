@@ -164,7 +164,7 @@ export default async function WorkspacePage() {
   return (
     <MainLayout>
       <div className="h-full overflow-y-auto">
-        <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
           {/* Header */}
           <div className="mb-6 sm:mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2.5">
@@ -306,7 +306,7 @@ export default async function WorkspacePage() {
                 ) : (
                   <div className="space-y-3">
                     {recentProjects.map((project) => (
-                      <Link key={project.id} href={`/chat?project=${project.id}`} className="block p-3 rounded-lg border border-border/50 hover:border-primary/20 hover:bg-primary/5 transition-all">
+                      <Link key={project.id} href={`/projects/${project.id}`} className="block p-3 rounded-lg border border-border/50 hover:border-primary/20 hover:bg-primary/5 transition-all">
                         <p className="font-medium text-sm truncate">{project.name}</p>
                         <div className="flex items-center gap-2 mt-2">
                           <Badge variant="outline" className="text-xs border-primary/20 text-primary">

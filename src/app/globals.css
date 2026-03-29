@@ -207,3 +207,30 @@ a, button {
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
+
+/* Marquee scrolling animations for project idea cards */
+@keyframes marquee-rtl {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@keyframes marquee-ltr {
+  0% { transform: translateX(-50%); }
+  100% { transform: translateX(0); }
+}
+.animate-marquee-rtl {
+  animation: marquee-rtl 25s linear infinite;
+}
+.animate-marquee-rtl:hover {
+  animation-play-state: paused;
+}
+.animate-marquee-ltr {
+  animation: marquee-ltr 20s linear infinite;
+}
+.animate-marquee-ltr:hover {
+  animation-play-state: paused;
+}
+/* Fade edges for marquee rows */
+.mask-marquee {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+}

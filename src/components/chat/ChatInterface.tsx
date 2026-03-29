@@ -10,6 +10,7 @@ import CodePanel from "@/components/workspace/CodePanel";
 import TodoPanel, { type TodoItem } from "@/components/workspace/TodoPanel";
 import PreviewPanel from "@/components/workspace/PreviewPanel";
 import { Button } from "@/components/ui/button";
+import AgentMonitor from "@/components/workspace/AgentMonitor";
 import { Code2, ListTodo, Eye, MessageSquare, Brain, Loader2, Sparkles, Hammer, MessageCircle } from "lucide-react";
 
 interface ToolCallData {
@@ -161,6 +162,7 @@ export default function ChatInterface({
   const [workflowTodos, setWorkflowTodos] = useState<TodoItem[]>([]);
   const [agentTodos, setAgentTodos] = useState<TodoItem[]>([]);
   const [defaultModelLoaded, setDefaultModelLoaded] = useState(false);
+  const [toolCallCount, setToolCallCount] = useState(0);
   const streamingContentRef = useRef("");
 
   // Load user's default model preference and configured keys
@@ -427,6 +429,7 @@ export default function ChatInterface({
               } else if (chunk.type === "tool_call") {
                 const newTc = { name: chunk.toolName, args: chunk.toolArgs };
                 activeToolCalls.push({ ...newTc });
+                setToolCallCount(prev => prev + 1);
 
                 const status = getAgentStatusFromToolCalls([newTc]);
                 setAgentStatus(status);
@@ -636,6 +639,16 @@ export default function ChatInterface({
           )}
         </div>
       </div>
+
+      {/* Agent Monitor - oversight system */}
+      <AgentMonitor
+        isLoading={isLoading}
+        agentStatus={agentStatus}
+        messageCount={messages.filter(m => m.role !== "system").length}
+        codeBlockCount={codeBlocks.length}
+        toolCallCount={toolCallCount}
+        onNudge={handleQuickPrompt}
+      />
 
       {/* Panel content */}
       <div className="flex-1 min-h-0 overflow-hidden">
