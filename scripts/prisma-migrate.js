@@ -3,17 +3,28 @@
 /**
  * Runs `prisma db push` if a database URL is available.
  * Supports DATABASE_URL, NETLIFY_DATABASE_URL, and NETLIFY_DATABASE_URL_UNPOOLED.
+ *
+ * For Neon with connection pooling (PgBouncer), use DIRECT_URL (or
+ * NETLIFY_DATABASE_URL_UNPOOLED) for the push so it bypasses the pool.
+ * Regular queries still use the pooled DATABASE_URL at runtime.
+ *
  * Used as part of the build process to keep the database schema in sync with
- * the Prisma schema, including newly-added columns like neonKey and netlifyToken.
+ * the Prisma schema.
  */
 
 const { execSync } = require("child_process");
 
-// Determine database URL - same priority as src/lib/db.ts
-const dbUrl =
-  process.env.DATABASE_URL ||
-  process.env.NETLIFY_DATABASE_URL ||
+// Determine which URL to use for the schema push.
+// Prefer unpooled / direct connection for migrations (avoids PgBouncer issues).
+const directUrl =
+  process.env.DIRECT_URL ||
   process.env.NETLIFY_DATABASE_URL_UNPOOLED;
+
+const pooledUrl =
+  process.env.DATABASE_URL ||
+  process.env.NETLIFY_DATABASE_URL;
+
+const dbUrl = directUrl || pooledUrl;
 
 if (!dbUrl) {
   console.log("⚠️  No database URL found, skipping prisma db push");
@@ -25,6 +36,9 @@ if (!dbUrl) {
 
 try {
   console.log("🔄 Syncing database schema with prisma db push...");
+  if (directUrl) {
+    console.log("   Using direct/unpooled connection for schema push");
+  }
   execSync("npx prisma db push --skip-generate", {
     stdio: "inherit",
     env: { ...process.env, DATABASE_URL: dbUrl },

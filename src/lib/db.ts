@@ -1,67 +1,65 @@
 import { PrismaClient } from "@prisma/client";
 
-// Only validate DATABASE_URL at runtime, not during build
-const isBuild = process.env.NEXT_PHASE === "phase-production-build";
+// Detect build phase to skip runtime validation during Next.js static analysis
+const isBuild =
+  process.env.NEXT_PHASE === "phase-production-build" ||
+  process.env.NEXT_PHASE === "phase-export" ||
+  process.env.BUILDING === "true";
+
+// Dummy URL used only so Prisma Client can be instantiated during the build
+// step when no real database is reachable. Never used for actual queries.
+const BUILD_PLACEHOLDER_URL =
+  "postgresql://build:placeholder@localhost:5432/db?schema=public";
 
 /**
- * Get database URL from environment variables.
- * Supports Netlify Neon integration which sets NETLIFY_DATABASE_URL.
- * Priority: DATABASE_URL > NETLIFY_DATABASE_URL > NETLIFY_DATABASE_URL_UNPOOLED
+ * Resolve the database URL from the environment.
+ *
+ * Priority:
+ *  1. DATABASE_URL                     – standard / explicit
+ *  2. NETLIFY_DATABASE_URL             – Netlify Neon integration (pooled)
+ *  3. NETLIFY_DATABASE_URL_UNPOOLED    – Netlify Neon integration (direct)
+ *  4. undefined                        – no database configured
  */
 function getDatabaseUrl(): string | undefined {
-  // Check standard DATABASE_URL first
-  if (process.env.DATABASE_URL) {
-    return process.env.DATABASE_URL;
-  }
-
-  // Check Netlify Neon integration variables
-  // Use pooled connection (better for serverless)
-  if (process.env.NETLIFY_DATABASE_URL) {
-    return process.env.NETLIFY_DATABASE_URL;
-  }
-
-  // Fall back to unpooled if pooled is not available
-  if (process.env.NETLIFY_DATABASE_URL_UNPOOLED) {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  if (process.env.NETLIFY_DATABASE_URL) return process.env.NETLIFY_DATABASE_URL;
+  if (process.env.NETLIFY_DATABASE_URL_UNPOOLED)
     return process.env.NETLIFY_DATABASE_URL_UNPOOLED;
-  }
-
-  // For build time, use a dummy URL if not provided
-  if (isBuild) {
-    return "postgresql://user:password@localhost:5432/db?schema=public";
-  }
-
   return undefined;
 }
 
 const databaseUrl = getDatabaseUrl();
 
 if (!isBuild && !databaseUrl) {
-  console.warn("⚠️ WARNING: No database URL found!");
-  console.warn("The app will not function properly without a database.");
-  console.warn("Please set one of these environment variables in Netlify UI or .env.local:");
-  console.warn("  - DATABASE_URL (standard)");
-  console.warn("  - NETLIFY_DATABASE_URL (Netlify Neon integration - pooled)");
-  console.warn("  - NETLIFY_DATABASE_URL_UNPOOLED (Netlify Neon integration - unpooled)");
-  console.warn("Example: postgresql://user:password@host:5432/database?schema=public");
+  console.warn("⚠️  WARNING: No database URL configured.");
+  console.warn(
+    "   Set DATABASE_URL (or NETLIFY_DATABASE_URL) in your environment."
+  );
+  console.warn(
+    "   Format: postgresql://user:password@host:5432/dbname?sslmode=require"
+  );
+  console.warn(
+    "   For Neon: copy the connection string from https://console.neon.tech"
+  );
 }
 
-// Export the function for use in other modules
+// Export so other modules can check before attempting DB operations
 export { getDatabaseUrl };
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+const resolvedUrl = databaseUrl ?? (isBuild ? BUILD_PLACEHOLDER_URL : undefined);
+
 export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-    // Use the database URL or a dummy one for build
-    datasources: databaseUrl ? {
-      db: {
-        url: databaseUrl
-      }
-    } : undefined,
+    log:
+      process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
+    datasources: resolvedUrl
+      ? { db: { url: resolvedUrl } }
+      : undefined,
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = db;

@@ -1,0 +1,309 @@
+"use client";
+
+import { useState } from "react";
+import MainLayout from "@/components/layout/MainLayout";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Lightbulb,
+  Layers,
+  FileText,
+  Code2,
+  GitBranch,
+  Layout,
+  Bug,
+  Sparkles,
+  Loader2,
+  Copy,
+  CheckCheck,
+  ChevronRight,
+} from "lucide-react";
+
+// ──────────────────────────────────────────────
+// Template metadata (mirrors server-side TEMPLATES)
+// ──────────────────────────────────────────────
+
+const TEMPLATES = [
+  {
+    key: "saas-idea",
+    label: "SaaS Idea Generator",
+    description: "Generate 3 validated SaaS business ideas with market analysis.",
+    icon: Lightbulb,
+    placeholder: "e.g. project management for remote teams",
+    color: "text-yellow-500",
+  },
+  {
+    key: "mvp-builder",
+    label: "MVP Feature List",
+    description: "Define the minimal viable product scope for your idea.",
+    icon: Layers,
+    placeholder: "e.g. An AI-powered invoice generator for freelancers",
+    color: "text-blue-500",
+  },
+  {
+    key: "landing-page",
+    label: "Landing Page Copy",
+    description: "Write compelling, conversion-focused landing page copy.",
+    icon: Layout,
+    placeholder: "e.g. A scheduling tool that syncs across Notion, Google Calendar and Slack",
+    color: "text-green-500",
+  },
+  {
+    key: "tech-stack",
+    label: "Tech Stack Recommendation",
+    description: "Get a tailored full-stack technology recommendation.",
+    icon: GitBranch,
+    placeholder: "e.g. A multi-tenant SaaS with real-time collaboration features",
+    color: "text-purple-500",
+  },
+  {
+    key: "feature-spec",
+    label: "Feature Spec Writer",
+    description: "Write detailed feature specs and user stories.",
+    icon: FileText,
+    placeholder: "e.g. Add a commenting system to a document editor",
+    color: "text-orange-500",
+  },
+  {
+    key: "ui-component",
+    label: "UI Component Generator",
+    description: "Generate ready-to-use React + Tailwind component code.",
+    icon: Code2,
+    placeholder: "e.g. A responsive pricing table with three tiers and a popular badge",
+    color: "text-pink-500",
+  },
+  {
+    key: "prd",
+    label: "PRD / Product Brief",
+    description: "Create a full Product Requirements Document.",
+    icon: Sparkles,
+    placeholder: "e.g. A B2B expense-tracking SaaS for small businesses",
+    color: "text-cyan-500",
+  },
+  {
+    key: "bug-fixer",
+    label: "Bug Fixer",
+    description: "Diagnose and fix code bugs with clear explanations.",
+    icon: Bug,
+    placeholder: "Paste your buggy code or error message here…",
+    color: "text-red-500",
+  },
+] as const;
+
+type TemplateKey = (typeof TEMPLATES)[number]["key"];
+
+// ──────────────────────────────────────────────
+// Component
+// ──────────────────────────────────────────────
+
+export default function GeneratePage() {
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateKey | null>(null);
+  const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [output, setOutput] = useState("");
+  const [error, setError] = useState("");
+  const [copied, setCopied] = useState(false);
+
+  const tmpl = TEMPLATES.find((t) => t.key === selectedTemplate);
+
+  const handleGenerate = async () => {
+    if (!selectedTemplate || !prompt.trim()) return;
+    setLoading(true);
+    setError("");
+    setOutput("");
+
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ template: selectedTemplate, prompt: prompt.trim() }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Generation failed. Please try again.");
+        return;
+      }
+
+      setOutput(data.output ?? "");
+    } catch (err) {
+      console.error("Generation request failed:", err);
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!output) return;
+    await navigator.clipboard.writeText(output);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleReset = () => {
+    setSelectedTemplate(null);
+    setPrompt("");
+    setOutput("");
+    setError("");
+  };
+
+  return (
+    <MainLayout>
+      <div className="h-full overflow-y-auto">
+        <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-8">
+          {/* Header */}
+          <div className="mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
+              <Sparkles className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+              Generate
+            </h1>
+            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
+              Use AI templates to build your SaaS product — from idea to launch-ready assets.
+            </p>
+          </div>
+
+          {/* Template Picker */}
+          {!selectedTemplate && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {TEMPLATES.map((t) => {
+                const Icon = t.icon;
+                return (
+                  <Card
+                    key={t.key}
+                    className="cursor-pointer hover:shadow-md hover:border-primary/50 transition-all group"
+                    onClick={() => setSelectedTemplate(t.key)}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className={`p-2 rounded-lg bg-muted ${t.color}`}>
+                          <Icon className="h-5 w-5" />
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <CardTitle className="text-sm leading-snug mt-2">{t.label}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-xs text-muted-foreground">{t.description}</p>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Prompt + Output */}
+          {selectedTemplate && tmpl && (
+            <div className="space-y-6">
+              {/* Selected template indicator */}
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm" onClick={handleReset} className="gap-1">
+                  ← Back
+                </Button>
+                <Badge variant="secondary" className="gap-1">
+                  <tmpl.icon className={`h-3 w-3 ${tmpl.color}`} />
+                  {tmpl.label}
+                </Badge>
+              </div>
+
+              {/* Input card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base">Your Input</CardTitle>
+                  <CardDescription className="text-xs">{tmpl.description}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Textarea
+                    value={prompt}
+                    onChange={(e) => setPrompt(e.target.value)}
+                    placeholder={tmpl.placeholder}
+                    rows={5}
+                    className="resize-none"
+                    disabled={loading}
+                  />
+                  {error && (
+                    <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md">
+                      {error}
+                    </div>
+                  )}
+                  <Button
+                    onClick={handleGenerate}
+                    disabled={loading || !prompt.trim()}
+                    className="w-full sm:w-auto gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Generating…
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4" />
+                        Generate
+                      </>
+                    )}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Output card */}
+              {output && (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-base">Result</CardTitle>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleCopy}
+                          className="gap-1"
+                        >
+                          {copied ? (
+                            <>
+                              <CheckCheck className="h-3 w-3" />
+                              Copied!
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="h-3 w-3" />
+                              Copy
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleGenerate}
+                          disabled={loading}
+                          className="gap-1"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          Regenerate
+                        </Button>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <pre className="whitespace-pre-wrap text-sm font-mono bg-muted/50 rounded-lg p-4 overflow-auto max-h-[600px]">
+                      {output}
+                    </pre>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </MainLayout>
+  );
+}

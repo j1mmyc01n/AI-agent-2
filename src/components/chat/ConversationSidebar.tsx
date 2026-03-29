@@ -22,6 +22,7 @@ import {
   LogOut,
   User,
   LayoutDashboard,
+  Sparkles,
 } from "lucide-react";
 
 interface Conversation {
@@ -225,6 +226,18 @@ export default function ConversationSidebar({
             >
               <FolderOpen className="h-4 w-4 flex-shrink-0" />
               {!collapsed && <span className="truncate">Projects</span>}
+            </Button>
+          </Link>
+          <Link href="/generate">
+            <Button
+              variant="ghost"
+              className={`w-full gap-2 ${
+                pathname === "/generate" ? "bg-accent" : ""
+              } ${collapsed ? "justify-center px-2" : "justify-start"}`}
+              size={collapsed ? "icon" : "default"}
+            >
+              <Sparkles className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">Generate</span>}
             </Button>
           </Link>
         </div>

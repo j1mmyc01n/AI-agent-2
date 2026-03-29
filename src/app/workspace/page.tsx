@@ -2,7 +2,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import MainLayout from "@/components/layout/MainLayout";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Plus,
-  TrendingUp,
 } from "lucide-react";
 
 export default async function WorkspacePage() {
@@ -26,44 +25,74 @@ export default async function WorkspacePage() {
   }
 
   const userId = (session.user as { id: string }).id;
+  const hasDb = !!getDatabaseUrl();
 
-  // Fetch user with integration status
-  const user = await db.user.findUnique({
-    where: { id: userId },
-    select: {
-      name: true,
-      email: true,
-      openaiKey: true,
-      githubToken: true,
-      vercelToken: true,
-      tavilyKey: true,
-      _count: {
+  // Default empty state for when DB is unavailable or user is test admin
+  let user: {
+    name: string | null;
+    email: string;
+    openaiKey: string | null;
+    githubToken: string | null;
+    vercelToken: string | null;
+    tavilyKey: string | null;
+    _count: { conversations: number; projects: number };
+  } | null = null;
+
+  let recentConversations: {
+    id: string;
+    title: string;
+    updatedAt: Date;
+    _count: { messages: number };
+  }[] = [];
+
+  let recentProjects: {
+    id: string;
+    name: string;
+    type: string;
+    status: string;
+  }[] = [];
+
+  if (hasDb) {
+    try {
+      user = await db.user.findUnique({
+        where: { id: userId },
         select: {
-          conversations: true,
-          projects: true,
+          name: true,
+          email: true,
+          openaiKey: true,
+          githubToken: true,
+          vercelToken: true,
+          tavilyKey: true,
+          _count: {
+            select: {
+              conversations: true,
+              projects: true,
+            },
+          },
         },
-      },
-    },
-  });
+      });
 
-  // Get recent conversations
-  const recentConversations = await db.conversation.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    take: 5,
-    include: {
-      _count: {
-        select: { messages: true },
-      },
-    },
-  });
+      recentConversations = await db.conversation.findMany({
+        where: { userId },
+        orderBy: { updatedAt: "desc" },
+        take: 5,
+        include: {
+          _count: {
+            select: { messages: true },
+          },
+        },
+      });
 
-  // Get recent projects
-  const recentProjects = await db.project.findMany({
-    where: { userId },
-    orderBy: { updatedAt: "desc" },
-    take: 3,
-  });
+      recentProjects = await db.project.findMany({
+        where: { userId },
+        orderBy: { updatedAt: "desc" },
+        take: 3,
+      });
+    } catch (err) {
+      console.error("Workspace DB error:", err);
+      // Fall through with empty data rather than crashing
+    }
+  }
 
   const connectedIntegrations = [
     user?.openaiKey,
@@ -90,8 +119,26 @@ export default async function WorkspacePage() {
             </p>
           </div>
 
+          {/* Database not configured banner */}
+          {!hasDb && (
+            <Card className="mb-6 border-yellow-200 dark:border-yellow-900 bg-yellow-50 dark:bg-yellow-950/20">
+              <CardHeader className="pb-3">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1 min-w-0">
+                    <CardTitle className="text-base sm:text-lg">Database Not Configured</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm">
+                      Set <code className="bg-muted px-1 rounded">DATABASE_URL</code> in your
+                      environment to persist conversations, projects, and settings.
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+          )}
+
           {/* Setup Status Banner */}
-          {!isFullySetup && (
+          {hasDb && !isFullySetup && (
             <Card className="mb-6 border-orange-200 dark:border-orange-900 bg-orange-50 dark:bg-orange-950/20">
               <CardHeader className="pb-3">
                 <div className="flex items-start gap-3">
@@ -120,7 +167,7 @@ export default async function WorkspacePage() {
               <CardHeader className="pb-2">
                 <CardDescription className="text-xs">Total Conversations</CardDescription>
                 <CardTitle className="text-2xl sm:text-3xl">
-                  {user?._count.conversations || 0}
+                  {user?._count.conversations ?? 0}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -135,7 +182,7 @@ export default async function WorkspacePage() {
               <CardHeader className="pb-2">
                 <CardDescription className="text-xs">Active Projects</CardDescription>
                 <CardTitle className="text-2xl sm:text-3xl">
-                  {user?._count.projects || 0}
+                  {user?._count.projects ?? 0}
                 </CardTitle>
               </CardHeader>
               <CardContent>

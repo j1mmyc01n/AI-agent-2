@@ -3,7 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect, notFound } from "next/navigation";
 import MainLayout from "@/components/layout/MainLayout";
 import ChatInterface from "@/components/chat/ChatInterface";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -18,21 +18,38 @@ export default async function ConversationPage({ params }: PageProps) {
   const userId = (session.user as { id: string }).id;
   const { id } = await params;
 
-  const conversation = await db.conversation.findFirst({
-    where: { id, userId },
-    include: { messages: { orderBy: { createdAt: "asc" } } },
-  });
-
-  if (!conversation) {
-    notFound();
+  // If no database, redirect to new chat (can't load history)
+  if (!getDatabaseUrl()) {
+    redirect("/chat");
   }
 
-  const initialMessages = conversation.messages.map((m) => ({
-    id: m.id,
-    role: m.role as "user" | "assistant" | "system" | "tool",
-    content: m.content,
-    toolCalls: m.toolCalls,
-  }));
+  let initialMessages: {
+    id: string;
+    role: "user" | "assistant" | "system" | "tool";
+    content: string;
+    toolCalls: string | null;
+  }[] = [];
+
+  try {
+    const conversation = await db.conversation.findFirst({
+      where: { id, userId },
+      include: { messages: { orderBy: { createdAt: "asc" } } },
+    });
+
+    if (!conversation) {
+      notFound();
+    }
+
+    initialMessages = conversation.messages.map((m) => ({
+      id: m.id,
+      role: m.role as "user" | "assistant" | "system" | "tool",
+      content: m.content,
+      toolCalls: m.toolCalls,
+    }));
+  } catch (err) {
+    console.error("Conversation load error:", err);
+    notFound();
+  }
 
   return (
     <MainLayout currentConversationId={id}>
