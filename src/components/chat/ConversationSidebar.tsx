@@ -22,6 +22,7 @@ import {
   LogOut,
   User,
   LayoutDashboard,
+  FolderOpen,
   Sparkles,
   Globe,
   History,
@@ -160,6 +161,7 @@ export default function ConversationSidebar({
 
   const navItems = [
     { href: "/workspace", icon: LayoutDashboard, label: "Workspace" },
+    { href: "/projects", icon: FolderOpen, label: "Projects" },
     { href: "/generate", icon: Sparkles, label: "Generate" },
     { href: "/connectivity", icon: Globe, label: "Connectivity" },
     { href: "/history", icon: History, label: "History" },

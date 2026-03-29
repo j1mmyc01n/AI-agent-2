@@ -156,7 +156,7 @@ export default function MessageInput({
     <div
       className="border-t border-border/50 bg-card/30 backdrop-blur-sm p-1.5 sm:p-2 shrink-0"
       style={{
-        paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))",
+        paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0.75rem))",
       }}
     >
       <div className="max-w-3xl mx-auto">

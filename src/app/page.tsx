@@ -30,7 +30,7 @@ export default async function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="fixed inset-0 bg-background overflow-y-auto">
       {/* Navigation */}
       <nav className="border-b border-border/50 bg-background/80 backdrop-blur-md sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -45,15 +45,9 @@ export default async function Home() {
           <div className="flex items-center gap-3">
             <Link
               href="/login"
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors px-3 py-2"
-            >
-              Sign in
-            </Link>
-            <Link
-              href="/register"
               className="text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 transition-all px-4 py-2 rounded-lg shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30"
             >
-              Get Started
+              Sign In
             </Link>
           </div>
         </div>
@@ -79,19 +73,13 @@ export default async function Home() {
               Chat with AI, generate code, manage tasks, and preview results — all in one workspace.
               From idea to shipped product, powered by GPT-4, Claude, and Grok.
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="flex items-center justify-center">
               <Link
                 href="/register"
-                className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-all px-6 py-3 rounded-lg text-base font-semibold w-full sm:w-auto justify-center shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
+                className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-all px-8 py-3.5 rounded-lg text-base font-semibold justify-center shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
               >
-                Start Building Free
+                Get Started
                 <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 border border-border/50 hover:bg-accent hover:border-primary/20 transition-all px-6 py-3 rounded-lg text-base font-medium w-full sm:w-auto justify-center"
-              >
-                Sign In
               </Link>
             </div>
           </div>
@@ -293,7 +281,7 @@ export default async function Home() {
             href="/register"
             className="inline-flex items-center gap-2 bg-primary text-primary-foreground hover:bg-primary/90 transition-all px-8 py-3.5 rounded-lg text-base font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30"
           >
-            Get Started Free
+            Get Started
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>

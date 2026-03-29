@@ -11,13 +11,10 @@ import {
   LayoutDashboard,
   MessageSquare,
   FolderOpen,
-  Settings,
   Bot,
   CheckCircle2,
   AlertCircle,
   Plus,
-  Globe,
-  Sparkles,
   Database,
   ArrowRight,
 } from "lucide-react";
@@ -232,80 +229,6 @@ export default async function WorkspacePage() {
             </Card>
           )}
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6 sm:mb-8">
-            <Card className="border-border/50 hover:border-primary/20 transition-colors">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs flex items-center gap-1.5">
-                  <MessageSquare className="h-3 w-3" />
-                  Conversations
-                </CardDescription>
-                <CardTitle className="text-2xl sm:text-3xl">
-                  {user?._count.conversations ?? 0}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">Chat sessions</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/50 hover:border-primary/20 transition-colors">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs flex items-center gap-1.5">
-                  <FolderOpen className="h-3 w-3" />
-                  Projects
-                </CardDescription>
-                <CardTitle className="text-2xl sm:text-3xl">
-                  {user?._count.projects ?? 0}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">Built by AI</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/50 hover:border-primary/20 transition-colors">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs flex items-center gap-1.5">
-                  <Settings className="h-3 w-3" />
-                  Integrations
-                </CardDescription>
-                <CardTitle className="text-2xl sm:text-3xl">
-                  {connectedIntegrations}/{totalIntegrations}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isFullySetup ? (
-                  <p className="text-xs text-green-500 flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3" />
-                    All connected
-                  </p>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Setup needed</p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="border-border/50 hover:border-primary/20 transition-colors">
-              <CardHeader className="pb-2">
-                <CardDescription className="text-xs flex items-center gap-1.5">
-                  <Bot className="h-3 w-3" />
-                  AI Status
-                </CardDescription>
-                <CardTitle className="text-2xl sm:text-3xl">
-                  {(user?.openaiKey || user?.anthropicKey || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) ? (
-                    <span className="text-green-500">Ready</span>
-                  ) : (
-                    <span className="text-primary">Setup</span>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground">Agent power</p>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Recent Conversations */}
@@ -401,81 +324,6 @@ export default async function WorkspacePage() {
             </Card>
           </div>
 
-          {/* Quick Actions */}
-          <Card className="mt-6 border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-primary" />
-                Quick Actions
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                <Link href="/chat">
-                  <Button variant="outline" className="w-full justify-start gap-2 border-border/50 hover:border-primary/20 hover:bg-primary/5">
-                    <MessageSquare className="h-4 w-4 text-primary" />
-                    New Chat
-                  </Button>
-                </Link>
-                <Link href="/generate">
-                  <Button variant="outline" className="w-full justify-start gap-2 border-border/50 hover:border-primary/20 hover:bg-primary/5">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    Generate
-                  </Button>
-                </Link>
-                <Link href="/connectivity">
-                  <Button variant="outline" className="w-full justify-start gap-2 border-border/50 hover:border-primary/20 hover:bg-primary/5">
-                    <Globe className="h-4 w-4 text-primary" />
-                    Connectivity Setup
-                  </Button>
-                </Link>
-                <Link href="/chat">
-                  <Button className="w-full justify-start gap-2 shadow-md shadow-primary/10">
-                    <Plus className="h-4 w-4" />
-                    Build New Project
-                  </Button>
-                </Link>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Storage Status */}
-          <Card className="mt-6 border-border/50">
-            <CardHeader>
-              <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                <Database className="h-5 w-5 text-primary" />
-                Storage Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-3 p-3 rounded-lg border border-border/50 bg-muted/20">
-                {hasDb ? (
-                  <>
-                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                    <div>
-                      <p className="text-sm font-medium">Cloud Database Connected</p>
-                      <p className="text-xs text-muted-foreground">Data persisted to PostgreSQL</p>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0">
-                      <Database className="h-4 w-4 text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium">Local Mode</p>
-                      <p className="text-xs text-muted-foreground">
-                        Data stored in browser. Connect a database in Settings for cloud persistence.
-                      </p>
-                    </div>
-                    <Link href="/settings" className="ml-auto">
-                      <Button size="sm" variant="outline" className="border-primary/20 hover:bg-primary/10">Connect DB</Button>
-                    </Link>
-                  </>
-                )}
-              </div>
-            </CardContent>
-          </Card>
         </div>
       </div>
     </MainLayout>
