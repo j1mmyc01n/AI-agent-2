@@ -176,26 +176,28 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
 
   if (messages.length === 0 && !isLoading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
-        <div className="text-center max-w-md">
-          <Bot className="h-16 w-16 text-primary/30 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Welcome to DoBetter Viber</h2>
-          <p className="text-muted-foreground mb-6">
-            Your AI-powered SaaS builder. Describe what you want to build and I&apos;ll
-            help you design, code, and deploy it.
+      <div className="flex-1 flex items-center justify-center p-4">
+        <div className="text-center max-w-lg">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+            <Bot className="h-8 w-8 text-primary" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold mb-3">Welcome to DoBetter Viber</h2>
+          <p className="text-muted-foreground mb-8 text-sm sm:text-base leading-relaxed">
+            Your AI-powered workspace. Describe what you want to build and the agent will
+            help you design, code, and ship it.
           </p>
-          <div className="grid grid-cols-2 gap-3 text-left">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
             {[
-              { icon: "🚀", text: "Build a SaaS MVP in minutes" },
-              { icon: "🔍", text: "Research any topic on the web" },
-              { icon: "💻", text: "Generate and push code to GitHub" },
-              { icon: "⚡", text: "Deploy live to Vercel instantly" },
+              { icon: "🚀", text: "Build a SaaS MVP from a prompt" },
+              { icon: "🔍", text: "Research topics with web search" },
+              { icon: "💻", text: "Generate & push code to GitHub" },
+              { icon: "⚡", text: "Deploy live to Vercel/Netlify" },
             ].map((item, i) => (
               <div
                 key={i}
-                className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 text-sm"
+                className="flex items-center gap-3 p-3 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-sm"
               >
-                <span>{item.icon}</span>
+                <span className="text-lg">{item.icon}</span>
                 <span>{item.text}</span>
               </div>
             ))}

@@ -63,7 +63,7 @@ export default function RegisterPage() {
           <CardHeader>
             <CardTitle>Create an account</CardTitle>
             <CardDescription>
-              Start building SaaS products with AI today
+              Start building products with your AI agent workspace
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -82,6 +82,8 @@ export default function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={loading}
+                  autoComplete="name"
+                  className="text-[16px] sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -94,6 +96,8 @@ export default function RegisterPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={loading}
+                  autoComplete="email"
+                  className="text-[16px] sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -107,6 +111,8 @@ export default function RegisterPage() {
                   required
                   minLength={8}
                   disabled={loading}
+                  autoComplete="new-password"
+                  className="text-[16px] sm:text-sm"
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading}>

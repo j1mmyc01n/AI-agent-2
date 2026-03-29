@@ -20,37 +20,42 @@ export async function POST(req: NextRequest) {
       conversationId?: string;
       model?: string;
       provider?: AIProvider;
+      history?: { role: string; content: string }[];
     };
 
     if (!message?.trim()) {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
 
-    // Check if database is available
-    if (!getDatabaseUrl()) {
-      return NextResponse.json(
-        {
-          error:
-            "Database not configured. Chat history cannot be saved. To use the chat feature with conversation history, please set up a DATABASE_URL.",
-          message:
-            "The AI chat requires a database to store conversation history. See TEST_ADMIN.md for setup instructions.",
-        },
-        { status: 503 }
-      );
-    }
+    const hasDb = !!getDatabaseUrl();
 
-    // Get user's API keys
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      select: {
-        openaiKey: true,
-        anthropicKey: true,
-        grokKey: true,
-        githubToken: true,
-        vercelToken: true,
-        tavilyKey: true,
-      },
-    });
+    // Get user's API keys from DB or fall back to env vars
+    let user: {
+      openaiKey?: string | null;
+      anthropicKey?: string | null;
+      grokKey?: string | null;
+      githubToken?: string | null;
+      vercelToken?: string | null;
+      tavilyKey?: string | null;
+    } | null = null;
+
+    if (hasDb) {
+      try {
+        user = await db.user.findUnique({
+          where: { id: userId },
+          select: {
+            openaiKey: true,
+            anthropicKey: true,
+            grokKey: true,
+            githubToken: true,
+            vercelToken: true,
+            tavilyKey: true,
+          },
+        });
+      } catch (e) {
+        console.error("Failed to fetch user keys from DB:", e);
+      }
+    }
 
     const activeProvider: AIProvider = provider || "openai";
 
@@ -61,65 +66,73 @@ export async function POST(req: NextRequest) {
 
     if (activeProvider === "openai" && !openaiKey) {
       return NextResponse.json(
-        { error: "No OpenAI API key configured. Please add one in Settings > AI Models." },
+        { error: "No OpenAI API key configured. Please add one in Settings > AI Models, or set OPENAI_API_KEY in your environment." },
         { status: 400 }
       );
     }
     if (activeProvider === "anthropic" && !anthropicKey) {
       return NextResponse.json(
-        { error: "No Anthropic API key configured. Please add one in Settings > AI Models." },
+        { error: "No Anthropic API key configured. Please add one in Settings > AI Models, or set ANTHROPIC_API_KEY in your environment." },
         { status: 400 }
       );
     }
     if (activeProvider === "grok" && !grokKey) {
       return NextResponse.json(
-        { error: "No Grok API key configured. Please add one in Settings > AI Models." },
+        { error: "No Grok API key configured. Please add one in Settings > AI Models, or set GROK_API_KEY in your environment." },
         { status: 400 }
       );
     }
 
-    // Get or create conversation
-    let conversation;
-    if (conversationId) {
-      conversation = await db.conversation.findFirst({
-        where: { id: conversationId, userId },
-        include: { messages: { orderBy: { createdAt: "asc" } } },
-      });
-      if (!conversation) {
-        return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+    // Get or create conversation (works with or without DB)
+    let conversation: { id: string; title: string; messages: { role: string; content: string }[] };
+    const localMode = !hasDb;
+
+    if (localMode) {
+      // In local mode, the client manages conversation persistence via IndexedDB
+      // Server just needs a conversation ID for the streaming response
+      const convId = conversationId || `local-${Date.now()}`;
+      conversation = {
+        id: convId,
+        title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
+        messages: [],
+      };
+      // Client sends history in local mode via the messages field
+      if (body.history && Array.isArray(body.history)) {
+        conversation.messages = body.history;
       }
     } else {
-      conversation = await db.conversation.create({
+      if (conversationId) {
+        const conv = await db.conversation.findFirst({
+          where: { id: conversationId, userId },
+          include: { messages: { orderBy: { createdAt: "asc" } } },
+        });
+        if (!conv) {
+          return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+        }
+        conversation = { id: conv.id, title: conv.title, messages: conv.messages };
+      } else {
+        const conv = await db.conversation.create({
+          data: {
+            userId,
+            title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
+          },
+          include: { messages: true },
+        });
+        conversation = { id: conv.id, title: conv.title, messages: conv.messages };
+      }
+
+      // Save user message to DB
+      await db.message.create({
         data: {
-          userId,
-          title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
+          conversationId: conversation.id,
+          role: "user",
+          content: message,
         },
-        include: { messages: true },
-      });
-    }
-
-    // Save user message
-    await db.message.create({
-      data: {
-        conversationId: conversation.id,
-        role: "user",
-        content: message,
-      },
-    });
-
-    // Update title if default
-    if (
-      conversation.title === "New Conversation" &&
-      (!conversation.messages || conversation.messages.length === 0)
-    ) {
-      await db.conversation.update({
-        where: { id: conversation.id },
-        data: { title: message.slice(0, 60) + (message.length > 60 ? "..." : "") },
       });
     }
 
     // Build message history
-    const history = (conversation.messages || []).map((m) => ({
+    const history = conversation.messages.map((m) => ({
       role: m.role as "user" | "assistant" | "system" | "tool",
       content: m.content,
     }));
@@ -164,21 +177,26 @@ export async function POST(req: NextRequest) {
             }
           );
 
-          // Save assistant message
-          await db.message.create({
-            data: {
-              conversationId: conversation.id,
-              role: "assistant",
-              content: fullResponse,
-              toolCalls: toolCallsData.length > 0 ? JSON.stringify(toolCallsData) : null,
-            },
-          });
+          // Save assistant message to DB if available
+          if (!localMode) {
+            try {
+              await db.message.create({
+                data: {
+                  conversationId: conversation.id,
+                  role: "assistant",
+                  content: fullResponse,
+                  toolCalls: toolCallsData.length > 0 ? JSON.stringify(toolCallsData) : null,
+                },
+              });
 
-          // Update conversation timestamp
-          await db.conversation.update({
-            where: { id: conversation.id },
-            data: { updatedAt: new Date() },
-          });
+              await db.conversation.update({
+                where: { id: conversation.id },
+                data: { updatedAt: new Date() },
+              });
+            } catch (e) {
+              console.error("Failed to save message to DB:", e);
+            }
+          }
 
           const doneData = JSON.stringify({
             type: "done",

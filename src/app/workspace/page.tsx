@@ -16,6 +16,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Plus,
+  Globe,
+  Sparkles,
+  Database,
 } from "lucide-react";
 
 export default async function WorkspacePage() {
@@ -339,24 +342,60 @@ export default async function WorkspacePage() {
                     New Chat
                   </Button>
                 </Link>
-                <Link href="/projects">
+                <Link href="/generate">
                   <Button variant="outline" className="w-full justify-start gap-2">
-                    <FolderOpen className="h-4 w-4" />
-                    View Projects
+                    <Sparkles className="h-4 w-4" />
+                    Generate
                   </Button>
                 </Link>
-                <Link href="/settings">
+                <Link href="/connectivity">
                   <Button variant="outline" className="w-full justify-start gap-2">
-                    <Settings className="h-4 w-4" />
-                    Settings
+                    <Globe className="h-4 w-4" />
+                    Connectivity Setup
                   </Button>
                 </Link>
                 <Link href="/chat">
                   <Button className="w-full justify-start gap-2">
                     <Plus className="h-4 w-4" />
-                    Build New SaaS
+                    Build New Project
                   </Button>
                 </Link>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Storage Status */}
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                <Database className="h-5 w-5" />
+                Storage Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                {hasDb ? (
+                  <>
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Cloud Database Connected</p>
+                      <p className="text-xs text-muted-foreground">Data persisted to PostgreSQL</p>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">Local Mode</p>
+                      <p className="text-xs text-muted-foreground">
+                        Data stored in browser. Connect a database in Settings for cloud persistence.
+                      </p>
+                    </div>
+                    <Link href="/settings" className="ml-auto">
+                      <Button size="sm" variant="outline">Connect DB</Button>
+                    </Link>
+                  </>
+                )}
               </div>
             </CardContent>
           </Card>

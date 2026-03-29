@@ -17,24 +17,25 @@ export async function GET() {
   const userId = (session.user as { id: string }).id;
 
   if (!getDatabaseUrl()) {
-    const sessionData = session as unknown as Record<string, unknown>;
+    // In local mode, report which env vars are available
     return NextResponse.json({
-      openaiKey: maskSecret(sessionData.openaiKey as string),
-      anthropicKey: maskSecret(sessionData.anthropicKey as string),
-      grokKey: maskSecret(sessionData.grokKey as string),
-      githubToken: maskSecret(sessionData.githubToken as string),
-      vercelToken: maskSecret(sessionData.vercelToken as string),
-      tavilyKey: maskSecret(sessionData.tavilyKey as string),
-      neonKey: maskSecret(sessionData.neonKey as string),
-      netlifyToken: maskSecret(sessionData.netlifyToken as string),
-      hasOpenaiKey: !!sessionData.openaiKey,
-      hasAnthropicKey: !!sessionData.anthropicKey,
-      hasGrokKey: !!sessionData.grokKey,
-      hasGithubToken: !!sessionData.githubToken,
-      hasVercelToken: !!sessionData.vercelToken,
-      hasTavilyKey: !!sessionData.tavilyKey,
-      hasNeonKey: !!sessionData.neonKey,
-      hasNetlifyToken: !!sessionData.netlifyToken,
+      openaiKey: maskSecret(process.env.OPENAI_API_KEY),
+      anthropicKey: maskSecret(process.env.ANTHROPIC_API_KEY),
+      grokKey: maskSecret(process.env.GROK_API_KEY),
+      githubToken: null,
+      vercelToken: null,
+      tavilyKey: maskSecret(process.env.TAVILY_API_KEY),
+      neonKey: null,
+      netlifyToken: null,
+      hasOpenaiKey: !!process.env.OPENAI_API_KEY,
+      hasAnthropicKey: !!process.env.ANTHROPIC_API_KEY,
+      hasGrokKey: !!process.env.GROK_API_KEY,
+      hasGithubToken: false,
+      hasVercelToken: false,
+      hasTavilyKey: !!process.env.TAVILY_API_KEY,
+      hasNeonKey: false,
+      hasNetlifyToken: false,
+      localMode: true,
     });
   }
 
@@ -121,12 +122,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        error:
-          "Database not configured. API keys cannot be persisted. Please set up a DATABASE_URL to save your integrations permanently.",
-        message:
-          "To use AI features, you'll need to set up a database. See TEST_ADMIN.md for instructions.",
+        error: "Running in local mode. API keys are stored in your browser only. Connect a database in Settings to persist them securely.",
+        localMode: true,
       },
-      { status: 503 }
+      { status: 200 }
     );
   }
 

@@ -251,26 +251,26 @@ export default function ChatInterface({
   return (
     <div className="flex flex-col h-full">
       {/* In-panel view tabs */}
-      <div className="flex items-center gap-1 px-4 py-2 border-b bg-muted/20 shrink-0">
+      <div className="flex items-center gap-1 px-2 sm:px-4 py-2 border-b bg-muted/20 shrink-0 overflow-x-auto">
         {panelTabs.map(({ id, label, icon: Icon }) => (
           <Button
             key={id}
             variant={activePanel === id ? "default" : "ghost"}
             size="sm"
-            className={`gap-1.5 px-3 h-8 text-xs font-medium ${
+            className={`gap-1 sm:gap-1.5 px-2 sm:px-3 h-8 text-xs font-medium shrink-0 ${
               activePanel === id ? "shadow-sm" : ""
             }`}
             onClick={() => setActivePanel(id)}
           >
             <Icon className="h-3.5 w-3.5" />
-            <span>{label}</span>
+            <span className="hidden xs:inline sm:inline">{label}</span>
             {id === "code" && codeBlocks.length > 0 && (
-              <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold">
+              <span className="ml-0.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold">
                 {codeBlocks.length}
               </span>
             )}
             {id === "todo" && todos.length > 0 && (
-              <span className="ml-1 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold">
+              <span className="ml-0.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold">
                 {todos.length}
               </span>
             )}

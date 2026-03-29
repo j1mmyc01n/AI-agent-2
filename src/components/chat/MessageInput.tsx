@@ -59,7 +59,7 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t bg-background p-4">
+    <div className="border-t bg-background p-3 sm:p-4 safe-area-bottom">
       <div className="max-w-3xl mx-auto">
         <div className="flex flex-col bg-muted/50 border rounded-xl p-2 gap-2">
           {/* Model selector row */}
@@ -77,7 +77,8 @@ export default function MessageInput({
               placeholder={placeholder}
               disabled={isLoading || disabled}
               rows={1}
-              className="flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] max-h-[200px] py-2 px-1 text-sm"
+              className="flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] max-h-[200px] py-2 px-1 text-[16px] sm:text-sm"
+              style={{ fontSize: "16px" }}
             />
             <Button
               onClick={handleSend}
@@ -89,7 +90,7 @@ export default function MessageInput({
             </Button>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground text-center mt-2">
+        <p className="text-[10px] sm:text-xs text-muted-foreground text-center mt-2">
           DoBetter Viber can make mistakes. Verify important information.
         </p>
       </div>

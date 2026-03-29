@@ -23,6 +23,8 @@ import {
   User,
   LayoutDashboard,
   Sparkles,
+  Globe,
+  History,
 } from "lucide-react";
 
 interface Conversation {
@@ -238,6 +240,30 @@ export default function ConversationSidebar({
             >
               <Sparkles className="h-4 w-4 flex-shrink-0" />
               {!collapsed && <span className="truncate">Generate</span>}
+            </Button>
+          </Link>
+          <Link href="/connectivity">
+            <Button
+              variant="ghost"
+              className={`w-full gap-2 ${
+                pathname === "/connectivity" ? "bg-accent" : ""
+              } ${collapsed ? "justify-center px-2" : "justify-start"}`}
+              size={collapsed ? "icon" : "default"}
+            >
+              <Globe className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">Connectivity</span>}
+            </Button>
+          </Link>
+          <Link href="/history">
+            <Button
+              variant="ghost"
+              className={`w-full gap-2 ${
+                pathname === "/history" ? "bg-accent" : ""
+              } ${collapsed ? "justify-center px-2" : "justify-start"}`}
+              size={collapsed ? "icon" : "default"}
+            >
+              <History className="h-4 w-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">History</span>}
             </Button>
           </Link>
         </div>

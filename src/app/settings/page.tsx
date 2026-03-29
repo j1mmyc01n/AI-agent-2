@@ -4,13 +4,18 @@ import { redirect } from "next/navigation";
 import MainLayout from "@/components/layout/MainLayout";
 import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Settings as SettingsIcon, Key, Plug, Database } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { getDatabaseUrl } from "@/lib/db";
+import { Settings as SettingsIcon, Key, Plug, Database, CheckCircle2, AlertCircle } from "lucide-react";
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     redirect("/login");
   }
+
+  const hasDb = !!getDatabaseUrl();
 
   return (
     <MainLayout>
@@ -27,7 +32,7 @@ export default async function SettingsPage() {
           </div>
 
           <Tabs defaultValue="ai-models" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-3">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="ai-models" className="gap-2">
                 <Key className="h-4 w-4" />
                 <span className="hidden sm:inline">AI Models</span>
@@ -38,9 +43,10 @@ export default async function SettingsPage() {
                 <span className="hidden sm:inline">Integrations</span>
                 <span className="sm:hidden">Apps</span>
               </TabsTrigger>
-              <TabsTrigger value="connectivity" className="gap-2 hidden lg:flex">
+              <TabsTrigger value="storage" className="gap-2">
                 <Database className="h-4 w-4" />
-                Connectivity
+                <span className="hidden sm:inline">Storage</span>
+                <span className="sm:hidden">DB</span>
               </TabsTrigger>
             </TabsList>
 
@@ -64,13 +70,120 @@ export default async function SettingsPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="connectivity" className="space-y-4">
+            <TabsContent value="storage" className="space-y-4">
               <div>
-                <h2 className="text-lg sm:text-xl font-semibold mb-2">Connectivity Settings</h2>
+                <h2 className="text-lg sm:text-xl font-semibold mb-2">Storage & Database</h2>
                 <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-                  Database and infrastructure connectivity options
+                  Database connection and storage mode configuration
                 </p>
-                <IntegrationsPanel filter="connectivity" />
+
+                {/* Current Status */}
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="text-base">Connection Status</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className={`flex items-center gap-3 p-4 rounded-lg border ${
+                      hasDb
+                        ? "bg-green-500/10 border-green-500/20"
+                        : "bg-yellow-500/10 border-yellow-500/20"
+                    }`}>
+                      {hasDb ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-yellow-500 shrink-0" />
+                      )}
+                      <div>
+                        <p className="text-sm font-medium">
+                          {hasDb ? "Cloud Database Connected" : "Local Mode Active"}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {hasDb
+                            ? "All data persisted to your PostgreSQL database."
+                            : "Data stored in your browser using IndexedDB. Set DATABASE_URL to enable cloud sync."}
+                        </p>
+                      </div>
+                      <Badge variant={hasDb ? "default" : "secondary"} className="ml-auto shrink-0">
+                        {hasDb ? "Connected" : "Local"}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Storage Modes Explanation */}
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="text-base">Storage Modes</CardTitle>
+                    <CardDescription className="text-xs">
+                      DoBetter Viber supports three storage modes
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {[
+                      {
+                        title: "Local-First (Browser)",
+                        desc: "Default mode. Uses IndexedDB for persistence. Data stays in your browser.",
+                        active: !hasDb,
+                      },
+                      {
+                        title: "Platform Database",
+                        desc: "Uses the Netlify-managed PostgreSQL database (Neon integration).",
+                        active: hasDb,
+                      },
+                      {
+                        title: "External Database",
+                        desc: "Connect your own PostgreSQL by setting DATABASE_URL in environment variables.",
+                        active: false,
+                      },
+                    ].map((mode) => (
+                      <div
+                        key={mode.title}
+                        className={`p-3 rounded-lg border ${
+                          mode.active ? "border-primary/50 bg-primary/5" : "bg-muted/30"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium">{mode.title}</p>
+                          {mode.active && <Badge className="text-xs">Active</Badge>}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{mode.desc}</p>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+
+                {/* Database Setup */}
+                {!hasDb && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Connect a Database</CardTitle>
+                      <CardDescription className="text-xs">
+                        Set these environment variables in your Netlify dashboard
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        <div className="p-3 rounded-lg bg-muted/50 border">
+                          <code className="text-xs font-mono text-primary">DATABASE_URL</code>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            PostgreSQL connection string. Example: postgresql://user:pass@host:5432/db?sslmode=require
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted/50 border">
+                          <code className="text-xs font-mono text-primary">NEXTAUTH_SECRET</code>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            JWT signing secret. Generate with: openssl rand -base64 32
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Connectivity Panel */}
+                <div className="mt-6">
+                  <IntegrationsPanel filter="connectivity" />
+                </div>
               </div>
             </TabsContent>
           </Tabs>

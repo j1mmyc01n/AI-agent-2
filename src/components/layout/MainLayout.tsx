@@ -45,7 +45,7 @@ export default function MainLayout({
   ];
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background" style={{ height: "100dvh" }}>
       {/* Mobile overlay */}
       {sidebarOpen && isMobile && (
         <div
