@@ -92,6 +92,11 @@ input, textarea, select {
   }
 }
 
+/* Safe area padding for mobile devices with notches/home indicators */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
 /* Use dynamic viewport height for mobile */
 .h-screen {
   height: 100vh;
@@ -106,7 +111,7 @@ html, body {
 }
 
 body {
-  overflow: auto;
+  overflow: hidden;
 }
 
 /* Better scrollbar styling for dark mode */

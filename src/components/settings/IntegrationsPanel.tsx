@@ -219,6 +219,24 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
     fetchStatus();
   }, []);
 
+  const refreshStatus = async () => {
+    const statusRes = await fetch("/api/integrations");
+    if (statusRes.ok) {
+      const data = await statusRes.json();
+      setStatus(data);
+      setValues({
+        openaiKey: data.openaiKey || "",
+        anthropicKey: data.anthropicKey || "",
+        grokKey: data.grokKey || "",
+        githubToken: data.githubToken || "",
+        vercelToken: data.vercelToken || "",
+        tavilyKey: data.tavilyKey || "",
+        neonKey: data.neonKey || "",
+        netlifyToken: data.netlifyToken || "",
+      });
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -228,32 +246,49 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
         body: JSON.stringify(values),
       });
 
-      if (!res.ok) throw new Error("Failed to save");
-
-      const statusRes = await fetch("/api/integrations");
-      if (statusRes.ok) {
-        const data = await statusRes.json();
-        setStatus(data);
-        setValues({
-          openaiKey: data.openaiKey || "",
-          anthropicKey: data.anthropicKey || "",
-          grokKey: data.grokKey || "",
-          githubToken: data.githubToken || "",
-          vercelToken: data.vercelToken || "",
-          tavilyKey: data.tavilyKey || "",
-          neonKey: data.neonKey || "",
-          netlifyToken: data.netlifyToken || "",
-        });
+      const result = await res.json();
+      if (!res.ok || result.success === false) {
+        throw new Error(result.error || "Failed to save");
       }
+
+      await refreshStatus();
 
       toast({
         title: "Settings saved",
         description: "Your API keys have been securely saved.",
       });
-    } catch {
+    } catch (err) {
       toast({
         title: "Error",
-        description: "Failed to save settings. Please try again.",
+        description: err instanceof Error ? err.message : "Failed to save settings. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveKey = async (keyId: ValueKey) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [keyId]: "" }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.success === false) {
+        throw new Error(result.error || "Failed to remove key");
+      }
+      await refreshStatus();
+      toast({
+        title: "Key removed",
+        description: "The API key has been removed.",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to remove key.",
         variant: "destructive",
       });
     } finally {
@@ -338,15 +373,28 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
                   }
                   className="font-mono text-sm"
                 />
-                <a
-                  href={integration.helpUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  {integration.helpText}
-                </a>
+                <div className="flex items-center justify-between">
+                  <a
+                    href={integration.helpUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    {integration.helpText}
+                  </a>
+                  {isConnected && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={() => handleRemoveKey(integration.id)}
+                      disabled={saving}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
               </CardContent>
             </Card>
           );

@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, getDatabaseUrl } from "@/lib/db";
 import { runAgent, type AIProvider } from "@/lib/ai/agent";
+import { getStore } from "@netlify/blobs";
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
@@ -92,6 +93,37 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // If no user data from DB, try Netlify Blobs for stored keys
+    if (!user) {
+      try {
+        const store = getStore({ name: "user-settings", consistency: "strong" });
+        const blobKeys = await store.get(`keys:${userId}`, { type: "json" }) as Record<string, string> | null;
+        if (blobKeys) {
+          user = {
+            openaiKey: blobKeys.openaiKey || null,
+            anthropicKey: blobKeys.anthropicKey || null,
+            grokKey: blobKeys.grokKey || null,
+            githubToken: blobKeys.githubToken || null,
+            vercelToken: blobKeys.vercelToken || null,
+            tavilyKey: blobKeys.tavilyKey || null,
+          };
+        }
+      } catch {
+        // Blobs not available, continue with env vars
+      }
+    }
+
+    // Try fetching projects from Blobs if not already loaded
+    if (userProjects.length === 0) {
+      try {
+        const store = getStore("projects");
+        const blobProjects = await store.get(`user:${userId}`, { type: "json" }) as typeof userProjects | null;
+        if (blobProjects) userProjects = blobProjects;
+      } catch {
+        // No projects available
+      }
+    }
+
     // Resolve API keys - check user settings, then env vars (Netlify AI Gateway auto-injects these)
     const openaiKey = user?.openaiKey || process.env.OPENAI_API_KEY;
     const anthropicKey = user?.anthropicKey || process.env.ANTHROPIC_API_KEY;
@@ -127,7 +159,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (localMode) {
-      const convId = conversationId || `local-${Date.now()}`;
+      const convId = conversationId || `blob-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       conversation = {
         id: convId,
         title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
@@ -135,6 +167,27 @@ export async function POST(req: NextRequest) {
       };
       if (body.history && Array.isArray(body.history)) {
         conversation.messages = body.history;
+      }
+
+      // Save conversation to Blobs if new
+      if (!conversationId) {
+        try {
+          const convStore = getStore("conversations");
+          const existing = await convStore.get(`user:${userId}`, { type: "json" }) as { id: string; title: string; projectId?: string | null; userId: string; createdAt: string; updatedAt: string; messageCount: number }[] || [];
+          const existingArr = Array.isArray(existing) ? existing : [];
+          existingArr.unshift({
+            id: convId,
+            title: conversation.title,
+            projectId: projectId || null,
+            userId,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            messageCount: 1,
+          });
+          await convStore.setJSON(`user:${userId}`, existingArr);
+        } catch {
+          // Non-critical: conversation just won't appear in sidebar
+        }
       }
     } else {
       try {
@@ -255,6 +308,21 @@ export async function POST(req: NextRequest) {
               });
             } catch (e) {
               console.error("Failed to save message to DB:", e);
+            }
+          } else {
+            // Update conversation in Blobs with new message count
+            try {
+              const convStore = getStore("conversations");
+              const existing = await convStore.get(`user:${userId}`, { type: "json" }) as { id: string; updatedAt: string; messageCount: number }[] || [];
+              const existingArr = Array.isArray(existing) ? existing : [];
+              const conv = existingArr.find(c => c.id === conversation.id);
+              if (conv) {
+                conv.updatedAt = new Date().toISOString();
+                conv.messageCount = (conv.messageCount || 0) + 2; // user + assistant
+                await convStore.setJSON(`user:${userId}`, existingArr);
+              }
+            } catch {
+              // Non-critical
             }
           }
 

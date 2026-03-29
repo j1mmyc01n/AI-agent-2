@@ -59,7 +59,7 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t border-border/50 bg-card/30 backdrop-blur-sm p-3 sm:p-4 safe-area-bottom">
+    <div className="border-t border-border/50 bg-card/30 backdrop-blur-sm p-3 sm:p-4 safe-area-bottom shrink-0">
       <div className="max-w-3xl mx-auto">
         <div className="flex flex-col bg-background border border-border/50 rounded-xl p-2 gap-2 shadow-sm focus-within:border-primary/30 focus-within:shadow-md focus-within:shadow-primary/5 transition-all">
           {/* Model selector row */}

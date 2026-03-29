@@ -90,6 +90,20 @@ export default function ConversationSidebar({
     fetchProjects();
   }, [fetchConversations, fetchProjects]);
 
+  // Listen for project/conversation updates from chat
+  useEffect(() => {
+    const handleProjectUpdate = () => {
+      fetchProjects();
+      fetchConversations();
+    };
+    window.addEventListener("dobetter-projects-updated", handleProjectUpdate);
+    window.addEventListener("dobetter-conversations-updated", handleProjectUpdate);
+    return () => {
+      window.removeEventListener("dobetter-projects-updated", handleProjectUpdate);
+      window.removeEventListener("dobetter-conversations-updated", handleProjectUpdate);
+    };
+  }, [fetchProjects, fetchConversations]);
+
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();

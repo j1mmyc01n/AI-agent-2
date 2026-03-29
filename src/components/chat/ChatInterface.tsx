@@ -131,13 +131,20 @@ export default function ChatInterface({
   // Auto-switch to code tab when code is generated
   const codeBlocks = extractCodeBlocks(messages);
   const todos = extractTodos(messages);
+  const hasPreviewableCode = codeBlocks.some(
+    (b) => b.language === "html" || b.language === "css" || b.language === "javascript" || b.language === "js"
+  );
   const prevCodeCount = useState(0);
 
   useEffect(() => {
     if (codeBlocks.length > 0 && codeBlocks.length !== prevCodeCount[0]) {
       prevCodeCount[0] = codeBlocks.length;
+      // Auto-switch to preview if we have previewable code and user hasn't navigated away
+      if (hasPreviewableCode && activePanel === "chat") {
+        setActivePanel("preview");
+      }
     }
-  }, [codeBlocks.length, prevCodeCount]);
+  }, [codeBlocks.length, prevCodeCount, hasPreviewableCode, activePanel]);
 
   const sendMessage = useCallback(
     async (content: string, model: AIModel) => {
@@ -260,8 +267,12 @@ export default function ChatInterface({
                   )
                 );
 
+                // Notify sidebar to refresh projects and conversations
+                window.dispatchEvent(new Event("dobetter-projects-updated"));
+                window.dispatchEvent(new Event("dobetter-conversations-updated"));
+
                 // Update URL without remounting the page so messages stay visible
-                if (!initialConversationId && newConversationId && !newConversationId.startsWith("local-")) {
+                if (!initialConversationId && newConversationId) {
                   window.history.replaceState(null, "", `/chat/${newConversationId}`);
                 }
               } else if (chunk.type === "error") {
@@ -286,14 +297,14 @@ export default function ChatInterface({
         });
       }
     },
-    [isLoading, currentConversationId, initialConversationId, projectId]
+    [isLoading, currentConversationId, initialConversationId, projectId, messages]
   );
 
   const panelTabs = [
     { id: "chat" as PanelView, label: "Chat", icon: MessageSquare, count: messages.filter(m => m.role !== "system").length },
     { id: "code" as PanelView, label: "Code", icon: Code2, count: codeBlocks.length },
     { id: "todo" as PanelView, label: "Tasks", icon: ListTodo, count: todos.length },
-    { id: "preview" as PanelView, label: "Preview", icon: Eye, count: previewUrl ? 1 : 0 },
+    { id: "preview" as PanelView, label: "Preview", icon: Eye, count: previewUrl ? 1 : hasPreviewableCode ? 1 : 0 },
   ];
 
   return (
@@ -362,7 +373,11 @@ export default function ChatInterface({
         {activePanel === "code" && <CodePanel codeBlocks={codeBlocks} />}
         {activePanel === "todo" && <TodoPanel todos={todos} />}
         {activePanel === "preview" && (
-          <PreviewPanel previewUrl={previewUrl} projectName={projectName || "Current Project"} />
+          <PreviewPanel
+            previewUrl={previewUrl}
+            projectName={projectName || "Current Project"}
+            codeBlocks={codeBlocks}
+          />
         )}
       </div>
     </div>
