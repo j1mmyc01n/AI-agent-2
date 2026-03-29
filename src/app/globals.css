@@ -95,18 +95,15 @@ input, textarea, select {
   height: 100dvh;
 }
 
-/* Stable scrolling */
-html {
-  overflow: hidden;
+/* Stable scrolling for app shell pages */
+html, body {
+  height: 100%;
+  height: 100dvh;
   overscroll-behavior: none;
 }
 
 body {
-  overflow: hidden;
-  position: fixed;
-  width: 100%;
-  height: 100%;
-  height: 100dvh;
+  overflow: auto;
 }
 
 /* Better scrollbar styling for dark mode */

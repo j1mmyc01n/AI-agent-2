@@ -18,9 +18,13 @@ export default async function ConversationPage({ params }: PageProps) {
   const userId = (session.user as { id: string }).id;
   const { id } = await params;
 
-  // If no database, redirect to new chat (can't load history)
+  // If no database and this is a local conversation, show empty chat with the ID preserved
   if (!getDatabaseUrl()) {
-    redirect("/chat");
+    return (
+      <MainLayout currentConversationId={id}>
+        <ChatInterface conversationId={id} />
+      </MainLayout>
+    );
   }
 
   let initialMessages: {

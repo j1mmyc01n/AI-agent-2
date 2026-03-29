@@ -1,11 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useCallback } from "react";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import { toast } from "@/components/ui/use-toast";
-import { type AIModel, DEFAULT_MODEL, AI_PROVIDERS } from "./ModelSelector";
+import { type AIModel, DEFAULT_MODEL } from "./ModelSelector";
 import { type PanelView } from "@/components/layout/MainLayout";
 import CodePanel from "@/components/workspace/CodePanel";
 import TodoPanel, { type TodoItem } from "@/components/workspace/TodoPanel";
@@ -100,7 +99,6 @@ export default function ChatInterface({
   conversationId: initialConversationId,
   initialMessages = [],
 }: ChatInterfaceProps) {
-  const router = useRouter();
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
   const [currentConversationId, setCurrentConversationId] = useState<string | undefined>(
@@ -218,8 +216,9 @@ export default function ChatInterface({
                   )
                 );
 
-                if (!initialConversationId && newConversationId) {
-                  router.push(`/chat/${newConversationId}`);
+                // Update URL without remounting the page so messages stay visible
+                if (!initialConversationId && newConversationId && !newConversationId.startsWith("local-")) {
+                  window.history.replaceState(null, "", `/chat/${newConversationId}`);
                 }
               } else if (chunk.type === "error") {
                 throw new Error(chunk.error);
@@ -242,7 +241,7 @@ export default function ChatInterface({
         });
       }
     },
-    [isLoading, currentConversationId, initialConversationId, router]
+    [isLoading, currentConversationId, initialConversationId]
   );
 
   const codeBlocks = extractCodeBlocks(messages);
