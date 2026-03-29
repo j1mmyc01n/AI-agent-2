@@ -158,6 +158,10 @@ export default function ChatInterface({
             model: model.id,
             provider: model.provider,
             projectId,
+            history: messages.filter(m => m.role === "user" || m.role === "assistant").map(m => ({
+              role: m.role,
+              content: m.content,
+            })),
           }),
         });
 

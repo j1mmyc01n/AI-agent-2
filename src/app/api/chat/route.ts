@@ -92,28 +92,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const activeProvider: AIProvider = provider || "openai";
-
-    // Validate that the relevant API key exists
+    // Resolve API keys - check user settings, then env vars (Netlify AI Gateway auto-injects these)
     const openaiKey = user?.openaiKey || process.env.OPENAI_API_KEY;
     const anthropicKey = user?.anthropicKey || process.env.ANTHROPIC_API_KEY;
     const grokKey = user?.grokKey || process.env.GROK_API_KEY;
 
+    // Auto-detect best available provider: prefer requested, then fallback to whatever is available
+    let activeProvider: AIProvider = provider || "anthropic";
     if (activeProvider === "openai" && !openaiKey) {
-      return NextResponse.json(
-        { error: "No OpenAI API key configured. Please add one in Settings > AI Models, or set OPENAI_API_KEY in your environment." },
-        { status: 400 }
-      );
+      activeProvider = anthropicKey ? "anthropic" : grokKey ? "grok" : "openai";
+    } else if (activeProvider === "anthropic" && !anthropicKey) {
+      activeProvider = openaiKey ? "openai" : grokKey ? "grok" : "anthropic";
+    } else if (activeProvider === "grok" && !grokKey) {
+      activeProvider = anthropicKey ? "anthropic" : openaiKey ? "openai" : "grok";
     }
-    if (activeProvider === "anthropic" && !anthropicKey) {
+
+    // Final check - at least one provider must be available
+    if (!openaiKey && !anthropicKey && !grokKey) {
       return NextResponse.json(
-        { error: "No Anthropic API key configured. Please add one in Settings > AI Models, or set ANTHROPIC_API_KEY in your environment." },
-        { status: 400 }
-      );
-    }
-    if (activeProvider === "grok" && !grokKey) {
-      return NextResponse.json(
-        { error: "No Grok API key configured. Please add one in Settings > AI Models, or set GROK_API_KEY in your environment." },
+        { error: "No AI provider configured. Netlify AI Gateway should provide Claude automatically. If this persists, add an API key in Settings > AI Models." },
         { status: 400 }
       );
     }
@@ -140,34 +137,48 @@ export async function POST(req: NextRequest) {
         conversation.messages = body.history;
       }
     } else {
-      if (conversationId) {
-        const conv = await db.conversation.findFirst({
-          where: { id: conversationId, userId },
-          include: { messages: { orderBy: { createdAt: "asc" } } },
-        });
-        if (!conv) {
-          return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+      try {
+        if (conversationId) {
+          const conv = await db.conversation.findFirst({
+            where: { id: conversationId, userId },
+            include: { messages: { orderBy: { createdAt: "asc" } } },
+          });
+          if (!conv) {
+            return NextResponse.json({ error: "Conversation not found" }, { status: 404 });
+          }
+          conversation = { id: conv.id, title: conv.title, messages: conv.messages };
+        } else {
+          const conv = await db.conversation.create({
+            data: {
+              userId,
+              title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
+            },
+            include: { messages: true },
+          });
+          conversation = { id: conv.id, title: conv.title, messages: conv.messages };
         }
-        conversation = { id: conv.id, title: conv.title, messages: conv.messages };
-      } else {
-        const conv = await db.conversation.create({
-          data: {
-            userId,
-            title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
-          },
-          include: { messages: true },
-        });
-        conversation = { id: conv.id, title: conv.title, messages: conv.messages };
-      }
 
-      // Save user message to DB
-      await db.message.create({
-        data: {
-          conversationId: conversation.id,
-          role: "user",
-          content: message,
-        },
-      });
+        // Save user message to DB
+        await db.message.create({
+          data: {
+            conversationId: conversation.id,
+            role: "user",
+            content: message,
+          },
+        });
+      } catch (dbError) {
+        console.error("DB error creating/finding conversation, falling back to local mode:", dbError);
+        // Fall back to local mode if DB fails
+        const convId = conversationId || `local-${Date.now()}`;
+        conversation = {
+          id: convId,
+          title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
+          messages: [],
+        };
+        if (body.history && Array.isArray(body.history)) {
+          conversation.messages = body.history;
+        }
+      }
     }
 
     // Build message history

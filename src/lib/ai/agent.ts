@@ -10,7 +10,8 @@ import {
   pushFiles,
 } from "@/lib/integrations/github";
 import { createProject as createVercelProject } from "@/lib/integrations/vercel";
-import { db } from "@/lib/db";
+import { db, getDatabaseUrl } from "@/lib/db";
+import { getStore } from "@netlify/blobs";
 
 export type AIProvider = "openai" | "anthropic" | "grok";
 
@@ -56,6 +57,32 @@ function toAnthropicTools(): Anthropic.Tool[] {
     }));
 }
 
+/**
+ * Detect available AI provider based on environment variables.
+ * Netlify AI Gateway auto-injects ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL
+ * and OPENAI_API_KEY/OPENAI_BASE_URL.
+ */
+function detectAvailableProvider(config: AgentConfig): { provider: AIProvider; apiKey?: string; baseURL?: string } | null {
+  // Check Anthropic (preferred - available via Netlify AI Gateway)
+  const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
+  if (anthropicKey) {
+    return { provider: "anthropic", apiKey: anthropicKey, baseURL: process.env.ANTHROPIC_BASE_URL };
+  }
+
+  // Check OpenAI
+  const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
+  if (openaiKey) {
+    return { provider: "openai", apiKey: openaiKey, baseURL: process.env.OPENAI_BASE_URL };
+  }
+
+  // Check Grok
+  if (config.grokKey) {
+    return { provider: "grok", apiKey: config.grokKey, baseURL: "https://api.x.ai/v1" };
+  }
+
+  return null;
+}
+
 async function runOpenAIAgent(
   messages: MessageParam[],
   config: AgentConfig,
@@ -65,8 +92,12 @@ async function runOpenAIAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  const openai = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
-  const model = config.model || (baseURL ? "grok-2-latest" : "gpt-4o");
+  const clientOptions: { apiKey: string; baseURL?: string } = { apiKey };
+  if (baseURL) clientOptions.baseURL = baseURL;
+  const openai = new OpenAI(clientOptions);
+
+  // For Grok, use grok model; otherwise use the configured or default OpenAI model
+  const model = config.model || (config.provider === "grok" ? "grok-2-latest" : "gpt-4o");
 
   const systemPrompt = buildSystemPrompt(config.projectContext);
   const systemMessage: MessageParam = { role: "system", content: systemPrompt };
@@ -151,10 +182,15 @@ async function runAnthropicAgent(
   onChunk: (chunk: string) => void,
   onToolCall: (toolName: string, args: Record<string, unknown>) => void,
   onToolResult: (toolName: string, result: string) => void,
-  apiKey: string
+  apiKey: string,
+  baseURL?: string
 ): Promise<string> {
-  const anthropic = new Anthropic({ apiKey });
-  const model = config.model || "claude-3-5-sonnet-20241022";
+  // Use zero-config constructor to leverage Netlify AI Gateway auto-injected env vars
+  const clientOptions: { apiKey: string; baseURL?: string } = { apiKey };
+  if (baseURL) clientOptions.baseURL = baseURL;
+  const anthropic = new Anthropic(clientOptions);
+
+  const model = config.model || "claude-sonnet-4-5";
   const anthropicTools = toAnthropicTools();
 
   const systemPrompt = buildSystemPrompt(config.projectContext);
@@ -239,27 +275,42 @@ export async function runAgent(
   onToolCall: (toolName: string, args: Record<string, unknown>) => void,
   onToolResult: (toolName: string, result: string) => void
 ): Promise<string> {
-  const provider = config.provider || "openai";
+  const requestedProvider = config.provider || "anthropic";
 
-  if (provider === "anthropic") {
-    if (!config.anthropicKey) {
-      throw new Error("No Anthropic API key configured. Please add one in Settings > AI Models.");
+  // Try the requested provider first, then auto-detect if it fails
+  if (requestedProvider === "anthropic") {
+    const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
+    if (anthropicKey) {
+      return runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, anthropicKey, process.env.ANTHROPIC_BASE_URL);
     }
-    return runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, config.anthropicKey);
   }
 
-  if (provider === "grok") {
-    if (!config.grokKey) {
-      throw new Error("No Grok API key configured. Please add one in Settings > AI Models.");
+  if (requestedProvider === "openai") {
+    const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
+    if (openaiKey) {
+      return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, openaiKey, process.env.OPENAI_BASE_URL);
     }
-    return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
   }
 
-  // Default: OpenAI
-  if (!config.openaiKey) {
-    throw new Error("No OpenAI API key configured. Please add one in Settings > AI Models.");
+  if (requestedProvider === "grok") {
+    if (config.grokKey) {
+      return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
+    }
   }
-  return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.openaiKey);
+
+  // Auto-detect available provider as fallback
+  const detected = detectAvailableProvider(config);
+  if (detected) {
+    if (detected.provider === "anthropic") {
+      return runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, detected.apiKey!, detected.baseURL);
+    }
+    return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, detected.apiKey!, detected.baseURL);
+  }
+
+  throw new Error(
+    "No AI provider configured. The platform uses Netlify AI Gateway which provides Claude automatically. " +
+    "If you need a different provider, add API keys in Settings > AI Models."
+  );
 }
 
 async function executeToolCall(
@@ -269,10 +320,11 @@ async function executeToolCall(
 ): Promise<string> {
   switch (toolName) {
     case "web_search": {
-      if (!config.tavilyKey) {
+      const tavilyKey = config.tavilyKey || process.env.TAVILY_API_KEY;
+      if (!tavilyKey) {
         return "Web search is not available. Please add your Tavily API key in Settings > Integrations.";
       }
-      return await searchWeb(args.query as string, config.tavilyKey);
+      return await searchWeb(args.query as string, tavilyKey);
     }
 
     case "create_github_repo": {
@@ -317,18 +369,48 @@ async function executeToolCall(
     }
 
     case "create_project_record": {
-      const project = await db.project.create({
-        data: {
-          name: args.name as string,
-          description: args.description as string,
-          type: (args.type as string) ?? "saas",
-          githubRepo: args.githubRepo as string | undefined,
-          vercelUrl: args.vercelUrl as string | undefined,
-          userId: config.userId,
-          status: "active",
-        },
-      });
-      return `Project '${project.name}' has been saved to your dashboard with ID: ${project.id}`;
+      const projectName = args.name as string;
+      const projectData = {
+        name: projectName,
+        description: args.description as string,
+        type: (args.type as string) ?? "saas",
+        githubRepo: args.githubRepo as string | undefined,
+        vercelUrl: args.vercelUrl as string | undefined,
+        userId: config.userId,
+        status: "active",
+      };
+
+      // Try database first
+      if (getDatabaseUrl()) {
+        try {
+          const project = await db.project.create({ data: projectData });
+          return `Project '${project.name}' has been saved to your dashboard with ID: ${project.id}`;
+        } catch (error) {
+          console.error("Failed to create project in DB:", error);
+          // Fall through to Blobs
+        }
+      }
+
+      // Fallback to Netlify Blobs
+      try {
+        const store = getStore("projects");
+        const newProject = {
+          id: `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          ...projectData,
+          githubRepo: projectData.githubRepo || null,
+          vercelUrl: projectData.vercelUrl || null,
+          description: projectData.description || null,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        const existing = await store.get(`user:${config.userId}`, { type: "json" }) as unknown[] || [];
+        (existing as unknown[]).unshift(newProject);
+        await store.setJSON(`user:${config.userId}`, existing);
+        return `Project '${projectName}' has been saved to your dashboard with ID: ${newProject.id}`;
+      } catch (error) {
+        console.error("Failed to create project in Blobs:", error);
+        return `Project '${projectName}' could not be saved due to a storage error, but the details are recorded in this conversation.`;
+      }
     }
 
     default:

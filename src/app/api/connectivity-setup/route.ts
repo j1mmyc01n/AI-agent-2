@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { url, provider = "openai", projectId } = body;
+  const { url, provider, projectId } = body;
 
   if (!url?.trim()) {
     return NextResponse.json({ error: "URL is required" }, { status: 400 });
@@ -61,6 +61,9 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Auto-detect provider
+  const activeProvider = provider || (anthropicKey ? "anthropic" : openaiKey ? "openai" : null);
+
   const prompt = `Generate a connectivity setup blueprint for this website: ${url.trim()}
 
 Analyze the domain, infer the product type, and suggest integration pathways, auth methods, database entities, and agent actions.`;
@@ -68,10 +71,12 @@ Analyze the domain, infer the product type, and suggest integration pathways, au
   let output = "";
 
   try {
-    if (provider === "anthropic" && anthropicKey) {
-      const anthropic = new Anthropic({ apiKey: anthropicKey });
+    if (activeProvider === "anthropic" && anthropicKey) {
+      const clientOptions: { apiKey: string; baseURL?: string } = { apiKey: anthropicKey };
+      if (process.env.ANTHROPIC_BASE_URL) clientOptions.baseURL = process.env.ANTHROPIC_BASE_URL;
+      const anthropic = new Anthropic(clientOptions);
       const response = await anthropic.messages.create({
-        model: "claude-3-5-sonnet-20241022",
+        model: "claude-sonnet-4-5",
         max_tokens: 2048,
         system: SETUP_SYSTEM_PROMPT,
         messages: [{ role: "user", content: prompt }],
@@ -80,8 +85,10 @@ Analyze the domain, infer the product type, and suggest integration pathways, au
         .filter((c) => c.type === "text")
         .map((c) => (c as { type: "text"; text: string }).text)
         .join("");
-    } else if (openaiKey) {
-      const openai = new OpenAI({ apiKey: openaiKey });
+    } else if (activeProvider === "openai" && openaiKey) {
+      const clientOptions: { apiKey: string; baseURL?: string } = { apiKey: openaiKey };
+      if (process.env.OPENAI_BASE_URL) clientOptions.baseURL = process.env.OPENAI_BASE_URL;
+      const openai = new OpenAI(clientOptions);
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         max_tokens: 2048,

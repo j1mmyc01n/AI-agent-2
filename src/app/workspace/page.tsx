@@ -35,6 +35,7 @@ export default async function WorkspacePage() {
     name: string | null;
     email: string;
     openaiKey: string | null;
+    anthropicKey: string | null;
     githubToken: string | null;
     vercelToken: string | null;
     tavilyKey: string | null;
@@ -63,6 +64,7 @@ export default async function WorkspacePage() {
           name: true,
           email: true,
           openaiKey: true,
+          anthropicKey: true,
           githubToken: true,
           vercelToken: true,
           tavilyKey: true,
@@ -235,7 +237,7 @@ export default async function WorkspacePage() {
                   AI Status
                 </CardDescription>
                 <CardTitle className="text-2xl sm:text-3xl">
-                  {user?.openaiKey ? (
+                  {(user?.openaiKey || user?.anthropicKey || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY) ? (
                     <span className="text-green-500">Ready</span>
                   ) : (
                     <span className="text-primary">Setup</span>

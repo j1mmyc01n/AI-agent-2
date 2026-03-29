@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { template, prompt, projectId, provider = "openai", model } = body;
+  const { template, prompt, projectId, provider, model } = body;
 
   if (!template || !TEMPLATES[template]) {
     return NextResponse.json(
@@ -222,6 +222,14 @@ export async function POST(req: NextRequest) {
   const openaiKey = userKeys.openaiKey ?? process.env.OPENAI_API_KEY;
   const anthropicKey = userKeys.anthropicKey ?? process.env.ANTHROPIC_API_KEY;
 
+  // Auto-detect provider: prefer requested, then fallback to available
+  let activeProvider = provider || (anthropicKey ? "anthropic" : "openai");
+  if (activeProvider === "openai" && !openaiKey && anthropicKey) {
+    activeProvider = "anthropic";
+  } else if (activeProvider === "anthropic" && !anthropicKey && openaiKey) {
+    activeProvider = "openai";
+  }
+
   const tmpl = TEMPLATES[template];
   const fullPrompt = `${tmpl.userPromptPrefix}\n\n${prompt.trim()}`;
 
@@ -229,15 +237,17 @@ export async function POST(req: NextRequest) {
   let usedModel = model;
 
   try {
-    if (provider === "anthropic") {
+    if (activeProvider === "anthropic") {
       if (!anthropicKey) {
         return NextResponse.json(
-          { error: "No Anthropic API key configured. Add one in Settings > AI Models." },
+          { error: "No AI provider configured. Netlify AI Gateway should provide Claude automatically." },
           { status: 400 }
         );
       }
-      const anthropic = new Anthropic({ apiKey: anthropicKey });
-      usedModel = model ?? "claude-3-5-sonnet-20241022";
+      const clientOptions: { apiKey: string; baseURL?: string } = { apiKey: anthropicKey };
+      if (process.env.ANTHROPIC_BASE_URL) clientOptions.baseURL = process.env.ANTHROPIC_BASE_URL;
+      const anthropic = new Anthropic(clientOptions);
+      usedModel = model ?? "claude-sonnet-4-5";
       const response = await anthropic.messages.create({
         model: usedModel,
         max_tokens: 4096,
@@ -253,11 +263,13 @@ export async function POST(req: NextRequest) {
       // Default: OpenAI
       if (!openaiKey) {
         return NextResponse.json(
-          { error: "No OpenAI API key configured. Add one in Settings > AI Models." },
+          { error: "No AI provider configured. Netlify AI Gateway should provide Claude automatically." },
           { status: 400 }
         );
       }
-      const openai = new OpenAI({ apiKey: openaiKey });
+      const clientOptions: { apiKey: string; baseURL?: string } = { apiKey: openaiKey };
+      if (process.env.OPENAI_BASE_URL) clientOptions.baseURL = process.env.OPENAI_BASE_URL;
+      const openai = new OpenAI(clientOptions);
       usedModel = model ?? "gpt-4o";
       const response = await openai.chat.completions.create({
         model: usedModel,
