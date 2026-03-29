@@ -15,6 +15,8 @@ const ALL_KEYS = [
   "netlifyToken",
 ] as const;
 
+const PREF_KEYS = ["defaultModel", "defaultProvider"] as const;
+
 type KeyName = (typeof ALL_KEYS)[number];
 
 const STATUS_KEY_MAP: Record<KeyName, string> = {
@@ -57,6 +59,9 @@ function buildResponse(userKeys: Record<string, string | null>) {
     result[key] = maskSecret(userVal);
     result[STATUS_KEY_MAP[key]] = !!userVal;
   }
+  // Include user preferences
+  result.defaultModel = userKeys.defaultModel || null;
+  result.defaultProvider = userKeys.defaultProvider || null;
   return result;
 }
 
@@ -66,6 +71,15 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const userId = (session.user as { id: string }).id;
+
+  // Load user preferences from Blobs
+  let prefs: Record<string, string | null> = {};
+  try {
+    const prefStore = getStore({ name: "user-settings", consistency: "strong" });
+    prefs = await prefStore.get(`prefs:${userId}`, { type: "json" }) as Record<string, string | null> || {};
+  } catch {
+    // No prefs
+  }
 
   // Try database first
   if (getDatabaseUrl()) {
@@ -84,7 +98,7 @@ export async function GET() {
         },
       });
 
-      return NextResponse.json(buildResponse(user || {}));
+      return NextResponse.json(buildResponse({ ...(user || {}), ...prefs }));
     } catch (error) {
       console.error("Database error in GET /api/integrations:", error);
       // Fall through to Blobs
@@ -93,7 +107,7 @@ export async function GET() {
 
   // Fallback: Netlify Blobs
   const blobKeys = await getBlobKeys(userId);
-  return NextResponse.json(buildResponse(blobKeys));
+  return NextResponse.json(buildResponse({ ...blobKeys, ...prefs }));
 }
 
 export async function POST(req: NextRequest) {
@@ -112,6 +126,32 @@ export async function POST(req: NextRequest) {
     if (shouldUpdate(val)) {
       updateData[key] = val || null;
     }
+  }
+
+  // Handle preference keys (defaultModel, defaultProvider) - always store in Blobs
+  const prefData: Record<string, string | null> = {};
+  for (const key of PREF_KEYS) {
+    const val = body[key] as string | undefined;
+    if (val !== undefined) {
+      prefData[key] = val || null;
+    }
+  }
+
+  // Save preferences to Blobs (works regardless of DB)
+  if (Object.keys(prefData).length > 0) {
+    try {
+      const prefStore = getStore({ name: "user-settings", consistency: "strong" });
+      const existingPrefs = await prefStore.get(`prefs:${userId}`, { type: "json" }) as Record<string, string | null> || {};
+      const mergedPrefs = { ...existingPrefs, ...prefData };
+      await prefStore.setJSON(`prefs:${userId}`, mergedPrefs);
+    } catch (error) {
+      console.error("Failed to save preferences:", error);
+    }
+  }
+
+  // If only preferences were being saved (no key updates), return success
+  if (Object.keys(updateData).length === 0) {
+    return NextResponse.json({ success: true });
   }
 
   // Try database first

@@ -280,33 +280,43 @@ export async function runAgent(
   const requestedProvider = config.provider || "anthropic";
 
   // Try the requested provider first, then auto-detect if it fails
-  if (requestedProvider === "anthropic") {
-    const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
-    if (anthropicKey) {
-      return runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, anthropicKey, process.env.ANTHROPIC_BASE_URL);
+  try {
+    if (requestedProvider === "anthropic") {
+      const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
+      if (anthropicKey) {
+        return await runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, anthropicKey, process.env.ANTHROPIC_BASE_URL);
+      }
     }
-  }
 
-  if (requestedProvider === "openai") {
-    const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
-    if (openaiKey) {
-      return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, openaiKey, process.env.OPENAI_BASE_URL);
+    if (requestedProvider === "openai") {
+      const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
+      if (openaiKey) {
+        return await runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, openaiKey, process.env.OPENAI_BASE_URL);
+      }
     }
-  }
 
-  if (requestedProvider === "grok") {
-    if (config.grokKey) {
-      return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
+    if (requestedProvider === "grok") {
+      if (config.grokKey) {
+        return await runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
+      }
     }
+  } catch (error) {
+    console.error(`Failed with requested provider ${requestedProvider}:`, error);
+    // Fall through to auto-detect
   }
 
   // Auto-detect available provider as fallback
   const detected = detectAvailableProvider(config);
   if (detected) {
-    if (detected.provider === "anthropic") {
-      return runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, detected.apiKey!, detected.baseURL);
+    try {
+      if (detected.provider === "anthropic") {
+        return await runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, detected.apiKey!, detected.baseURL);
+      }
+      return await runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, detected.apiKey!, detected.baseURL);
+    } catch (error) {
+      console.error(`Failed with auto-detected provider ${detected.provider}:`, error);
+      throw error;
     }
-    return runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, detected.apiKey!, detected.baseURL);
   }
 
   throw new Error(

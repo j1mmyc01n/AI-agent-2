@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ListTodo, CheckCircle2, Circle, Clock, SkipForward, X, ChevronDown, ChevronUp } from "lucide-react";
+import { ListTodo, CheckCircle2, Circle, Clock, SkipForward, X, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
 
 export interface TodoItem {
   id: string;
@@ -18,82 +18,94 @@ interface TodoPanelProps {
 }
 
 const statusConfig = {
-  pending: { icon: Circle, label: "Pending", color: "text-muted-foreground", badge: "outline" as const },
-  "in-progress": { icon: Clock, label: "In Progress", color: "text-blue-500", badge: "default" as const },
-  done: { icon: CheckCircle2, label: "Done", color: "text-green-500", badge: "secondary" as const },
-  skipped: { icon: SkipForward, label: "Skipped", color: "text-yellow-500", badge: "outline" as const },
+  pending: { icon: Circle, label: "Pending", color: "text-muted-foreground", badge: "outline" as const, bg: "" },
+  "in-progress": { icon: Loader2, label: "In Progress", color: "text-blue-500", badge: "default" as const, bg: "bg-blue-500/5 border-blue-500/20" },
+  done: { icon: CheckCircle2, label: "Done", color: "text-green-500", badge: "secondary" as const, bg: "bg-green-500/5 border-green-500/20" },
+  skipped: { icon: SkipForward, label: "Skipped", color: "text-yellow-500", badge: "outline" as const, bg: "" },
 };
 
 export default function TodoPanel({ todos: initialTodos = [] }: TodoPanelProps) {
-  const [todos, setTodos] = useState<TodoItem[]>(initialTodos);
+  const [localOverrides, setLocalOverrides] = useState<Record<string, "skipped">>({});
   const [showSkipped, setShowSkipped] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Sync with new incoming todos from messages
-  const mergedTodos = initialTodos.map((incoming) => {
-    const existing = todos.find((t) => t.id === incoming.id);
-    if (existing && (existing.status === "skipped")) {
-      return existing; // preserve user's skip/remove action
+  // Merge local overrides with incoming todos
+  const mergedTodos = initialTodos.map((todo) => {
+    if (localOverrides[todo.id]) {
+      return { ...todo, status: localOverrides[todo.id] };
     }
-    return incoming;
+    return todo;
   });
 
   const activeTodos = mergedTodos.filter((t) => t.status !== "skipped");
   const skippedTodos = mergedTodos.filter((t) => t.status === "skipped");
 
-  const handleSkip = (id: string) => {
-    setTodos((prev) => {
-      const exists = prev.find((t) => t.id === id);
-      if (exists) {
-        return prev.map((t) => (t.id === id ? { ...t, status: "skipped" as const } : t));
+  // Auto-scroll to the current in-progress task
+  useEffect(() => {
+    const inProgressIdx = activeTodos.findIndex(t => t.status === "in-progress");
+    if (inProgressIdx >= 0 && scrollRef.current) {
+      const items = scrollRef.current.querySelectorAll("[data-todo-item]");
+      if (items[inProgressIdx]) {
+        items[inProgressIdx].scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
-      const incoming = initialTodos.find((t) => t.id === id);
-      if (incoming) {
-        return [...prev, { ...incoming, status: "skipped" as const }];
-      }
-      return prev;
-    });
-  };
+    }
+  }, [activeTodos]);
 
-  const handleRemove = (id: string) => {
-    setTodos((prev) => {
-      const exists = prev.find((t) => t.id === id);
-      if (exists) {
-        return prev.map((t) => (t.id === id ? { ...t, status: "skipped" as const } : t));
-      }
-      const incoming = initialTodos.find((t) => t.id === id);
-      if (incoming) {
-        return [...prev, { ...incoming, status: "skipped" as const }];
-      }
-      return prev;
-    });
+  const handleSkip = (id: string) => {
+    setLocalOverrides(prev => ({ ...prev, [id]: "skipped" }));
   };
 
   const handleRestore = (id: string) => {
-    setTodos((prev) => prev.filter((t) => t.id !== id));
+    setLocalOverrides(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   };
 
   if (initialTodos.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
-        <ListTodo className="h-12 w-12 opacity-30" />
-        <div className="text-center">
-          <p className="font-medium">No tasks yet</p>
-          <p className="text-sm mt-1">Ask the agent to plan a project and tasks will appear here</p>
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 p-6">
+        <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+          <ListTodo className="h-8 w-8 opacity-30" />
+        </div>
+        <div className="text-center max-w-sm">
+          <p className="font-medium mb-1">No tasks yet</p>
+          <p className="text-sm opacity-70">
+            Switch to <span className="font-semibold text-orange-500">Build</span> mode and describe your project.
+            Tasks will appear here as the agent works through them.
+          </p>
         </div>
       </div>
     );
   }
 
   const done = activeTodos.filter((t) => t.status === "done").length;
+  const inProgress = activeTodos.filter((t) => t.status === "in-progress").length;
   const total = activeTodos.length;
+  const progressPercent = total > 0 ? (done / total) * 100 : 0;
 
   return (
     <ScrollArea className="h-full">
-      <div className="p-4 space-y-4">
+      <div className="p-4 space-y-4" ref={scrollRef}>
         {/* Progress */}
         <div className="rounded-lg border p-3 bg-muted/30">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium">Progress</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Progress</span>
+              {inProgress > 0 && (
+                <Badge variant="default" className="bg-blue-500 text-[10px] h-5 px-1.5 animate-pulse">
+                  <Loader2 className="h-2.5 w-2.5 mr-0.5 animate-spin" />
+                  Working
+                </Badge>
+              )}
+              {done === total && total > 0 && (
+                <Badge variant="default" className="bg-green-500 text-[10px] h-5 px-1.5">
+                  <CheckCircle2 className="h-2.5 w-2.5 mr-0.5" />
+                  Complete
+                </Badge>
+              )}
+            </div>
             <span className="text-sm text-muted-foreground">
               {done}/{total} tasks
               {skippedTodos.length > 0 && (
@@ -101,41 +113,85 @@ export default function TodoPanel({ todos: initialTodos = [] }: TodoPanelProps) 
               )}
             </span>
           </div>
-          <div className="w-full bg-muted rounded-full h-2">
+          <div className="w-full bg-muted rounded-full h-2.5 overflow-hidden">
             <div
-              className="bg-primary rounded-full h-2 transition-all duration-500"
-              style={{ width: `${total > 0 ? (done / total) * 100 : 0}%` }}
+              className="bg-primary rounded-full h-2.5 transition-all duration-700 ease-out"
+              style={{ width: `${progressPercent}%` }}
             />
+          </div>
+          {/* Status summary */}
+          <div className="flex items-center gap-3 mt-2 text-[11px] text-muted-foreground">
+            <span className="flex items-center gap-1">
+              <CheckCircle2 className="h-3 w-3 text-green-500" />
+              {done} done
+            </span>
+            {inProgress > 0 && (
+              <span className="flex items-center gap-1">
+                <Clock className="h-3 w-3 text-blue-500" />
+                {inProgress} in progress
+              </span>
+            )}
+            <span className="flex items-center gap-1">
+              <Circle className="h-3 w-3 text-muted-foreground" />
+              {total - done - inProgress} remaining
+            </span>
           </div>
         </div>
 
         {/* Active task list */}
         <div className="space-y-2">
-          {activeTodos.map((todo) => {
-            const { icon: StatusIcon, label, color, badge } = statusConfig[todo.status] || statusConfig.pending;
+          {activeTodos.map((todo, idx) => {
+            const config = statusConfig[todo.status] || statusConfig.pending;
+            const isActive = todo.status === "in-progress";
             return (
               <div
                 key={todo.id}
-                className={`flex items-start gap-2 p-3 rounded-lg border transition-colors group ${
-                  todo.status === "done" ? "opacity-60 bg-muted/20" : "bg-background hover:bg-muted/20"
+                data-todo-item
+                className={`flex items-start gap-2.5 p-3 rounded-lg border transition-all group ${
+                  todo.status === "done"
+                    ? "opacity-60 bg-muted/20"
+                    : isActive
+                    ? `${config.bg} shadow-sm`
+                    : "bg-background hover:bg-muted/20"
                 }`}
               >
-                <StatusIcon className={`h-4 w-4 mt-0.5 shrink-0 ${color}`} />
+                {/* Step number or icon */}
+                <div className={`flex items-center justify-center h-6 w-6 rounded-full shrink-0 mt-0.5 ${
+                  todo.status === "done"
+                    ? "bg-green-500/20"
+                    : isActive
+                    ? "bg-blue-500/20"
+                    : "bg-muted"
+                }`}>
+                  {todo.status === "done" ? (
+                    <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                  ) : isActive ? (
+                    <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />
+                  ) : (
+                    <span className="text-[11px] font-semibold text-muted-foreground">{idx + 1}</span>
+                  )}
+                </div>
+
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className={`text-sm font-medium ${todo.status === "done" ? "line-through text-muted-foreground" : ""}`}>
+                    <p className={`text-sm font-medium leading-tight ${
+                      todo.status === "done" ? "line-through text-muted-foreground" : ""
+                    }`}>
                       {todo.title}
                     </p>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <Badge variant={badge} className="text-xs">{label}</Badge>
-                    </div>
+                    <Badge variant={config.badge} className={`text-[10px] shrink-0 ${
+                      isActive ? "bg-blue-500 text-white" : ""
+                    }`}>
+                      {config.label}
+                    </Badge>
                   </div>
                   {todo.description && (
                     <p className="text-xs text-muted-foreground mt-1">{todo.description}</p>
                   )}
                 </div>
-                {/* Skip and Remove buttons */}
-                {todo.status !== "done" && (
+
+                {/* Skip button */}
+                {todo.status !== "done" && todo.status !== "in-progress" && (
                   <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                     <Button
                       variant="ghost"
@@ -150,7 +206,7 @@ export default function TodoPanel({ todos: initialTodos = [] }: TodoPanelProps) 
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6"
-                      onClick={() => handleRemove(todo.id)}
+                      onClick={() => handleSkip(todo.id)}
                       title="Remove this task"
                     >
                       <X className="h-3 w-3 text-destructive" />

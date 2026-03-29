@@ -16,12 +16,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { message, conversationId, model, provider, projectId } = body as {
+    const { message, conversationId, model, provider, projectId, mode } = body as {
       message: string;
       conversationId?: string;
       model?: string;
       provider?: AIProvider;
       projectId?: string;
+      mode?: "chat" | "build";
       history?: { role: string; content: string }[];
     };
 
@@ -254,10 +255,22 @@ export async function POST(req: NextRequest) {
       userName: user?.name || undefined,
       hasGithub: !!(user?.githubToken),
       hasVercel: !!(user?.vercelToken),
+      mode: mode || "chat",
     };
 
     const stream = new ReadableStream({
       async start(controller) {
+        // Set a timeout to prevent stalling
+        const timeout = setTimeout(() => {
+          try {
+            const errorData = JSON.stringify({ type: "error", error: "Request timed out. The AI provider may be unavailable. Please try again or switch to a different model in the model selector." });
+            controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
+            controller.close();
+          } catch {
+            // Controller may already be closed
+          }
+        }, 120000); // 2 minute timeout
+
         try {
           await runAgent(
             history,
@@ -333,11 +346,24 @@ export async function POST(req: NextRequest) {
             conversationId: conversation.id,
           });
           controller.enqueue(encoder.encode(`data: ${doneData}\n\n`));
+          clearTimeout(timeout);
           controller.close();
         } catch (error) {
+          clearTimeout(timeout);
           console.error("Agent error:", error);
           const errorMsg = error instanceof Error ? error.message : "An error occurred";
-          const errorData = JSON.stringify({ type: "error", error: errorMsg });
+          // Provide more helpful error messages
+          let friendlyError = errorMsg;
+          if (errorMsg.includes("ENOTFOUND") || errorMsg.includes("ECONNREFUSED") || errorMsg.includes("fetch failed")) {
+            friendlyError = "Could not connect to the AI provider. Please check your API key in Settings > AI Models, or try a different model.";
+          } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized") || errorMsg.includes("invalid_api_key")) {
+            friendlyError = "Invalid API key. Please update your API key in Settings > AI Models.";
+          } else if (errorMsg.includes("429") || errorMsg.includes("rate_limit")) {
+            friendlyError = "Rate limited by the AI provider. Please wait a moment and try again.";
+          } else if (errorMsg.includes("No AI provider")) {
+            friendlyError = errorMsg;
+          }
+          const errorData = JSON.stringify({ type: "error", error: friendlyError });
           controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
           controller.close();
         }
