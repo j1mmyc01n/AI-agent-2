@@ -88,20 +88,25 @@ async function runOpenAIAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use zero-config constructor for Netlify AI Gateway (env vars auto-injected),
-  // otherwise pass explicit credentials for user-provided keys
+  // Always use zero-config constructor when gateway env vars are present —
+  // this lets the SDK pick up OPENAI_BASE_URL automatically, which is
+  // required for Netlify AI Gateway to proxy the request correctly.
   const envKey = process.env.OPENAI_API_KEY;
   const envBase = process.env.OPENAI_BASE_URL;
-  const useGateway = !!(envKey && envBase && apiKey === envKey);
+  const useGateway = !!(envKey && envBase);
   const openai = useGateway
     ? new OpenAI()
     : new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
   const model = config.model || "gpt-4o";
 
+  // Reasoning models (o-series) don't support system messages or max_tokens
+  const isReasoningModel = model.startsWith("o");
   const systemPrompt = buildSystemPrompt(config.projectContext);
-  const systemMessage: MessageParam = { role: "system", content: systemPrompt };
-  const allMessages: MessageParam[] = [systemMessage, ...messages];
+
+  const allMessages: MessageParam[] = isReasoningModel
+    ? [{ role: "user", content: `[System Instructions]\n${systemPrompt}\n\n[End System Instructions]` }, ...messages]
+    : [{ role: "system", content: systemPrompt }, ...messages];
 
   let finalResponse = "";
   let continueLoop = true;
@@ -113,7 +118,7 @@ async function runOpenAIAgent(
       tools,
       tool_choice: "auto",
       stream: true,
-      max_tokens: 4096,
+      ...(isReasoningModel ? {} : { max_tokens: 4096 }),
     });
 
     let currentContent = "";
@@ -185,11 +190,11 @@ async function runAnthropicAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use zero-config constructor for Netlify AI Gateway (env vars auto-injected),
-  // otherwise pass explicit credentials for user-provided keys
+  // Always use zero-config constructor when gateway env vars are present —
+  // this lets the SDK pick up ANTHROPIC_BASE_URL automatically.
   const envKey = process.env.ANTHROPIC_API_KEY;
   const envBase = process.env.ANTHROPIC_BASE_URL;
-  const useGateway = !!(envKey && envBase && apiKey === envKey);
+  const useGateway = !!(envKey && envBase);
   const anthropic = useGateway
     ? new Anthropic()
     : new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
@@ -281,7 +286,7 @@ export async function runAgent(
 ): Promise<string> {
   const requestedProvider = config.provider || "anthropic";
 
-  // Try the requested provider first, then auto-detect if it fails
+  // Try the requested provider first
   try {
     if (requestedProvider === "anthropic") {
       const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
@@ -297,11 +302,37 @@ export async function runAgent(
       }
     }
   } catch (error) {
-    console.error(`Failed with requested provider ${requestedProvider}:`, error);
-    // Fall through to auto-detect
+    const errMsg = error instanceof Error ? error.message : String(error);
+    console.error(`Failed with requested provider ${requestedProvider}:`, errMsg);
+
+    // If the requested provider failed, try the OTHER provider as fallback
+    const fallbackProvider = requestedProvider === "openai" ? "anthropic" : "openai";
+    try {
+      if (fallbackProvider === "anthropic") {
+        const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
+        if (anthropicKey) {
+          // Override the model to a valid Anthropic model when falling back
+          const fallbackConfig = { ...config, model: "claude-sonnet-4-5", provider: "anthropic" as AIProvider };
+          return await runAnthropicAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, anthropicKey, process.env.ANTHROPIC_BASE_URL);
+        }
+      } else {
+        const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
+        if (openaiKey) {
+          const fallbackConfig = { ...config, model: "gpt-4o", provider: "openai" as AIProvider };
+          return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, openaiKey, process.env.OPENAI_BASE_URL);
+        }
+      }
+    } catch (fallbackError) {
+      console.error(`Fallback provider ${fallbackProvider} also failed:`, fallbackError);
+      // Throw the original error for better diagnostics
+      throw error;
+    }
+
+    // If we got here, fallback provider had no key available
+    throw error;
   }
 
-  // Auto-detect available provider as fallback (Netlify AI Gateway injects keys automatically)
+  // If no key for the requested provider, auto-detect
   const detected = detectAvailableProvider(config);
   if (detected) {
     try {

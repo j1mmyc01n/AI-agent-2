@@ -489,8 +489,10 @@ export default function ProjectsList() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((project) => (
               <Card key={project.id} className="border-border/50 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group overflow-hidden">
-                {/* Project thumbnail */}
-                <ProjectThumbnail project={project} />
+                {/* Clickable project thumbnail - navigates to chat with this project */}
+                <Link href={`/chat?project=${project.id}`} className="block cursor-pointer">
+                  <ProjectThumbnail project={project} />
+                </Link>
 
                 <CardHeader className="pb-2 pt-3">
                   <div className="flex items-start justify-between gap-2">
@@ -515,9 +517,11 @@ export default function ProjectsList() {
                         </Button>
                       </div>
                     ) : (
-                      <CardTitle className="text-base leading-tight truncate flex-1">
-                        {project.name}
-                      </CardTitle>
+                      <Link href={`/chat?project=${project.id}`} className="flex-1 min-w-0">
+                        <CardTitle className="text-base leading-tight truncate hover:text-primary transition-colors cursor-pointer">
+                          {project.name}
+                        </CardTitle>
+                      </Link>
                     )}
 
                     {/* Action buttons - always visible */}

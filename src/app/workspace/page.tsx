@@ -98,6 +98,62 @@ export default async function WorkspacePage() {
     }
   }
 
+  // Fallback to Blobs if no DB data loaded
+  if (!user || (recentConversations.length === 0 && recentProjects.length === 0)) {
+    try {
+      const { getStore } = await import("@netlify/blobs");
+
+      // Load conversations from Blobs
+      if (recentConversations.length === 0) {
+        try {
+          const convStore = getStore("conversations");
+          const blobConvs = await convStore.get(`user:${userId}`, { type: "json" }) as { id: string; title: string; updatedAt: string; messageCount: number }[] | null;
+          if (blobConvs && blobConvs.length > 0) {
+            recentConversations = blobConvs.slice(0, 5).map((c) => ({
+              id: c.id,
+              title: c.title,
+              updatedAt: new Date(c.updatedAt),
+              _count: { messages: c.messageCount || 0 },
+            }));
+          }
+        } catch {
+          // Blobs not available for conversations
+        }
+      }
+
+      // Load projects from Blobs
+      if (recentProjects.length === 0) {
+        try {
+          const projStore = getStore("projects");
+          const blobProjects = await projStore.get(`user:${userId}`, { type: "json" }) as { id: string; name: string; type: string; status: string }[] | null;
+          if (blobProjects && blobProjects.length > 0) {
+            recentProjects = blobProjects.slice(0, 3);
+          }
+        } catch {
+          // Blobs not available for projects
+        }
+      }
+
+      // Create a synthetic user object for display when no DB
+      if (!user) {
+        const convCount = recentConversations.length;
+        const projCount = recentProjects.length;
+        user = {
+          name: session.user.name || null,
+          email: session.user.email || "user@example.com",
+          openaiKey: null,
+          anthropicKey: null,
+          githubToken: null,
+          vercelToken: null,
+          tavilyKey: null,
+          _count: { conversations: convCount, projects: projCount },
+        };
+      }
+    } catch {
+      // Blobs import failed - continue with empty data
+    }
+  }
+
   const connectedIntegrations = [
     user?.openaiKey,
     user?.githubToken,
@@ -327,7 +383,7 @@ export default async function WorkspacePage() {
                 ) : (
                   <div className="space-y-3">
                     {recentProjects.map((project) => (
-                      <div key={project.id} className="p-3 rounded-lg border border-border/50 hover:border-primary/20 transition-colors">
+                      <Link key={project.id} href={`/chat?project=${project.id}`} className="block p-3 rounded-lg border border-border/50 hover:border-primary/20 hover:bg-primary/5 transition-all">
                         <p className="font-medium text-sm truncate">{project.name}</p>
                         <div className="flex items-center gap-2 mt-2">
                           <Badge variant="outline" className="text-xs border-primary/20 text-primary">
@@ -337,7 +393,7 @@ export default async function WorkspacePage() {
                             {project.status}
                           </Badge>
                         </div>
-                      </div>
+                      </Link>
                     ))}
                   </div>
                 )}

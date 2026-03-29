@@ -253,63 +253,68 @@ export async function POST(req: NextRequest) {
   let output = "";
   let usedModel = model;
 
-  try {
-    if (activeProvider === "anthropic") {
-      if (!anthropicKey) {
-        return NextResponse.json(
-          { error: "No AI provider available. Netlify AI Gateway should provide Claude automatically — no API keys needed." },
-          { status: 400 }
-        );
-      }
-      // Use zero-config constructor for Netlify AI Gateway
+  // Try generation with primary provider, fall back to alternate on failure
+  const tryGenerate = async (useProvider: "anthropic" | "openai", useModel?: string): Promise<string> => {
+    if (useProvider === "anthropic") {
+      const key = userKeys.anthropicKey ?? process.env.ANTHROPIC_API_KEY;
+      if (!key) throw new Error("No Anthropic key available");
       const anthropic = new Anthropic();
-      usedModel = model ?? "claude-sonnet-4-5";
+      const m = useModel ?? "claude-sonnet-4-5";
+      usedModel = m;
       const response = await anthropic.messages.create({
-        model: usedModel,
+        model: m,
         max_tokens: 4096,
         system: tmpl.systemPrompt,
         messages: [{ role: "user", content: fullPrompt }],
       });
-      output =
-        response.content
-          .filter((c) => c.type === "text")
-          .map((c) => (c as { type: "text"; text: string }).text)
-          .join("");
+      return response.content
+        .filter((c) => c.type === "text")
+        .map((c) => (c as { type: "text"; text: string }).text)
+        .join("");
     } else {
-      // Default: OpenAI
-      if (!openaiKey) {
-        return NextResponse.json(
-          { error: "No AI provider available. Netlify AI Gateway should provide models automatically — no API keys needed." },
-          { status: 400 }
-        );
-      }
-      // Use zero-config constructor for Netlify AI Gateway
+      const key = userKeys.openaiKey ?? process.env.OPENAI_API_KEY;
+      if (!key) throw new Error("No OpenAI key available");
       const openai = new OpenAI();
-      usedModel = model ?? "gpt-4o";
+      const m = useModel ?? "gpt-4o";
+      usedModel = m;
       const response = await openai.chat.completions.create({
-        model: usedModel,
+        model: m,
         max_tokens: 4096,
         messages: [
           { role: "system", content: tmpl.systemPrompt },
           { role: "user", content: fullPrompt },
         ],
       });
-      output = response.choices[0]?.message?.content ?? "";
+      return response.choices[0]?.message?.content ?? "";
     }
-  } catch (err) {
-    console.error("AI generation error:", err);
-    const message =
-      err instanceof Error ? err.message : "AI generation failed";
-    // Never expose raw API errors (may contain key fingerprints)
-    const safe =
-      message.includes("API key") || message.includes("Incorrect API key")
-        ? "Invalid API key. Please check your key in Settings > AI Models."
-        : message.includes("rate limit") || message.includes("429")
-        ? "Rate limit reached. Please wait a moment and try again."
-        : message.includes("quota") || message.includes("insufficient_quota")
-        ? "API quota exceeded. Please check your billing on the provider dashboard."
-        : "AI generation failed. Please try again.";
-    return NextResponse.json({ error: safe }, { status: 502 });
+  };
+
+  try {
+    output = await tryGenerate(activeProvider, model ?? undefined);
+  } catch (primaryErr) {
+    console.error(`Primary provider ${activeProvider} failed:`, primaryErr);
+    // Try fallback provider
+    const fallback = activeProvider === "openai" ? "anthropic" : "openai";
+    const fallbackModel = fallback === "anthropic" ? "claude-sonnet-4-5" : "gpt-4o";
+    try {
+      output = await tryGenerate(fallback, fallbackModel);
+    } catch (fallbackErr) {
+      console.error(`Fallback provider ${fallback} also failed:`, fallbackErr);
+      const err = primaryErr;
+      const message =
+        err instanceof Error ? err.message : "AI generation failed";
+      const safe =
+        message.includes("API key") || message.includes("Incorrect API key")
+          ? "Invalid API key. Please check your key in Settings > AI Models."
+          : message.includes("rate limit") || message.includes("429")
+          ? "Rate limit reached. Please wait a moment and try again."
+          : message.includes("quota") || message.includes("insufficient_quota")
+          ? "API quota exceeded. Please check your billing on the provider dashboard."
+          : message.includes("404") || message.includes("Not Found")
+          ? "Model not available. Try switching to a different model."
+          : "AI generation failed. Please try again.";
+      return NextResponse.json({ error: safe }, { status: 502 });
+    }
   }
 
   // Persist to database if available

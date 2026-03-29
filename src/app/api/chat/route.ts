@@ -401,8 +401,10 @@ export async function POST(req: NextRequest) {
           const errorMsg = error instanceof Error ? error.message : "An error occurred";
           // Provide more helpful error messages
           let friendlyError = errorMsg;
-          if (errorMsg.includes("ENOTFOUND") || errorMsg.includes("ECONNREFUSED") || errorMsg.includes("fetch failed")) {
-            friendlyError = "Could not connect to the AI provider. Please check your API key in Settings > AI Models, or try a different model.";
+          if (errorMsg.includes("404") || errorMsg.includes("Not Found") || errorMsg.includes("model_not_found")) {
+            friendlyError = "The selected model returned a 404 error. Try switching to a different model (e.g. Claude Sonnet 4.5 or GPT-4o) using the model selector.";
+          } else if (errorMsg.includes("ENOTFOUND") || errorMsg.includes("ECONNREFUSED") || errorMsg.includes("fetch failed")) {
+            friendlyError = "Could not connect to the AI provider. Please try a different model or check Settings > AI Models.";
           } else if (errorMsg.includes("401") || errorMsg.includes("Unauthorized") || errorMsg.includes("invalid_api_key")) {
             friendlyError = "Invalid API key. Please update your API key in Settings > AI Models.";
           } else if (errorMsg.includes("429") || errorMsg.includes("rate_limit")) {

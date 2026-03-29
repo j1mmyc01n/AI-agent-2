@@ -85,12 +85,11 @@ Analyze the domain, infer the product type, and suggest integration pathways, au
 
   try {
     if (activeProvider === "anthropic" && anthropicKey) {
-      // Use zero-config constructor when env vars match (Netlify AI Gateway)
-      const envKey = process.env.ANTHROPIC_API_KEY;
+      // Always use zero-config constructor when gateway env vars are present
       const envBase = process.env.ANTHROPIC_BASE_URL;
-      const anthropic = (envKey && envBase && anthropicKey === envKey)
+      const anthropic = envBase
         ? new Anthropic()
-        : new Anthropic({ apiKey: anthropicKey, ...(process.env.ANTHROPIC_BASE_URL ? { baseURL: process.env.ANTHROPIC_BASE_URL } : {}) });
+        : new Anthropic({ apiKey: anthropicKey });
       const response = await anthropic.messages.create({
         model: "claude-sonnet-4-5",
         max_tokens: 2048,
@@ -102,12 +101,11 @@ Analyze the domain, infer the product type, and suggest integration pathways, au
         .map((c) => (c as { type: "text"; text: string }).text)
         .join("");
     } else if (activeProvider === "openai" && openaiKey) {
-      // Use zero-config constructor when env vars match (Netlify AI Gateway)
-      const envOaiKey = process.env.OPENAI_API_KEY;
+      // Always use zero-config constructor when gateway env vars are present
       const envOaiBase = process.env.OPENAI_BASE_URL;
-      const openai = (envOaiKey && envOaiBase && openaiKey === envOaiKey)
+      const openai = envOaiBase
         ? new OpenAI()
-        : new OpenAI({ apiKey: openaiKey, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) });
+        : new OpenAI({ apiKey: openaiKey });
       const response = await openai.chat.completions.create({
         model: "gpt-4o",
         max_tokens: 2048,
