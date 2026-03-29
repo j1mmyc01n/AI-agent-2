@@ -78,8 +78,7 @@ export default function MessageInput({
               placeholder={placeholder}
               disabled={isLoading || disabled}
               rows={1}
-              className="flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[36px] max-h-[120px] py-1.5 px-1 text-[16px] sm:text-sm"
-              style={{ fontSize: "16px" }}
+              className="flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[36px] max-h-[120px] py-1.5 px-1 text-base sm:text-sm"
             />
             <Button
               onClick={handleSend}

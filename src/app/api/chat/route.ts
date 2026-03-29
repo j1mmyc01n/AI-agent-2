@@ -5,6 +5,45 @@ import { db, getDatabaseUrl } from "@/lib/db";
 import { runAgent, type AIProvider } from "@/lib/ai/agent";
 import { getStore } from "@netlify/blobs";
 
+/**
+ * Generate a 2-3 word descriptive title from a user message.
+ * Extracts key nouns/verbs and removes filler words.
+ */
+function generateShortTitle(message: string): string {
+  const stopWords = new Set([
+    "a", "an", "the", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "will", "would", "could",
+    "should", "may", "might", "shall", "can", "need", "dare", "ought",
+    "i", "me", "my", "we", "our", "you", "your", "he", "she", "it",
+    "they", "them", "his", "her", "its", "this", "that", "these", "those",
+    "am", "to", "of", "in", "for", "on", "with", "at", "by", "from",
+    "as", "into", "through", "during", "before", "after", "above",
+    "below", "between", "out", "off", "over", "under", "again", "further",
+    "then", "once", "here", "there", "when", "where", "why", "how", "all",
+    "each", "every", "both", "few", "more", "most", "other", "some",
+    "such", "no", "nor", "not", "only", "own", "same", "so", "than",
+    "too", "very", "just", "because", "but", "and", "or", "if", "while",
+    "about", "up", "what", "which", "who", "whom", "please", "want",
+    "like", "let", "lets", "let's", "going", "get", "got", "make",
+    "help", "something", "thing", "things", "really", "actually",
+  ]);
+
+  // Clean the message and extract meaningful words
+  const words = message
+    .replace(/[^a-zA-Z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter(w => w.length > 1 && !stopWords.has(w.toLowerCase()))
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+
+  if (words.length === 0) {
+    return "New Chat";
+  }
+
+  // Take first 2-3 meaningful words
+  const titleWords = words.slice(0, 3);
+  return titleWords.join(" ");
+}
+
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
 
@@ -163,7 +202,7 @@ export async function POST(req: NextRequest) {
       const convId = conversationId || `blob-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
       conversation = {
         id: convId,
-        title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
+        title: generateShortTitle(message),
         messages: [],
       };
       if (body.history && Array.isArray(body.history)) {
@@ -205,7 +244,7 @@ export async function POST(req: NextRequest) {
           const conv = await db.conversation.create({
             data: {
               userId,
-              title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
+              title: generateShortTitle(message),
             },
             include: { messages: true },
           });
@@ -226,7 +265,7 @@ export async function POST(req: NextRequest) {
         const convId = conversationId || `local-${Date.now()}`;
         conversation = {
           id: convId,
-          title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
+          title: generateShortTitle(message),
           messages: [],
         };
         if (body.history && Array.isArray(body.history)) {

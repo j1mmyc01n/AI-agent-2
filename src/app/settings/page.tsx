@@ -3,6 +3,7 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import MainLayout from "@/components/layout/MainLayout";
 import IntegrationsPanel from "@/components/settings/IntegrationsPanel";
+import SettingsClient from "@/components/settings/SettingsClient";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,9 @@ export default async function SettingsPage() {
               Manage your API keys, integrations, and connectivity settings
             </p>
           </div>
+
+          {/* Quick Setup Wizard (client component) */}
+          <SettingsClient />
 
           <Tabs defaultValue="ai-models" className="space-y-6">
             <TabsList className="grid w-full grid-cols-3">

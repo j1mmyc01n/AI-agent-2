@@ -84,11 +84,13 @@ body {
 /* Prevent iOS zoom on input focus */
 input, textarea, select {
   font-size: 16px !important;
+  touch-action: manipulation;
 }
 
 @media (min-width: 768px) {
   input, textarea, select {
     font-size: inherit !important;
+    touch-action: auto;
   }
 }
 

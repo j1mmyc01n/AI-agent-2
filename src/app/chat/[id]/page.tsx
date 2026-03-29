@@ -1,6 +1,6 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
-import { redirect, notFound } from "next/navigation";
+import { redirect } from "next/navigation";
 import MainLayout from "@/components/layout/MainLayout";
 import ChatInterface from "@/components/chat/ChatInterface";
 import { db, getDatabaseUrl } from "@/lib/db";
@@ -18,7 +18,7 @@ export default async function ConversationPage({ params }: PageProps) {
   const userId = (session.user as { id: string }).id;
   const { id } = await params;
 
-  // If no database and this is a local conversation, show empty chat with the ID preserved
+  // If no database, show chat with the ID preserved (conversation lives in blobs/browser)
   if (!getDatabaseUrl()) {
     return (
       <MainLayout currentConversationId={id}>
@@ -40,19 +40,18 @@ export default async function ConversationPage({ params }: PageProps) {
       include: { messages: { orderBy: { createdAt: "asc" } } },
     });
 
-    if (!conversation) {
-      notFound();
+    if (conversation) {
+      initialMessages = conversation.messages.map((m) => ({
+        id: m.id,
+        role: m.role as "user" | "assistant" | "system" | "tool",
+        content: m.content,
+        toolCalls: m.toolCalls,
+      }));
     }
-
-    initialMessages = conversation.messages.map((m) => ({
-      id: m.id,
-      role: m.role as "user" | "assistant" | "system" | "tool",
-      content: m.content,
-      toolCalls: m.toolCalls,
-    }));
+    // If not found in DB, still show the chat (conversation may be blob-based)
   } catch (err) {
     console.error("Conversation load error:", err);
-    notFound();
+    // Don't 404 - fall through to show empty chat for this ID
   }
 
   return (

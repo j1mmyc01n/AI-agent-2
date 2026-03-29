@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check } from "lucide-react";
+import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check, Link2 } from "lucide-react";
 
 interface Project {
   id: string;
@@ -56,6 +56,9 @@ export default function ProjectsList() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [showRecreateForm, setShowRecreateForm] = useState(false);
+  const [recreateUrl, setRecreateUrl] = useState("");
+  const [recreating, setRecreating] = useState(false);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -140,6 +143,76 @@ export default function ProjectsList() {
     setDeletingId(null);
   };
 
+  const handleRecreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = recreateUrl.trim();
+    if (!url) return;
+    setRecreating(true);
+    setError(null);
+
+    try {
+      // Extract a domain/path-based descriptive name from the URL
+      let urlObj: URL;
+      try {
+        urlObj = new URL(url.startsWith("http") ? url : `https://${url}`);
+      } catch {
+        throw new Error("Please enter a valid URL");
+      }
+
+      // Generate an original project name inspired by the URL
+      const hostname = urlObj.hostname.replace("www.", "");
+      const pathParts = urlObj.pathname.split("/").filter(Boolean);
+      const domainParts = hostname.split(".");
+      const siteName = domainParts[0] === "www" ? domainParts[1] : domainParts[0];
+
+      // Create a unique, original name (not a copy)
+      const descriptors = ["Inspired", "Fresh", "Original", "Custom", "Unique", "New"];
+      const types = ["App", "Platform", "Tool", "Hub", "Studio", "Space"];
+      const descriptor = descriptors[Math.floor(Math.random() * descriptors.length)];
+      const type = types[Math.floor(Math.random() * types.length)];
+      const projectName = `${descriptor} ${siteName.charAt(0).toUpperCase() + siteName.slice(1)} ${type}`;
+
+      // Determine project type from URL patterns
+      let projectType = "other";
+      const urlLower = url.toLowerCase();
+      if (urlLower.includes("twitter.com") || urlLower.includes("x.com") || urlLower.includes("instagram") || urlLower.includes("tiktok") || urlLower.includes("facebook") || urlLower.includes("linkedin")) {
+        projectType = "saas";
+      } else if (pathParts.some(p => ["app", "dashboard", "admin"].includes(p))) {
+        projectType = "saas";
+      } else if (pathParts.length <= 1) {
+        projectType = "landing-page";
+      } else if (urlLower.includes("api") || urlLower.includes("docs")) {
+        projectType = "api";
+      } else {
+        projectType = "mvp";
+      }
+
+      const res = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: projectName,
+          description: `Original project inspired by ${urlObj.hostname}${pathParts.length > 0 ? "/" + pathParts[0] : ""}. Not a copy — built with unique ideas and a fresh approach.`,
+          type: projectType,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || "Failed to create project");
+      }
+
+      const newProject = await res.json();
+      setProjects((prev) => [newProject, ...prev]);
+      setRecreateUrl("");
+      setShowRecreateForm(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to create project from URL");
+    } finally {
+      setRecreating(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto p-6">
@@ -155,13 +228,23 @@ export default function ProjectsList() {
               Track and manage your AI-built SaaS projects
             </p>
           </div>
-          <Button
-            onClick={() => setShowCreateForm(true)}
-            className="gap-2 shadow-md shadow-primary/10"
-          >
-            <Plus className="h-4 w-4" />
-            New Project
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setShowRecreateForm(true); setShowCreateForm(false); }}
+              className="gap-2"
+            >
+              <Link2 className="h-4 w-4" />
+              From URL
+            </Button>
+            <Button
+              onClick={() => { setShowCreateForm(true); setShowRecreateForm(false); }}
+              className="gap-2 shadow-md shadow-primary/10"
+            >
+              <Plus className="h-4 w-4" />
+              New Project
+            </Button>
+          </div>
         </div>
 
         {/* Create project form */}
@@ -246,6 +329,76 @@ export default function ProjectsList() {
                   <Button type="submit" disabled={creating} className="gap-2">
                     {creating && <Loader2 className="h-4 w-4 animate-spin" />}
                     Create Project
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Recreate from URL form */}
+        {showRecreateForm && (
+          <Card className="mb-6 border-primary/20 shadow-lg shadow-primary/5">
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Link2 className="h-5 w-5 text-primary" />
+                  Create from URL
+                </CardTitle>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => {
+                    setShowRecreateForm(false);
+                    setError(null);
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <CardDescription className="text-xs">
+                Paste a website URL or social media link. An original project will be created
+                inspired by it — not a copy, but a fresh take with a unique name and approach.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleRecreate} className="space-y-4">
+                <div>
+                  <label htmlFor="recreate-url" className="text-sm font-medium mb-1.5 block">
+                    URL or Social Link *
+                  </label>
+                  <input
+                    id="recreate-url"
+                    type="text"
+                    value={recreateUrl}
+                    onChange={(e) => setRecreateUrl(e.target.value)}
+                    placeholder="https://example.com or https://twitter.com/username"
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+                    autoFocus
+                  />
+                  <p className="text-[11px] text-muted-foreground mt-1.5">
+                    Supports websites, Twitter/X, Instagram, LinkedIn, TikTok, and more.
+                    The generated project will be 100% original — never plagiarized.
+                  </p>
+                </div>
+                {error && (
+                  <p className="text-sm text-destructive">{error}</p>
+                )}
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowRecreateForm(false);
+                      setError(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={recreating || !recreateUrl.trim()} className="gap-2">
+                    {recreating && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Create Original Project
                   </Button>
                 </div>
               </form>
