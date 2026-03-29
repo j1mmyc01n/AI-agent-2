@@ -41,7 +41,7 @@ interface ChatInterfaceProps {
 }
 
 type AgentStatus = "idle" | "thinking" | "coding" | "searching" | "deploying" | "saving";
-type ChatMode = "chat" | "build";
+type ChatMode = "chat" | "build" | "saas-upgrade";
 
 // Extract code blocks from assistant messages
 function extractCodeBlocks(messages: Message[]): CodeBlock[] {
@@ -98,7 +98,7 @@ function getAgentStatusFromToolCalls(streamingToolCalls: { name: string; args: R
     case "web_search": return "searching";
     case "create_github_repo":
     case "push_code_to_github":
-    case "save_artifact": return "coding";
+    case "save_artifact": return "saving";
     case "create_vercel_project": return "deploying";
     case "create_project_record": return "saving";
     default: return "thinking";
@@ -125,6 +125,21 @@ function isBuildRequest(message: string): boolean {
     /\bi (want|need) (a |an |to build |to create )/i,
   ];
   return buildKeywords.some(regex => regex.test(message));
+}
+
+// Detect if a message is requesting a SaaS/MVP upgrade
+function isSaasUpgradeRequest(message: string): boolean {
+  const upgradeKeywords = [
+    /\bupgrade\s+(to\s+)?saas\b/i,
+    /\bupgrade\s+(to\s+)?mvp\b/i,
+    /\bupgrade\s+(to\s+)?(full|proper|production)\b/i,
+    /\bconvert\s+(to\s+)?saas\b/i,
+    /\bfull\s+(saas|mvp)\s+(version|structure|upgrade)\b/i,
+    /\bmulti[- ]?page\s+(version|structure|upgrade)\b/i,
+    /\bproduction[- ]?ready\b/i,
+    /\bproper\s+file\s+structure\b/i,
+  ];
+  return upgradeKeywords.some(regex => regex.test(message));
 }
 
 export default function ChatInterface({
@@ -236,12 +251,13 @@ export default function ChatInterface({
 
       // Auto-generate tasks based on what the agent is doing
       if (status === "thinking" && tasks.length === 0 && content) {
-        // First thinking phase - create initial tasks
+        // First thinking phase - create research-first tasks
         return [
-          { id: "agent-1", title: "Analyzing your request", status: "in-progress" },
-          { id: "agent-2", title: "Planning implementation", status: "pending" },
-          { id: "agent-3", title: "Generating code", status: "pending" },
-          { id: "agent-4", title: "Saving project files", status: "pending" },
+          { id: "agent-1", title: "Researching best practices & design patterns", status: "in-progress" },
+          { id: "agent-2", title: "Planning architecture & UX approach", status: "pending" },
+          { id: "agent-3", title: "Generating premium code", status: "pending" },
+          { id: "agent-4", title: "Adding polish & micro-interactions", status: "pending" },
+          { id: "agent-5", title: "Saving project files", status: "pending" },
         ];
       }
 
@@ -264,16 +280,17 @@ export default function ChatInterface({
       if (status === "coding") {
         return tasks.map(t => {
           if (t.title.includes("Searching")) return { ...t, status: "done" as const };
-          if (t.title.includes("Analyzing")) return { ...t, status: "done" as const };
+          if (t.title.includes("Researching")) return { ...t, status: "done" as const };
           if (t.title.includes("Planning")) return { ...t, status: "done" as const };
-          if (t.title.includes("Generating code")) return { ...t, status: "in-progress" as const };
+          if (t.title.includes("Generating")) return { ...t, status: "in-progress" as const };
           return t;
         });
       }
 
       if (status === "saving") {
         return tasks.map(t => {
-          if (t.title.includes("Generating code")) return { ...t, status: "done" as const };
+          if (t.title.includes("Generating")) return { ...t, status: "done" as const };
+          if (t.title.includes("Adding polish")) return { ...t, status: "done" as const };
           if (t.title.includes("Saving")) return { ...t, status: "in-progress" as const };
           return t;
         });
@@ -289,9 +306,9 @@ export default function ChatInterface({
         const codeBlockCount = (content.match(/```\w/g) || []).length;
         if (codeBlockCount > 0) {
           return tasks.map(t => {
-            if (t.title.includes("Analyzing")) return { ...t, status: "done" as const };
+            if (t.title.includes("Researching")) return { ...t, status: "done" as const };
             if (t.title.includes("Planning")) return { ...t, status: "done" as const };
-            if (t.title.includes("Generating code")) return { ...t, status: "in-progress" as const, description: `${codeBlockCount} file${codeBlockCount > 1 ? "s" : ""} generated` };
+            if (t.title.includes("Generating")) return { ...t, status: "in-progress" as const, description: `${codeBlockCount} file${codeBlockCount > 1 ? "s" : ""} generated` };
             return t;
           });
         }
@@ -305,9 +322,12 @@ export default function ChatInterface({
     async (content: string, model: AIModel) => {
       if (isLoading) return;
 
-      // Detect if this should trigger build mode
-      const shouldBuild = chatMode === "build" || isBuildRequest(content);
-      if (shouldBuild && chatMode !== "build") {
+      // Detect if this should trigger build mode or saas upgrade
+      const shouldUpgrade = isSaasUpgradeRequest(content);
+      const shouldBuild = shouldUpgrade || chatMode === "build" || chatMode === "saas-upgrade" || isBuildRequest(content);
+      if (shouldUpgrade) {
+        setChatMode("saas-upgrade");
+      } else if (shouldBuild && chatMode !== "build" && chatMode !== "saas-upgrade") {
         setChatMode("build");
       }
 
@@ -332,7 +352,7 @@ export default function ChatInterface({
             model: model.id,
             provider: model.provider,
             projectId,
-            mode: shouldBuild ? "build" : "chat",
+            mode: shouldUpgrade ? "saas-upgrade" : shouldBuild ? "build" : "chat",
             history: messages.filter(m => m.role === "user" || m.role === "assistant").map(m => ({
               role: m.role,
               content: m.content,
@@ -513,6 +533,11 @@ export default function ChatInterface({
     [isLoading, currentConversationId, initialConversationId, projectId, messages, chatMode, parseWorkflowTasks, updateAgentTasks]
   );
 
+  const handleQuickPrompt = useCallback((prompt: string) => {
+    if (isLoading) return;
+    sendMessage(prompt, selectedModel);
+  }, [isLoading, sendMessage, selectedModel]);
+
   const panelTabs = [
     { id: "chat" as PanelView, label: "Chat", icon: MessageSquare, count: messages.filter(m => m.role !== "system").length },
     { id: "code" as PanelView, label: "Code", icon: Code2, count: codeBlocks.length },
@@ -580,6 +605,18 @@ export default function ChatInterface({
               <Hammer className="h-3 w-3" />
               <span className="hidden sm:inline">Build</span>
             </button>
+            <button
+              onClick={() => setChatMode("saas-upgrade")}
+              className={`flex items-center gap-1 px-2 py-1 text-[11px] font-medium transition-colors ${
+                chatMode === "saas-upgrade"
+                  ? "bg-gradient-to-r from-violet-500 to-purple-600 text-white"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              }`}
+              title="SaaS upgrade - convert to full multi-page SaaS structure"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span className="hidden sm:inline">SaaS</span>
+            </button>
           </div>
 
           {/* Agent status indicator */}
@@ -604,7 +641,7 @@ export default function ChatInterface({
       <div className="flex-1 min-h-0 overflow-hidden">
         {activePanel === "chat" && (
           <div className="flex flex-col h-full min-h-0">
-            <MessageList messages={messages} isLoading={isLoading} agentStatus={agentStatus} />
+            <MessageList messages={messages} isLoading={isLoading} agentStatus={agentStatus} onQuickPrompt={handleQuickPrompt} />
             <MessageInput
               onSend={sendMessage}
               isLoading={isLoading}

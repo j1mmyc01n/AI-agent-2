@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
       model?: string;
       provider?: AIProvider;
       projectId?: string;
-      mode?: "chat" | "build";
+      mode?: "chat" | "build" | "saas-upgrade";
       history?: { role: string; content: string }[];
     };
 

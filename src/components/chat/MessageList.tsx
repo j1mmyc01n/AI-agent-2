@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Bot, User, Globe, Github, Zap, Database, Loader2, Brain, Code2, Sparkles } from "lucide-react";
+import { Bot, User, Globe, Github, Zap, Database, Loader2, Brain, Code2, Sparkles, Layout, ShoppingCart, BarChart3, MessageSquare as ChatIcon, FileText, Music } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface ToolCallData {
@@ -25,6 +25,7 @@ interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
   agentStatus?: AgentStatus;
+  onQuickPrompt?: (prompt: string) => void;
 }
 
 function getToolIcon(toolName: string) {
@@ -38,6 +39,8 @@ function getToolIcon(toolName: string) {
       return <Zap className="h-3 w-3" />;
     case "create_project_record":
       return <Database className="h-3 w-3" />;
+    case "save_artifact":
+      return <Code2 className="h-3 w-3" />;
     default:
       return <Zap className="h-3 w-3" />;
   }
@@ -50,6 +53,7 @@ function getToolLabel(toolName: string) {
     push_code_to_github: "Push to GitHub",
     create_vercel_project: "Deploy to Vercel",
     create_project_record: "Save Project",
+    save_artifact: "Save Files",
   };
   return labels[toolName] || toolName;
 }
@@ -169,7 +173,7 @@ function InlineFormatted({ text }: { text: string }) {
   );
 }
 
-export default function MessageList({ messages, isLoading, agentStatus = "idle" }: MessageListProps) {
+export default function MessageList({ messages, isLoading, agentStatus = "idle", onQuickPrompt }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -179,34 +183,119 @@ export default function MessageList({ messages, isLoading, agentStatus = "idle" 
   if (messages.length === 0 && !isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
-        <div className="text-center max-w-lg">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 glow-primary">
-            <Bot className="h-8 w-8 text-primary" />
+        <div className="text-center max-w-xl w-full">
+          <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center mx-auto mb-4 glow-primary">
+            <Bot className="h-6 w-6 text-primary" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold mb-3">
+          <h2 className="text-lg sm:text-xl font-bold mb-2">
             <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
               DoBetter Viber
             </span>
           </h2>
-          <p className="text-muted-foreground mb-8 text-sm sm:text-base leading-relaxed">
-            Your AI-powered workspace. Describe what you want to build and the agent will
-            help you design, code, and ship it. Ask about the platform itself for help!
+          <p className="text-muted-foreground mb-5 text-xs sm:text-sm leading-relaxed">
+            Describe what you want to build. The agent will research, design, and code it.
           </p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
+          <div className="grid grid-cols-2 gap-2 text-left">
             {[
-              { icon: "🚀", text: "Build a SaaS MVP with live preview" },
-              { icon: "🔍", text: "Research topics with web search" },
-              { icon: "💻", text: "Generate code — view it in the Code tab" },
-              { icon: "💡", text: "Ask about DoBetter platform features" },
+              { icon: "🚀", text: "Build a SaaS MVP with live preview", prompt: "Build me a modern SaaS landing page with pricing table, feature grid, and hero section" },
+              { icon: "🔍", text: "Research & build from best practices", prompt: "Research the best project management tools and build me a task board like Trello" },
+              { icon: "💻", text: "Generate premium UI components", prompt: "Create a beautiful dashboard with analytics cards, charts, and a responsive sidebar" },
+              { icon: "💡", text: "Design a complete app from an idea", prompt: "I want to build an AI-powered writing assistant tool with a clean minimal UI" },
             ].map((item, i) => (
-              <div
+              <button
                 key={i}
-                className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card hover:bg-primary/5 hover:border-primary/20 transition-all text-sm cursor-default"
+                onClick={() => onQuickPrompt?.(item.prompt)}
+                className="flex items-center gap-2 p-2.5 rounded-lg border border-border/50 bg-card hover:bg-primary/5 hover:border-primary/30 transition-all text-left group cursor-pointer"
               >
-                <span className="text-lg">{item.icon}</span>
-                <span>{item.text}</span>
-              </div>
+                <span className="text-sm shrink-0">{item.icon}</span>
+                <span className="text-xs text-muted-foreground group-hover:text-foreground transition-colors leading-tight">{item.text}</span>
+              </button>
             ))}
+          </div>
+
+          {/* Thumbnail Gallery - Visual project templates */}
+          <div className="mt-5">
+            <p className="text-[11px] text-muted-foreground/70 uppercase tracking-wider font-medium mb-2.5">Or pick a template to start with</p>
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                {
+                  label: "SaaS Dashboard",
+                  prompt: "Build me a modern SaaS analytics dashboard with a sidebar navigation, stat cards showing revenue/users/growth, a line chart area, recent activity feed, and a clean dark/light theme. Make it look like a real funded startup product.",
+                  icon: BarChart3,
+                  gradient: "from-blue-500/20 to-cyan-500/20",
+                  border: "border-blue-500/20 hover:border-blue-400/40",
+                  iconColor: "text-blue-400",
+                  preview: ["Stats Cards", "Charts", "Activity Feed"],
+                },
+                {
+                  label: "Landing Page",
+                  prompt: "Build me a premium startup landing page with a hero section with gradient text, feature grid with icons, testimonials carousel, pricing table with 3 tiers, FAQ accordion, and a CTA footer. Modern SaaS style like Linear or Vercel.",
+                  icon: Layout,
+                  gradient: "from-violet-500/20 to-purple-500/20",
+                  border: "border-violet-500/20 hover:border-violet-400/40",
+                  iconColor: "text-violet-400",
+                  preview: ["Hero", "Features", "Pricing"],
+                },
+                {
+                  label: "E-Commerce",
+                  prompt: "Build me a modern e-commerce product page with image gallery, size/color selectors, add to cart button, product description tabs, reviews section, and recommended products grid. Style it like a premium fashion brand.",
+                  icon: ShoppingCart,
+                  gradient: "from-emerald-500/20 to-green-500/20",
+                  border: "border-emerald-500/20 hover:border-emerald-400/40",
+                  iconColor: "text-emerald-400",
+                  preview: ["Products", "Cart", "Checkout"],
+                },
+                {
+                  label: "Chat App",
+                  prompt: "Build me a real-time chat application UI with a contacts sidebar, message thread area with sent/received bubbles, typing indicators, message input with emoji picker, and online status indicators. Style it like Discord or Slack.",
+                  icon: ChatIcon,
+                  gradient: "from-orange-500/20 to-amber-500/20",
+                  border: "border-orange-500/20 hover:border-orange-400/40",
+                  iconColor: "text-orange-400",
+                  preview: ["Contacts", "Messages", "Input"],
+                },
+                {
+                  label: "Blog / CMS",
+                  prompt: "Build me a modern blog platform with a featured post hero, post grid with thumbnails and categories, sidebar with tags and newsletter signup, and a clean reading view with typography. Style it like Medium or Substack.",
+                  icon: FileText,
+                  gradient: "from-pink-500/20 to-rose-500/20",
+                  border: "border-pink-500/20 hover:border-rose-400/40",
+                  iconColor: "text-pink-400",
+                  preview: ["Posts", "Categories", "Reader"],
+                },
+                {
+                  label: "Creative Portfolio",
+                  prompt: "Build me a stunning creative portfolio with a full-screen hero with animated text, project showcase grid with hover effects, about section with skills, contact form, and smooth scroll navigation. Make it feel premium and artistic.",
+                  icon: Music,
+                  gradient: "from-fuchsia-500/20 to-purple-500/20",
+                  border: "border-fuchsia-500/20 hover:border-fuchsia-400/40",
+                  iconColor: "text-fuchsia-400",
+                  preview: ["Hero", "Projects", "Contact"],
+                },
+              ].map((tmpl, i) => (
+                <button
+                  key={i}
+                  onClick={() => onQuickPrompt?.(tmpl.prompt)}
+                  className={`group relative overflow-hidden rounded-lg border ${tmpl.border} bg-gradient-to-br ${tmpl.gradient} p-2.5 text-left transition-all hover:shadow-md hover:shadow-black/5 cursor-pointer`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <tmpl.icon className={`h-3.5 w-3.5 ${tmpl.iconColor}`} />
+                    <span className="text-[11px] font-semibold text-foreground/90">{tmpl.label}</span>
+                  </div>
+                  {/* Mini wireframe preview */}
+                  <div className="space-y-1">
+                    {tmpl.preview.map((section, j) => (
+                      <div key={j} className="flex items-center gap-1">
+                        <div className={`h-1 rounded-full ${j === 0 ? "w-8" : j === 1 ? "w-6" : "w-5"} bg-foreground/10`} />
+                        <span className="text-[9px] text-muted-foreground/50">{section}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Hover shine effect */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity -skew-x-12 translate-x-[-100%] group-hover:translate-x-[100%] duration-700" />
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>

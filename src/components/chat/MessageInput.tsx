@@ -60,9 +60,9 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t border-border/50 bg-card/30 backdrop-blur-sm p-2 sm:p-3 shrink-0" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0px))" }}>
+    <div className="border-t border-border/50 bg-card/30 backdrop-blur-sm p-1.5 sm:p-2 shrink-0" style={{ paddingBottom: "max(0.5rem, env(safe-area-inset-bottom, 0px))" }}>
       <div className="max-w-3xl mx-auto">
-        <div className="flex flex-col bg-background border border-border/50 rounded-xl p-2 gap-1.5 shadow-sm focus-within:border-primary/30 focus-within:shadow-md focus-within:shadow-primary/5 transition-all">
+        <div className="flex flex-col bg-background border border-border/50 rounded-xl p-1.5 gap-1 shadow-sm focus-within:border-primary/30 focus-within:shadow-md focus-within:shadow-primary/5 transition-all">
           {/* Model selector row */}
           <div className="flex items-center gap-2 px-1">
             <ModelSelector selectedModel={activeModel} onSelect={handleModelChange} />

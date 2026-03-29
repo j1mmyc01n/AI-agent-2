@@ -146,7 +146,6 @@ export default function ConversationSidebar({
 
   const navItems = [
     { href: "/workspace", icon: LayoutDashboard, label: "Workspace" },
-    { href: "/projects", icon: FolderOpen, label: "Projects" },
     { href: "/generate", icon: Sparkles, label: "Generate" },
     { href: "/connectivity", icon: Globe, label: "Connectivity" },
     { href: "/history", icon: History, label: "History" },
@@ -240,47 +239,8 @@ export default function ConversationSidebar({
             </div>
           ) : (
             <div className="space-y-1">
-              {/* Project-grouped conversations */}
-              {projects.filter(p => projectConversations.has(p.id)).map((project) => (
-                <div key={project.id}>
-                  <button
-                    onClick={() => toggleProject(project.id)}
-                    className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full text-left"
-                  >
-                    <ChevronRight className={`h-3 w-3 transition-transform ${expandedProjects.has(project.id) ? "rotate-90" : ""}`} />
-                    <FolderOpen className="h-3 w-3" />
-                    <span className="truncate">{project.name}</span>
-                    <span className="text-[10px] ml-auto opacity-50">{projectConversations.get(project.id)?.length}</span>
-                  </button>
-                  {expandedProjects.has(project.id) && (
-                    <div className="ml-2">
-                      {projectConversations.get(project.id)?.map(renderConversation)}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Unassigned conversations */}
-              {unassigned.length > 0 && (
-                <div>
-                  {projects.some(p => projectConversations.has(p.id)) && (
-                    <button
-                      onClick={() => toggleProject("unassigned")}
-                      className="flex items-center gap-1.5 px-3 py-1 text-xs font-medium text-muted-foreground hover:text-foreground w-full text-left"
-                    >
-                      <ChevronRight className={`h-3 w-3 transition-transform ${expandedProjects.has("unassigned") ? "rotate-90" : ""}`} />
-                      <MessageSquare className="h-3 w-3" />
-                      <span>Chats</span>
-                      <span className="text-[10px] ml-auto opacity-50">{unassigned.length}</span>
-                    </button>
-                  )}
-                  {(expandedProjects.has("unassigned") || !projects.some(p => projectConversations.has(p.id))) && (
-                    <div className={projects.some(p => projectConversations.has(p.id)) ? "ml-2" : ""}>
-                      {unassigned.map(renderConversation)}
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* All conversations (flat list) */}
+              {conversations.map(renderConversation)}
             </div>
           )}
         </ScrollArea>
