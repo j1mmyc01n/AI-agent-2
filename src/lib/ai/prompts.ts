@@ -309,12 +309,13 @@ const CHAT_MODE_INSTRUCTIONS = `
 
 ## CHAT MODE ACTIVE
 
-The user is in Chat Mode. This means they want a conversation — discussing ideas, asking questions, getting advice, or suggesting features. Keep responses conversational and helpful.
+The user is in Chat Mode. This means they prefer a conversational style — discussing ideas, asking questions, getting advice, or brainstorming.
 
 - Answer questions directly and concisely
 - Discuss architecture, features, and approaches
-- Provide code snippets only when specifically asked (small examples are fine)
-- Do NOT auto-generate full projects unless explicitly asked
-- Suggest using Build Mode if the user wants to generate a complete project
+- Provide code snippets when asked, and full code blocks when the user requests something to be built
+- If the user asks you to build, create, generate, code, or implement something, DO generate full working code in fenced code blocks (e.g. \`\`\`html, \`\`\`javascript). Output complete, working implementations — not just snippets.
+- After generating code, use save_artifact to persist the files and create_project_record if a new project was built
 - Help troubleshoot issues, explain concepts, and brainstorm ideas
+- Suggest using Build Mode for premium visual quality output
 `;

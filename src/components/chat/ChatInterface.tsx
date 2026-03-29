@@ -44,20 +44,41 @@ interface ChatInterfaceProps {
 type AgentStatus = "idle" | "thinking" | "coding" | "searching" | "deploying" | "saving";
 type ChatMode = "chat" | "build" | "saas-upgrade";
 
-// Extract code blocks from assistant messages
-function extractCodeBlocks(messages: Message[]): CodeBlock[] {
+// Extract code blocks from assistant messages (including streaming/incomplete blocks)
+function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlock[] {
   const blocks: CodeBlock[] = [];
   const codeRegex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g;
 
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
     let match;
-    while ((match = codeRegex.exec(msg.content)) !== null) {
+    const content = msg.content;
+    while ((match = codeRegex.exec(content)) !== null) {
       blocks.push({
         language: match[1] || "text",
         filename: match[2] || undefined,
         content: match[3].trim(),
       });
+    }
+
+    // For streaming messages, also extract in-progress (unclosed) code blocks
+    if (includePartial && msg.isStreaming) {
+      const partialRegex = /```(\w+)?(?::([^\n]+))?\n([\s\S]+)$/g;
+      let partialMatch;
+      // Only look for unclosed block if the last ``` count is odd (block still open)
+      const fenceCount = (content.match(/```/g) || []).length;
+      if (fenceCount % 2 === 1) {
+        while ((partialMatch = partialRegex.exec(content)) !== null) {
+          const partialContent = partialMatch[3].trim();
+          if (partialContent.length > 0) {
+            blocks.push({
+              language: partialMatch[1] || "text",
+              filename: partialMatch[2] ? `${partialMatch[2]} (generating...)` : "(generating...)",
+              content: partialContent,
+            });
+          }
+        }
+      }
     }
   }
   return blocks;
@@ -118,12 +139,18 @@ const statusLabels: Record<AgentStatus, { label: string; icon: React.ReactNode }
 // Detect if a message looks like a build/project request
 function isBuildRequest(message: string): boolean {
   const buildKeywords = [
-    /\b(build|create|make|generate|develop|code|implement|design)\b.*\b(app|application|website|site|page|landing|dashboard|project|saas|mvp|tool|platform|component|form|feature)\b/i,
-    /\b(app|application|website|site|page|landing|dashboard|project|saas|mvp|tool|platform)\b.*\b(build|create|make|generate|develop|code|implement|design)\b/i,
-    /^(build|create|make|generate|develop) (me |a |an |the )/i,
-    /\bstart (building|coding|creating|developing)\b/i,
-    /\blet'?s (build|create|make|code|develop)\b/i,
-    /\bi (want|need) (a |an |to build |to create )/i,
+    /\b(build|create|make|generate|develop|code|implement|design|write|scaffold|setup|set up|prototype|wireframe|mock|sketch)\b.*\b(app|application|website|site|page|landing|dashboard|project|saas|mvp|tool|platform|component|form|feature|ui|interface|layout|template|widget|module|screen|view|panel)\b/i,
+    /\b(app|application|website|site|page|landing|dashboard|project|saas|mvp|tool|platform|component|form|feature|ui|interface)\b.*\b(build|create|make|generate|develop|code|implement|design|write|for me)\b/i,
+    /^(build|create|make|generate|develop|code|write|design|scaffold) (me |a |an |the |my |this )/i,
+    /\bstart (building|coding|creating|developing|writing|making)\b/i,
+    /\blet'?s (build|create|make|code|develop|write|design|start)\b/i,
+    /\bi (want|need|would like) (a |an |to build |to create |to make |to code |to develop |you to )/i,
+    /\b(give me|show me|can you) (a |an |the )?(code|html|css|javascript|react|next|vue|angular|page|app|website|component|dashboard)/i,
+    /\b(add|put|include|insert) (a |an |the )?(button|form|table|chart|sidebar|navbar|header|footer|modal|menu|card|grid|section|hero)/i,
+    /\bwrite (the |some |me )?(code|html|css|javascript|js|typescript|ts|react|component)/i,
+    /\b(html|css|javascript|react|next\.?js|vue|angular|svelte)\b.*\b(code|file|page|component)\b/i,
+    /\bcode (this|that|it|the|a |an )/i,
+    /\b(todo|task|project|inventory|crm|blog|portfolio|ecommerce|e-commerce|store|shop|calculator|tracker|timer|calendar|chat|messenger|social|forum|wiki|admin)\s*(app|panel|page|board|manager|tracker|system|platform)?\b/i,
   ];
   return buildKeywords.some(regex => regex.test(message));
 }
@@ -197,8 +224,9 @@ export default function ChatInterface({
     loadDefaultModel();
   }, [defaultModelLoaded]);
 
-  // Extract code blocks and todos from messages
-  const codeBlocks = extractCodeBlocks(messages);
+  // Extract code blocks and todos from messages (include partial for streaming)
+  const isStreaming = messages.some(m => m.isStreaming);
+  const codeBlocks = extractCodeBlocks(messages, true);
   const chatTodos = extractTodos(messages);
   // Merge: agent-generated activity todos + workflow parsed todos + chat-extracted todos
   const todos = agentTodos.length > 0 ? agentTodos : workflowTodos.length > 0 ? workflowTodos : chatTodos;
@@ -411,7 +439,11 @@ export default function ChatInterface({
 
               if (chunk.type === "text") {
                 streamingContentRef.current += chunk.content;
-                setAgentStatus("thinking");
+                // Detect if we're inside a code block (odd number of ``` means open block)
+                const fenceCount = (streamingContentRef.current.match(/```/g) || []).length;
+                const isInsideCodeBlock = fenceCount % 2 === 1;
+                setAgentStatus(isInsideCodeBlock ? "coding" : "thinking");
+
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMessageId
@@ -420,11 +452,16 @@ export default function ChatInterface({
                   )
                 );
 
+                // Auto-switch to Code tab when first code block is detected in build mode
+                if (shouldBuild && isInsideCodeBlock && fenceCount === 1) {
+                  setActivePanel("code");
+                }
+
                 // Parse tasks in real-time during build mode
                 if (shouldBuild) {
                   parseWorkflowTasks(streamingContentRef.current);
                   // Update agent tasks based on streaming content
-                  updateAgentTasks("thinking", undefined, streamingContentRef.current);
+                  updateAgentTasks(isInsideCodeBlock ? "coding" : "thinking", undefined, streamingContentRef.current);
                 }
               } else if (chunk.type === "tool_call") {
                 const newTc = { name: chunk.toolName, args: chunk.toolArgs };
@@ -543,7 +580,7 @@ export default function ChatInterface({
 
   const panelTabs = [
     { id: "chat" as PanelView, label: "Chat", icon: MessageSquare, count: messages.filter(m => m.role !== "system").length },
-    { id: "code" as PanelView, label: "Code", icon: Code2, count: codeBlocks.length },
+    { id: "code" as PanelView, label: "Code", icon: Code2, count: codeBlocks.length, pulsing: isStreaming && agentStatus === "coding" },
     { id: "todo" as PanelView, label: "Tasks", icon: ListTodo, count: todos.length },
     { id: "preview" as PanelView, label: "Preview", icon: Eye, count: previewUrl ? 1 : hasPreviewableCode ? 1 : 0 },
   ];
@@ -554,7 +591,7 @@ export default function ChatInterface({
       <div className="flex items-center justify-between px-2 sm:px-4 py-1.5 border-b bg-card/50 shrink-0">
         {/* Panel tabs */}
         <div className="flex items-center gap-0.5 overflow-x-auto">
-          {panelTabs.map(({ id, label, icon: Icon, count }) => (
+          {panelTabs.map(({ id, label, icon: Icon, count, pulsing }) => (
             <Button
               key={id}
               variant={activePanel === id ? "default" : "ghost"}
@@ -566,15 +603,17 @@ export default function ChatInterface({
               }`}
               onClick={() => setActivePanel(id)}
             >
-              <Icon className="h-3.5 w-3.5" />
+              <Icon className={`h-3.5 w-3.5 ${pulsing ? "animate-pulse text-primary" : ""}`} />
               <span className="hidden sm:inline">{label}</span>
-              {count > 0 && id !== "chat" && (
+              {(count > 0 || pulsing) && id !== "chat" && (
                 <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
-                  activePanel === id
+                  pulsing
+                    ? "bg-primary/20 text-primary animate-pulse"
+                    : activePanel === id
                     ? "bg-primary-foreground/20"
                     : "bg-primary/15 text-primary"
                 }`}>
-                  {count}
+                  {pulsing && count === 0 ? "..." : count}
                 </span>
               )}
             </Button>
@@ -671,7 +710,7 @@ export default function ChatInterface({
         )}
         {activePanel === "code" && (
           <div className="flex flex-col h-full min-h-0">
-            <CodePanel codeBlocks={codeBlocks} />
+            <CodePanel codeBlocks={codeBlocks} isGenerating={isStreaming && agentStatus === "coding"} />
             <MessageInput
               onSend={sendMessage}
               isLoading={isLoading}
