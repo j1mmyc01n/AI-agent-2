@@ -186,6 +186,82 @@ function isSaasUpgradeRequest(message: string): boolean {
   return upgradeKeywords.some(regex => regex.test(message));
 }
 
+// Detect if a prompt is too vague for a quality build (short, generic, lacks specifics)
+function isVaguePrompt(message: string): boolean {
+  const trimmed = message.trim();
+  const wordCount = trimmed.split(/\s+/).length;
+
+  // Short messages (under 8 words) with build intent are often vague
+  if (wordCount < 8) return true;
+
+  // Check if the prompt has specific details (colors, features, sections, styles, tech)
+  const specificityIndicators = [
+    /\b(dark|light|gradient|neon|minimal|modern|retro|glassmorphism|neumorphism)\b/i,
+    /\b(sidebar|navbar|footer|hero|modal|card|table|form|chart|grid)\b/i,
+    /\b(react|next|vue|angular|tailwind|bootstrap)\b/i,
+    /\b(login|signup|register|dashboard|settings|profile|pricing|checkout)\b/i,
+    /\b(blue|red|green|purple|orange|#[0-9a-f]{3,6})\b/i,
+    /\b(api|database|auth|payment|stripe|firebase)\b/i,
+    /\b(like\s+(linear|vercel|stripe|notion|figma|spotify|twitter|airbnb|uber))\b/i,
+    /\b(features?:\s|include|with\s+(a\s+)?)\b.*\b(and|,)\b/i,
+    /https?:\/\//i,
+  ];
+
+  const specificCount = specificityIndicators.filter(r => r.test(trimmed)).length;
+  // If they have 2+ specificity markers, it's probably not vague
+  if (specificCount >= 2) return false;
+
+  // Medium-length prompts (8-15 words) with no specific details
+  if (wordCount <= 15 && specificCount === 0) return true;
+
+  return false;
+}
+
+// Generate clarifying questions based on what the user wants to build
+function getClarifyingQuestions(message: string): { intro: string; questions: { id: string; text: string; options?: string[] }[] } {
+  const lower = message.toLowerCase();
+
+  const questions: { id: string; text: string; options?: string[] }[] = [];
+
+  // Visual style question
+  questions.push({
+    id: "style",
+    text: "What visual style are you going for?",
+    options: ["Dark & modern (Linear/Vercel style)", "Clean & minimal", "Bold & colorful", "Professional & corporate", "Playful & creative"],
+  });
+
+  // Key features/pages
+  if (/dashboard|app|saas|platform|tool/i.test(lower)) {
+    questions.push({
+      id: "pages",
+      text: "Which key pages/sections do you need?",
+      options: ["Dashboard + Analytics", "User auth (login/register)", "Settings/Profile", "Pricing page", "Landing page"],
+    });
+  } else if (/landing|page|site|website/i.test(lower)) {
+    questions.push({
+      id: "sections",
+      text: "What sections should the landing page include?",
+      options: ["Hero + CTA", "Features grid", "Pricing table", "Testimonials", "FAQ accordion"],
+    });
+  } else {
+    questions.push({
+      id: "features",
+      text: "What are the 2-3 most important features?",
+    });
+  }
+
+  // Reference/inspiration
+  questions.push({
+    id: "reference",
+    text: "Any website or app you'd like it to look similar to? (paste a link or name)",
+  });
+
+  return {
+    intro: "A few quick questions to build something great:",
+    questions,
+  };
+}
+
 export default function ChatInterface({
   conversationId: initialConversationId,
   initialMessages = [],
@@ -206,6 +282,13 @@ export default function ChatInterface({
   const [agentTodos, setAgentTodos] = useState<TodoItem[]>([]);
   const [defaultModelLoaded, setDefaultModelLoaded] = useState(false);
   const [toolCallCount, setToolCallCount] = useState(0);
+  const [clarifyingFlow, setClarifyingFlow] = useState<{
+    originalPrompt: string;
+    questions: { id: string; text: string; options?: string[] }[];
+    intro: string;
+    answers: Record<string, string>;
+    currentIdx: number;
+  } | null>(null);
   const streamingContentRef = useRef("");
 
   // Load user's default model preference and configured keys
@@ -250,23 +333,25 @@ export default function ChatInterface({
     (b) => b.language === "html" || b.language === "css" || b.language === "javascript" || b.language === "js"
   );
   const prevCodeCount = useRef(0);
+  const userHasManuallySelectedPanel = useRef(false);
 
-  // Auto-switch panels when code appears in build mode
+  // Track when user manually clicks a tab - respect their choice
+  const handlePanelChange = useCallback((panel: PanelView) => {
+    userHasManuallySelectedPanel.current = true;
+    setActivePanel(panel);
+  }, []);
+
+  // Auto-switch panels ONLY on first code appearance in build mode, and only if user hasn't manually selected
   useEffect(() => {
-    if (codeBlocks.length > 0 && (chatMode === "build" || chatMode === "saas-upgrade")) {
-      if (codeBlocks.length !== prevCodeCount.current) {
-        prevCodeCount.current = codeBlocks.length;
-        if (hasPreviewableCode) {
-          setActivePanel("preview");
-        } else {
-          setActivePanel("code");
-        }
-      } else if (hasPreviewableCode && activePanel === "code") {
-        // If code count didn't change but we now have previewable code (e.g., partial HTML became complete)
-        setActivePanel("preview");
-      }
+    if (userHasManuallySelectedPanel.current) return;
+    if (codeBlocks.length > 0 && prevCodeCount.current === 0 && (chatMode === "build" || chatMode === "saas-upgrade")) {
+      prevCodeCount.current = codeBlocks.length;
+      // Show code tab first so users can see the agent coding
+      setActivePanel("code");
+    } else {
+      prevCodeCount.current = codeBlocks.length;
     }
-  }, [codeBlocks.length, hasPreviewableCode, chatMode, activePanel]);
+  }, [codeBlocks.length, chatMode]);
 
   // Parse streaming content for workflow tasks in real-time
   const parseWorkflowTasks = useCallback((content: string) => {
@@ -367,13 +452,8 @@ export default function ChatInterface({
     });
   }, []);
 
-  const sendMessage = useCallback(
-    async (content: string, model: AIModel) => {
-      if (isLoading) return;
-
-      // Detect if this should trigger build mode or saas upgrade
-      const shouldUpgrade = isSaasUpgradeRequest(content);
-      const shouldBuild = shouldUpgrade || chatMode === "build" || chatMode === "saas-upgrade" || isBuildRequest(content);
+  const sendMessageToAgent = useCallback(
+    async (content: string, model: AIModel, shouldUpgrade: boolean, shouldBuild: boolean) => {
       if (shouldUpgrade) {
         setChatMode("saas-upgrade");
       } else if (shouldBuild && chatMode !== "build" && chatMode !== "saas-upgrade") {
@@ -458,7 +538,6 @@ export default function ChatInterface({
 
               if (chunk.type === "text") {
                 streamingContentRef.current += chunk.content;
-                // Detect if we're inside a code block (odd number of ``` means open block)
                 const fenceCount = (streamingContentRef.current.match(/```/g) || []).length;
                 const isInsideCodeBlock = fenceCount % 2 === 1;
                 setAgentStatus(isInsideCodeBlock ? "coding" : "thinking");
@@ -471,19 +550,12 @@ export default function ChatInterface({
                   )
                 );
 
-                // Auto-switch to Preview tab when first HTML code block is detected in build mode
-                if (shouldBuild && isInsideCodeBlock && fenceCount === 1) {
-                  // Check if this is an HTML block by looking at what follows the opening ```
-                  const lastFenceIdx = streamingContentRef.current.lastIndexOf("```");
-                  const afterFence = streamingContentRef.current.slice(lastFenceIdx + 3, lastFenceIdx + 20);
-                  const isHtmlBlock = /^html/i.test(afterFence);
-                  setActivePanel(isHtmlBlock ? "preview" : "code");
+                if (shouldBuild && isInsideCodeBlock && fenceCount === 1 && !userHasManuallySelectedPanel.current) {
+                  setActivePanel("code");
                 }
 
-                // Parse tasks in real-time during build mode
                 if (shouldBuild) {
                   parseWorkflowTasks(streamingContentRef.current);
-                  // Update agent tasks based on streaming content
                   updateAgentTasks(isInsideCodeBlock ? "coding" : "thinking", undefined, streamingContentRef.current);
                 }
               } else if (chunk.type === "tool_call") {
@@ -494,7 +566,6 @@ export default function ChatInterface({
                 const status = getAgentStatusFromToolCalls([newTc]);
                 setAgentStatus(status);
 
-                // Update tasks based on tool calls
                 if (shouldBuild) {
                   updateAgentTasks(status, chunk.toolName);
                 }
@@ -523,7 +594,6 @@ export default function ChatInterface({
                 if (chunk.previewUrl) setPreviewUrl(chunk.previewUrl);
                 setAgentStatus("idle");
 
-                // Complete all agent tasks
                 if (shouldBuild) {
                   updateAgentTasks("idle");
                 }
@@ -541,25 +611,13 @@ export default function ChatInterface({
                   )
                 );
 
-                // Final parse of tasks
                 if (shouldBuild) {
                   parseWorkflowTasks(streamingContentRef.current);
                 }
 
-                // In build mode, switch to preview if we have previewable code
-                if (shouldBuild) {
-                  const finalBlocks = extractCodeBlocks([...messages, { role: "assistant", content: streamingContentRef.current }]);
-                  const hasPreview = finalBlocks.some(
-                    b => b.language === "html" || b.language === "css" || b.language === "javascript" || b.language === "js"
-                  );
-                  if (hasPreview) {
-                    setActivePanel("preview");
-                  } else if (finalBlocks.length > 0) {
-                    setActivePanel("code");
-                  }
-                }
+                // Reset manual panel tracking for next message
+                userHasManuallySelectedPanel.current = false;
 
-                // Notify sidebar to refresh
                 window.dispatchEvent(new Event("dobetter-projects-updated"));
                 window.dispatchEvent(new Event("dobetter-conversations-updated"));
 
@@ -580,7 +638,6 @@ export default function ChatInterface({
         setAgentStatus("idle");
         setMessages((prev) => prev.filter((m) => !m.isStreaming));
 
-        // Clear agent tasks on error
         if (chatMode === "build") {
           setAgentTodos([]);
         }
@@ -594,6 +651,68 @@ export default function ChatInterface({
       }
     },
     [isLoading, currentConversationId, initialConversationId, projectId, messages, chatMode, parseWorkflowTasks, updateAgentTasks]
+  );
+
+  const sendMessage = useCallback(
+    async (content: string, model: AIModel) => {
+      if (isLoading) return;
+
+      // Detect if this should trigger build mode or saas upgrade
+      const shouldUpgrade = isSaasUpgradeRequest(content);
+      const shouldBuild = shouldUpgrade || chatMode === "build" || chatMode === "saas-upgrade" || isBuildRequest(content);
+
+      // If it's a build request with a vague prompt and no clarifying flow active, ask questions first
+      if (shouldBuild && !clarifyingFlow && isVaguePrompt(content) && messages.length === 0) {
+        const { intro, questions } = getClarifyingQuestions(content);
+        setClarifyingFlow({
+          originalPrompt: content,
+          questions,
+          intro,
+          answers: {},
+          currentIdx: 0,
+        });
+        // Show the user's message in chat
+        setMessages((prev) => [...prev, { role: "user", content }]);
+        // Show clarifying questions as assistant message
+        const questionText = `${intro}\n\n${questions.map((q, i) => `**${i + 1}. ${q.text}**${q.options ? "\n" + q.options.map(o => `  - ${o}`).join("\n") : ""}`).join("\n\n")}\n\nJust reply with your preferences, or say **"skip"** to build right away!`;
+        setMessages((prev) => [...prev, { role: "assistant", content: questionText }]);
+        return;
+      }
+
+      // If clarifying flow is active, collect the answer and either continue or build
+      if (clarifyingFlow) {
+        const isSkip = /^skip$/i.test(content.trim());
+        if (isSkip) {
+          // Build with original prompt as-is
+          const buildPrompt = clarifyingFlow.originalPrompt;
+          setClarifyingFlow(null);
+          // Remove the clarifying messages and re-send
+          setMessages((prev) => prev.filter((m) => m.role === "user" && m.content === clarifyingFlow!.originalPrompt ? true : false).slice(0, 1));
+          // Fall through to normal send with original prompt
+          return sendMessageToAgent(buildPrompt, model, shouldUpgrade, shouldBuild);
+        }
+
+        // Combine original prompt with all clarifying answers into an enhanced prompt
+        const enhancedParts = [clarifyingFlow.originalPrompt];
+        // Add all previous answers
+        Object.entries(clarifyingFlow.answers).forEach(([, v]) => {
+          if (v.trim()) enhancedParts.push(v.trim());
+        });
+        // Add current answer
+        enhancedParts.push(content.trim());
+
+        const enhancedPrompt = enhancedParts.join(". ") + ".";
+        setClarifyingFlow(null);
+
+        // Show user's answer in chat
+        setMessages((prev) => [...prev, { role: "user", content }]);
+
+        return sendMessageToAgent(enhancedPrompt, model, shouldUpgrade, true);
+      }
+
+      return sendMessageToAgent(content, model, shouldUpgrade, shouldBuild);
+    },
+    [isLoading, chatMode, messages.length, clarifyingFlow, sendMessageToAgent]
   );
 
   const handleQuickPrompt = useCallback((prompt: string) => {
@@ -624,7 +743,7 @@ export default function ChatInterface({
                   ? "bg-primary text-primary-foreground shadow-sm"
                   : "text-muted-foreground hover:text-foreground"
               }`}
-              onClick={() => setActivePanel(id)}
+              onClick={() => handlePanelChange(id)}
             >
               <Icon className={`h-3.5 w-3.5 ${pulsing ? "animate-pulse text-primary" : ""}`} />
               <span className="hidden sm:inline">{label}</span>
