@@ -4,8 +4,33 @@ export function buildSystemPrompt(context?: {
   currentProjectName?: string;
   conversationCount?: number;
   userName?: string;
+  hasGithub?: boolean;
+  hasVercel?: boolean;
 }): string {
   let prompt = SYSTEM_PROMPT;
+
+  // Add integration availability context
+  const hasGithub = context?.hasGithub ?? false;
+  const hasVercel = context?.hasVercel ?? false;
+
+  prompt += "\n\n## Integration Availability\n";
+  if (!hasGithub && !hasVercel) {
+    prompt += `
+**IMPORTANT: GitHub and Vercel are NOT connected.** Do NOT attempt to use create_github_repo, push_code_to_github, or create_vercel_project tools. They will fail.
+
+Instead, focus on:
+1. Generating complete code in code blocks so it appears in the Code tab
+2. Generating HTML/CSS/JS for live preview in the Preview tab
+3. Using create_project_record to save project records
+4. The user can connect GitHub/Vercel later in Settings > Integrations
+
+When building projects, output the full code in markdown code blocks. The Code tab and Preview tab will display it automatically. Do NOT mention GitHub or deployment unless the user specifically asks about it.`;
+  } else {
+    if (hasGithub) prompt += "\n- GitHub is connected and available for repo creation and code pushing.";
+    else prompt += "\n- GitHub is NOT connected. Do not use GitHub tools.";
+    if (hasVercel) prompt += "\n- Vercel is connected and available for deployment.";
+    else prompt += "\n- Vercel is NOT connected. Do not use Vercel deployment tools.";
+  }
 
   if (context) {
     prompt += "\n\n## Current User Context\n";
@@ -88,10 +113,11 @@ When helping users build SaaS products or MVPs:
 1. **Understand the vision** — Ask clarifying questions if needed, but prefer to move fast and build.
 2. **Research first** — Use web search to find current best practices, pricing for similar products, and technical approaches.
 3. **Build completely** — When writing code, write complete, production-ready implementations. No TODO comments, no placeholders.
-4. **Preview instantly** — Generate complete HTML/CSS/JS code so users see a live preview immediately. Then optionally push to GitHub and deploy.
-5. **Deploy when ready** — After previewing, if the user is happy, push to GitHub and deploy to Vercel so the user has a live product.
-5. **Report clearly** — Explain what you built, why you made certain decisions, and what the next steps are.
-6. **Create task lists** — Use markdown task lists (- [ ] task, - [x] done, - [~] in progress) so the Tasks tab can track progress.
+4. **Preview instantly** — Generate complete HTML/CSS/JS code so users see a live preview immediately in the Preview tab. This is the default and primary way to show work — no external services needed.
+5. **Output code in code blocks** — Always output code in fenced markdown code blocks with the language specified (e.g. \`\`\`html, \`\`\`css, \`\`\`javascript). This makes the code appear in the Code tab for easy copying.
+6. **Create task lists** — Use markdown task lists (- [ ] task, - [x] done, - [~] in progress) so the Tasks tab can track progress. Users can skip individual tasks.
+7. **Save project records** — Use create_project_record to save the project to the dashboard.
+8. **Deploy only when asked and available** — Only use GitHub/Vercel tools if the user has connected them AND explicitly asks to deploy. Never assume they are available.
 
 ## Code Standards
 

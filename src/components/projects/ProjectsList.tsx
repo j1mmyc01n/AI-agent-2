@@ -11,7 +11,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2 } from "lucide-react";
+import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check } from "lucide-react";
 
 interface Project {
   id: string;
@@ -53,6 +53,9 @@ export default function ProjectsList() {
     type: "saas",
   });
   const [error, setError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -102,6 +105,39 @@ export default function ProjectsList() {
     } finally {
       setCreating(false);
     }
+  };
+
+  const handleRename = async (projectId: string) => {
+    if (!editName.trim()) return;
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: editName.trim() }),
+      });
+      if (res.ok) {
+        setProjects((prev) =>
+          prev.map((p) => (p.id === projectId ? { ...p, name: editName.trim() } : p))
+        );
+      }
+    } catch (err) {
+      console.error("Failed to rename project:", err);
+    }
+    setEditingId(null);
+    setEditName("");
+  };
+
+  const handleDelete = async (projectId: string) => {
+    setDeletingId(projectId);
+    try {
+      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
+      if (res.ok) {
+        setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      }
+    } catch (err) {
+      console.error("Failed to delete project:", err);
+    }
+    setDeletingId(null);
   };
 
   return (
@@ -247,12 +283,67 @@ export default function ProjectsList() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((project) => (
-              <Card key={project.id} className="border-border/50 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all">
+              <Card key={project.id} className="border-border/50 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group">
                 <CardHeader>
                   <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg leading-tight">
-                      {project.name}
-                    </CardTitle>
+                    {editingId === project.id ? (
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                        <input
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleRename(project.id);
+                            if (e.key === "Escape") { setEditingId(null); setEditName(""); }
+                          }}
+                          className="flex-1 min-w-0 px-2 py-1 rounded border border-primary/30 bg-background text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-primary/30"
+                          autoFocus
+                        />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          onClick={() => handleRename(project.id)}
+                        >
+                          <Check className="h-3.5 w-3.5 text-green-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0"
+                          onClick={() => { setEditingId(null); setEditName(""); }}
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <CardTitle className="text-lg leading-tight flex items-center gap-1.5">
+                        <span className="truncate">{project.name}</span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          onClick={() => { setEditingId(project.id); setEditName(project.name); }}
+                          title="Rename project"
+                        >
+                          <Pencil className="h-3 w-3 text-muted-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          onClick={() => handleDelete(project.id)}
+                          disabled={deletingId === project.id}
+                          title="Delete project"
+                        >
+                          {deletingId === project.id ? (
+                            <Loader2 className="h-3 w-3 animate-spin text-destructive" />
+                          ) : (
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          )}
+                        </Button>
+                      </CardTitle>
+                    )}
                     <div className="flex gap-1 flex-shrink-0">
                       <Badge
                         variant="outline"

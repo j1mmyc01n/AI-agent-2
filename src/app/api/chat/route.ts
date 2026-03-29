@@ -252,6 +252,8 @@ export async function POST(req: NextRequest) {
       currentProjectName,
       conversationCount,
       userName: user?.name || undefined,
+      hasGithub: !!(user?.githubToken),
+      hasVercel: !!(user?.vercelToken),
     };
 
     const stream = new ReadableStream({

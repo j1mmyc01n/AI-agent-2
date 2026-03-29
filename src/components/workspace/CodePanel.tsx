@@ -27,11 +27,14 @@ export default function CodePanel({ codeBlocks = [] }: CodePanelProps) {
 
   if (codeBlocks.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3">
+      <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 p-6">
         <Code2 className="h-12 w-12 opacity-30" />
-        <div className="text-center">
+        <div className="text-center max-w-sm">
           <p className="font-medium">No code generated yet</p>
-          <p className="text-sm mt-1">Start a conversation to generate code</p>
+          <p className="text-sm mt-1 opacity-70">
+            Start a conversation and ask the AI to build something.
+            Generated code will appear here automatically — no GitHub needed!
+          </p>
         </div>
       </div>
     );

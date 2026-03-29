@@ -194,9 +194,9 @@ export default function MessageList({ messages, isLoading, agentStatus = "idle" 
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
             {[
-              { icon: "🚀", text: "Build a SaaS MVP from a prompt" },
+              { icon: "🚀", text: "Build a SaaS MVP with live preview" },
               { icon: "🔍", text: "Research topics with web search" },
-              { icon: "💻", text: "Generate & push code to GitHub" },
+              { icon: "💻", text: "Generate code — view it in the Code tab" },
               { icon: "💡", text: "Ask about DoBetter platform features" },
             ].map((item, i) => (
               <div

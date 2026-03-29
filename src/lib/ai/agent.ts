@@ -21,6 +21,8 @@ interface ProjectContext {
   currentProjectName?: string;
   conversationCount?: number;
   userName?: string;
+  hasGithub?: boolean;
+  hasVercel?: boolean;
 }
 
 interface AgentConfig {

@@ -308,7 +308,7 @@ export default function ChatInterface({
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       {/* Agent status bar + panel tabs */}
       <div className="flex items-center justify-between px-2 sm:px-4 py-1.5 border-b bg-card/50 shrink-0">
         {/* Panel tabs */}
@@ -358,9 +358,9 @@ export default function ChatInterface({
       </div>
 
       {/* Panel content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1 min-h-0 overflow-hidden">
         {activePanel === "chat" && (
-          <div className="flex flex-col h-full">
+          <div className="flex flex-col h-full min-h-0">
             <MessageList messages={messages} isLoading={isLoading} agentStatus={agentStatus} />
             <MessageInput
               onSend={sendMessage}
