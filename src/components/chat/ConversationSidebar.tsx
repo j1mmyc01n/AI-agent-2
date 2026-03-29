@@ -11,10 +11,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   MessageSquarePlus,
-  FolderOpen,
   Settings,
   Trash2,
   MoreHorizontal,
@@ -25,9 +25,8 @@ import {
   Sparkles,
   Globe,
   History,
-  ChevronDown,
-  ChevronRight,
   MessageSquare,
+  Eraser,
 } from "lucide-react";
 
 interface Conversation {
@@ -57,7 +56,8 @@ export default function ConversationSidebar({
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set(["unassigned"]));
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [clearingAll, setClearingAll] = useState(false);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -97,19 +97,31 @@ export default function ConversationSidebar({
       fetchConversations();
     };
     window.addEventListener("dobetter-projects-updated", handleProjectUpdate);
-    window.addEventListener("dobetter-conversations-updated", handleProjectUpdate);
+    window.addEventListener(
+      "dobetter-conversations-updated",
+      handleProjectUpdate
+    );
     return () => {
-      window.removeEventListener("dobetter-projects-updated", handleProjectUpdate);
-      window.removeEventListener("dobetter-conversations-updated", handleProjectUpdate);
+      window.removeEventListener(
+        "dobetter-projects-updated",
+        handleProjectUpdate
+      );
+      window.removeEventListener(
+        "dobetter-conversations-updated",
+        handleProjectUpdate
+      );
     };
   }, [fetchProjects, fetchConversations]);
 
   const handleDelete = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    setDeletingId(id);
 
     try {
-      const res = await fetch(`/api/conversations/${id}`, { method: "DELETE" });
+      const res = await fetch(`/api/conversations/${id}`, {
+        method: "DELETE",
+      });
       if (res.ok) {
         setConversations((prev) => prev.filter((c) => c.id !== id));
         if (currentConversationId === id) {
@@ -118,31 +130,33 @@ export default function ConversationSidebar({
       }
     } catch (error) {
       console.error("Failed to delete conversation:", error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
-  const toggleProject = (projectId: string) => {
-    setExpandedProjects((prev) => {
-      const next = new Set(prev);
-      if (next.has(projectId)) next.delete(projectId);
-      else next.add(projectId);
-      return next;
-    });
-  };
+  const handleClearAll = async () => {
+    if (conversations.length === 0) return;
+    setClearingAll(true);
 
-  // Group conversations by project
-  const projectConversations = new Map<string, Conversation[]>();
-  const unassigned: Conversation[] = [];
-
-  conversations.forEach((conv) => {
-    if (conv.projectId) {
-      const existing = projectConversations.get(conv.projectId) || [];
-      existing.push(conv);
-      projectConversations.set(conv.projectId, existing);
-    } else {
-      unassigned.push(conv);
+    try {
+      // Delete all conversations one by one
+      const deletePromises = conversations.map((conv) =>
+        fetch(`/api/conversations/${conv.id}`, { method: "DELETE" }).catch(
+          () => null
+        )
+      );
+      await Promise.all(deletePromises);
+      setConversations([]);
+      if (currentConversationId) {
+        router.push("/chat");
+      }
+    } catch (error) {
+      console.error("Failed to clear conversations:", error);
+    } finally {
+      setClearingAll(false);
     }
-  });
+  };
 
   const navItems = [
     { href: "/workspace", icon: LayoutDashboard, label: "Workspace" },
@@ -164,28 +178,16 @@ export default function ConversationSidebar({
         <MessageSquare className="h-3.5 w-3.5 shrink-0 opacity-50" />
         <span className="truncate flex-1 text-xs">{conv.title}</span>
       </Link>
+      {/* Delete button - always visible on right side */}
       <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-5 w-5"
-              onClick={(e) => e.preventDefault()}
-            >
-              <MoreHorizontal className="h-3 w-3" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={(e) => handleDelete(conv.id, e)}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <button
+          onClick={(e) => handleDelete(conv.id, e)}
+          disabled={deletingId === conv.id}
+          className="h-5 w-5 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          title="Delete conversation"
+        >
+          <Trash2 className="h-3 w-3" />
+        </button>
       </div>
     </div>
   );
@@ -194,7 +196,10 @@ export default function ConversationSidebar({
     <div className="flex flex-col h-full bg-sidebar-bg border-r border-border/50">
       {/* Header */}
       <div className={`p-3 border-b border-border/50 ${collapsed ? "px-2" : ""}`}>
-        <Link href="/" className={`flex items-center gap-2.5 px-2 py-1.5 mb-2 ${collapsed ? "justify-center" : ""}`}>
+        <Link
+          href="/"
+          className={`flex items-center gap-2.5 px-2 py-1.5 mb-2 ${collapsed ? "justify-center" : ""}`}
+        >
           <div className="h-7 w-7 rounded-lg bg-primary/15 flex items-center justify-center shrink-0">
             <Bot className="h-4 w-4 text-primary" />
           </div>
@@ -213,14 +218,18 @@ export default function ConversationSidebar({
           </Link>
         ) : (
           <Link href="/chat">
-            <Button variant="outline" size="icon" className="w-full border-primary/20 hover:bg-primary/10">
+            <Button
+              variant="outline"
+              size="icon"
+              className="w-full border-primary/20 hover:bg-primary/10"
+            >
               <MessageSquarePlus className="h-4 w-4 text-primary" />
             </Button>
           </Link>
         )}
       </div>
 
-      {/* Conversations grouped by project */}
+      {/* Conversations list */}
       {!collapsed && (
         <ScrollArea className="flex-1 py-2">
           {loading ? (
@@ -239,7 +248,21 @@ export default function ConversationSidebar({
             </div>
           ) : (
             <div className="space-y-1">
-              {/* All conversations (flat list) */}
+              {/* Header with clear all */}
+              <div className="flex items-center justify-between px-3 mb-1">
+                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
+                  Conversations ({conversations.length})
+                </span>
+                <button
+                  onClick={handleClearAll}
+                  disabled={clearingAll}
+                  className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-destructive transition-colors"
+                  title="Clear all conversations"
+                >
+                  <Eraser className="h-3 w-3" />
+                  <span>{clearingAll ? "Clearing..." : "Clear all"}</span>
+                </button>
+              </div>
               {conversations.map(renderConversation)}
             </div>
           )}
@@ -247,7 +270,9 @@ export default function ConversationSidebar({
       )}
 
       {/* Main Navigation */}
-      <div className={`px-2 py-2 border-t border-border/50 ${collapsed ? "px-1" : ""}`}>
+      <div
+        className={`px-2 py-2 border-t border-border/50 ${collapsed ? "px-1" : ""}`}
+      >
         <div className="space-y-0.5">
           {navItems.map(({ href, icon: Icon, label }) => (
             <Link key={href} href={href}>
@@ -260,8 +285,12 @@ export default function ConversationSidebar({
                 } ${collapsed ? "justify-center px-2" : "justify-start"}`}
                 size={collapsed ? "icon" : "default"}
               >
-                <Icon className={`h-4 w-4 flex-shrink-0 ${pathname === href ? "text-primary" : ""}`} />
-                {!collapsed && <span className="truncate text-sm">{label}</span>}
+                <Icon
+                  className={`h-4 w-4 flex-shrink-0 ${pathname === href ? "text-primary" : ""}`}
+                />
+                {!collapsed && (
+                  <span className="truncate text-sm">{label}</span>
+                )}
               </Button>
             </Link>
           ))}
@@ -269,7 +298,9 @@ export default function ConversationSidebar({
       </div>
 
       {/* Footer Nav */}
-      <div className={`p-2 border-t border-border/50 space-y-0.5 ${collapsed ? "px-1" : ""}`}>
+      <div
+        className={`p-2 border-t border-border/50 space-y-0.5 ${collapsed ? "px-1" : ""}`}
+      >
         <Link href="/settings">
           <Button
             variant="ghost"
@@ -280,7 +311,9 @@ export default function ConversationSidebar({
             } ${collapsed ? "justify-center px-2" : "justify-start"}`}
             size={collapsed ? "icon" : "default"}
           >
-            <Settings className={`h-4 w-4 flex-shrink-0 ${pathname === "/settings" ? "text-primary" : ""}`} />
+            <Settings
+              className={`h-4 w-4 flex-shrink-0 ${pathname === "/settings" ? "text-primary" : ""}`}
+            />
             {!collapsed && <span className="truncate text-sm">Settings</span>}
           </Button>
         </Link>
@@ -294,17 +327,25 @@ export default function ConversationSidebar({
               <div className="h-5 w-5 rounded-full bg-primary/20 flex items-center justify-center shrink-0">
                 <User className="h-3 w-3 text-primary" />
               </div>
-              {!collapsed && <span className="truncate text-sm">Profile</span>}
+              {!collapsed && (
+                <span className="truncate text-sm">Profile</span>
+              )}
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
             <DropdownMenuItem asChild>
-              <Link href="/profile" className="flex items-center cursor-pointer">
+              <Link
+                href="/profile"
+                className="flex items-center cursor-pointer"
+              >
                 <User className="mr-2 h-4 w-4" />
                 View Profile
               </Link>
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => signOut({ callbackUrl: "/login" })}
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Sign out
             </DropdownMenuItem>

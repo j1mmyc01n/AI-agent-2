@@ -1,319 +1,407 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import MainLayout from "@/components/layout/MainLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Globe,
   Loader2,
-  ArrowRight,
-  Database,
-  Key,
+  Github,
   Zap,
-  Code2,
-  Shield,
-  Copy,
-  CheckCheck,
-  RotateCcw,
+  Cloud,
+  Bot,
+  Cpu,
+  Database,
+  CheckCircle2,
+  ArrowRight,
+  ExternalLink,
+  ChevronRight,
+  X,
 } from "lucide-react";
 
-interface SetupResult {
-  url: string;
-  siteName: string;
-  siteCategory: string;
-  apiPathways: string[];
-  authMethod: string;
-  fallbackStrategy: string;
-  envVars: { key: string; description: string }[];
-  dbEntities: { name: string; fields: string[] }[];
-  agentActions: string[];
-  uiModule: string;
+interface ConnectorConfig {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  statusKey: string;
+  valueKey: string;
+  placeholder: string;
+  helpUrl: string;
+  helpLabel: string;
+  category: "ai" | "deploy" | "data";
+  description: string;
 }
 
-export default function ConnectivityPage() {
-  const [url, setUrl] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [result, setResult] = useState<SetupResult | null>(null);
-  const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
+const connectors: ConnectorConfig[] = [
+  {
+    id: "github",
+    title: "GitHub",
+    icon: <Github className="h-5 w-5" />,
+    statusKey: "hasGithubToken",
+    valueKey: "githubToken",
+    placeholder: "ghp_...",
+    helpUrl: "https://github.com/settings/tokens",
+    helpLabel: "Create token",
+    category: "deploy",
+    description: "Push code to repositories",
+  },
+  {
+    id: "vercel",
+    title: "Vercel",
+    icon: <Zap className="h-5 w-5" />,
+    statusKey: "hasVercelToken",
+    valueKey: "vercelToken",
+    placeholder: "Paste token...",
+    helpUrl: "https://vercel.com/account/tokens",
+    helpLabel: "Create token",
+    category: "deploy",
+    description: "Deploy projects live",
+  },
+  {
+    id: "netlify",
+    title: "Netlify",
+    icon: <Cloud className="h-5 w-5" />,
+    statusKey: "hasNetlifyToken",
+    valueKey: "netlifyToken",
+    placeholder: "Paste token...",
+    helpUrl: "https://app.netlify.com/user/applications",
+    helpLabel: "Create token",
+    category: "deploy",
+    description: "Host on Netlify",
+  },
+  {
+    id: "openai",
+    title: "OpenAI",
+    icon: <Bot className="h-5 w-5" />,
+    statusKey: "hasOpenaiKey",
+    valueKey: "openaiKey",
+    placeholder: "sk-...",
+    helpUrl: "https://platform.openai.com/api-keys",
+    helpLabel: "Get key",
+    category: "ai",
+    description: "GPT-4o, GPT-4 Turbo",
+  },
+  {
+    id: "anthropic",
+    title: "Anthropic",
+    icon: <Cpu className="h-5 w-5" />,
+    statusKey: "hasAnthropicKey",
+    valueKey: "anthropicKey",
+    placeholder: "sk-ant-...",
+    helpUrl: "https://console.anthropic.com/settings/keys",
+    helpLabel: "Get key",
+    category: "ai",
+    description: "Claude models",
+  },
+  {
+    id: "grok",
+    title: "xAI (Grok)",
+    icon: <Zap className="h-5 w-5" />,
+    statusKey: "hasGrokKey",
+    valueKey: "grokKey",
+    placeholder: "xai-...",
+    helpUrl: "https://console.x.ai/",
+    helpLabel: "Get key",
+    category: "ai",
+    description: "Grok 2 models",
+  },
+  {
+    id: "tavily",
+    title: "Tavily",
+    icon: <Globe className="h-5 w-5" />,
+    statusKey: "hasTavilyKey",
+    valueKey: "tavilyKey",
+    placeholder: "tvly-...",
+    helpUrl: "https://app.tavily.com/home",
+    helpLabel: "Get key",
+    category: "data",
+    description: "Web search for agent",
+  },
+  {
+    id: "neon",
+    title: "Neon DB",
+    icon: <Database className="h-5 w-5" />,
+    statusKey: "hasNeonKey",
+    valueKey: "neonKey",
+    placeholder: "Paste key...",
+    helpUrl: "https://neon.tech/docs/get-started-with-neon/api-keys",
+    helpLabel: "Get key",
+    category: "data",
+    description: "PostgreSQL database",
+  },
+];
 
-  const handleGenerate = async () => {
-    if (!url.trim()) return;
-    setLoading(true);
-    setError("");
-    setResult(null);
+type StatusMap = Record<string, boolean | string | null>;
+
+export default function ConnectivityPage() {
+  const [status, setStatus] = useState<StatusMap>({});
+  const [loading, setLoading] = useState(true);
+  const [activeConnector, setActiveConnector] = useState<string | null>(null);
+  const [inputValue, setInputValue] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch("/api/integrations");
+        if (res.ok) {
+          const data = await res.json();
+          setStatus(data);
+        }
+      } catch {
+        // ignore
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStatus();
+  }, []);
+
+  const handleConnect = async (connector: ConnectorConfig) => {
+    if (!inputValue.trim()) return;
+    setSaving(true);
 
     try {
-      const res = await fetch("/api/connectivity-setup", {
+      const res = await fetch("/api/integrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({ [connector.valueKey]: inputValue.trim() }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || "Generation failed");
-        return;
+      if (res.ok) {
+        // Refresh status
+        const statusRes = await fetch("/api/integrations");
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          setStatus(data);
+        }
+        setActiveConnector(null);
+        setInputValue("");
       }
-      setResult(data);
     } catch {
-      setError("An error occurred. Please try again.");
+      // ignore
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleCopy = () => {
-    if (!result) return;
-    navigator.clipboard.writeText(JSON.stringify(result, null, 2));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleDisconnect = async (connector: ConnectorConfig) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [connector.valueKey]: "" }),
+      });
+      if (res.ok) {
+        const statusRes = await fetch("/api/integrations");
+        if (statusRes.ok) {
+          const data = await statusRes.json();
+          setStatus(data);
+        }
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleReset = () => {
-    setUrl("");
-    setResult(null);
-    setError("");
-  };
+  const categories = [
+    { id: "deploy", label: "Deploy & Source", description: "Connect code and hosting" },
+    { id: "ai", label: "AI Models", description: "Optional - works without keys" },
+    { id: "data", label: "Data & Search", description: "Optional enhancements" },
+  ];
+
+  if (loading) {
+    return (
+      <MainLayout>
+        <div className="flex items-center justify-center h-full">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  const connectedCount = connectors.filter((c) => status[c.statusKey]).length;
 
   return (
     <MainLayout>
       <div className="h-full overflow-y-auto">
-        <div className="max-w-4xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div className="max-w-2xl mx-auto p-4 sm:p-6 lg:p-8">
           {/* Header */}
-          <div className="mb-6 sm:mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold flex items-center gap-2">
-              <Globe className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-              Connectivity Setup
+          <div className="mb-6">
+            <h1 className="text-2xl font-bold flex items-center gap-2">
+              <Globe className="h-6 w-6 text-primary" />
+              Connectivity
             </h1>
-            <p className="text-muted-foreground mt-1 text-sm sm:text-base">
-              Enter a website URL to generate an integration blueprint with API pathways, auth methods, and connector specs.
+            <p className="text-muted-foreground mt-1 text-sm">
+              {connectedCount} of {connectors.length} connected. Tap a service to set up.
             </p>
           </div>
 
-          {/* URL Input */}
-          <Card className="mb-6">
-            <CardContent className="pt-6">
-              <div className="flex gap-3">
-                <div className="flex-1">
-                  <Input
-                    placeholder="https://example.com or example.com"
-                    value={url}
-                    onChange={(e) => setUrl(e.target.value)}
-                    disabled={loading}
-                    onKeyDown={(e) => e.key === "Enter" && handleGenerate()}
-                    className="h-11 text-base"
-                  />
-                </div>
-                <Button
-                  onClick={handleGenerate}
-                  disabled={loading || !url.trim()}
-                  className="h-11 gap-2 px-6"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Analyzing...
-                    </>
-                  ) : (
-                    <>
-                      Generate
-                      <ArrowRight className="h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-              </div>
-              {error && (
-                <div className="bg-destructive/10 text-destructive text-sm p-3 rounded-md mt-3">
-                  {error}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Results */}
-          {result && (
-            <div className="space-y-6">
-              {/* Header + Actions */}
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-bold">{result.siteName}</h2>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge variant="secondary">{result.siteCategory}</Badge>
-                    <span className="text-xs text-muted-foreground">{result.url}</span>
+          {/* Categories */}
+          <div className="space-y-6">
+            {categories.map((cat) => {
+              const catConnectors = connectors.filter(
+                (c) => c.category === cat.id
+              );
+              return (
+                <div key={cat.id}>
+                  <div className="flex items-center justify-between mb-2">
+                    <div>
+                      <h2 className="text-sm font-semibold">{cat.label}</h2>
+                      <p className="text-xs text-muted-foreground">
+                        {cat.description}
+                      </p>
+                    </div>
+                    <Badge variant="outline" className="text-[10px]">
+                      {catConnectors.filter((c) => status[c.statusKey]).length}/{catConnectors.length}
+                    </Badge>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1">
-                    {copied ? <CheckCheck className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                    {copied ? "Copied" : "Copy JSON"}
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={handleReset} className="gap-1">
-                    <RotateCcw className="h-3 w-3" />
-                    New
-                  </Button>
-                </div>
-              </div>
 
-              {/* API Pathways */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-blue-500" />
-                    API Pathways
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {result.apiPathways.map((p, i) => (
-                      <div key={i} className="flex items-start gap-2 text-sm">
-                        <span className="text-primary font-mono text-xs mt-0.5">{i + 1}.</span>
-                        <span>{p}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
+                  <div className="space-y-1.5">
+                    {catConnectors.map((connector) => {
+                      const isConnected = !!status[connector.statusKey];
+                      const isActive = activeConnector === connector.id;
 
-              {/* Auth + Fallback */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-green-500" />
-                      Auth Method
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm">{result.authMethod}</p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <Globe className="h-4 w-4 text-orange-500" />
-                      Fallback Strategy
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm">{result.fallbackStrategy}</p>
-                  </CardContent>
-                </Card>
-              </div>
+                      return (
+                        <div
+                          key={connector.id}
+                          className={`rounded-lg border transition-all ${
+                            isActive
+                              ? "border-primary/40 bg-primary/5"
+                              : isConnected
+                                ? "border-green-500/20 bg-green-500/5"
+                                : "border-border/50 hover:border-border"
+                          }`}
+                        >
+                          {/* Connector row */}
+                          <button
+                            onClick={() => {
+                              if (isActive) {
+                                setActiveConnector(null);
+                                setInputValue("");
+                              } else {
+                                setActiveConnector(connector.id);
+                                setInputValue("");
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 p-3 text-left cursor-pointer"
+                          >
+                            <div
+                              className={`p-2 rounded-lg shrink-0 ${
+                                isConnected
+                                  ? "bg-green-500/10 text-green-500"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              {connector.icon}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">
+                                  {connector.title}
+                                </span>
+                                {isConnected && (
+                                  <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground truncate">
+                                {connector.description}
+                              </p>
+                            </div>
+                            {!isConnected && !isActive && (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                            )}
+                            {isConnected && !isActive && (
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] border-green-500/30 text-green-500 shrink-0"
+                              >
+                                Connected
+                              </Badge>
+                            )}
+                            {isActive && (
+                              <X className="h-4 w-4 text-muted-foreground shrink-0" />
+                            )}
+                          </button>
 
-              {/* Env Vars */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Key className="h-4 w-4 text-yellow-500" />
-                    Environment Variables
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {result.envVars.map((v, i) => (
-                      <div key={i} className="flex items-start gap-3 p-2 rounded-lg bg-muted/50">
-                        <code className="text-xs font-mono bg-background px-2 py-1 rounded border shrink-0">
-                          {v.key}
-                        </code>
-                        <span className="text-xs text-muted-foreground">{v.description}</span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* DB Entities */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Database className="h-4 w-4 text-purple-500" />
-                    Database Entities
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {result.dbEntities.map((entity, i) => (
-                      <div key={i} className="p-3 rounded-lg border bg-muted/30">
-                        <p className="font-mono text-sm font-semibold mb-2">{entity.name}</p>
-                        <div className="flex flex-wrap gap-1">
-                          {entity.fields.map((f, j) => (
-                            <Badge key={j} variant="outline" className="text-xs font-mono">
-                              {f}
-                            </Badge>
-                          ))}
+                          {/* Expanded setup form */}
+                          {isActive && (
+                            <div className="px-3 pb-3 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={connector.helpUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                                >
+                                  <ExternalLink className="h-3 w-3" />
+                                  {connector.helpLabel}
+                                </a>
+                                <span className="text-xs text-muted-foreground">
+                                  then paste below
+                                </span>
+                              </div>
+                              <div className="flex gap-2">
+                                <Input
+                                  type="password"
+                                  placeholder={connector.placeholder}
+                                  value={inputValue}
+                                  onChange={(e) =>
+                                    setInputValue(e.target.value)
+                                  }
+                                  onKeyDown={(e) =>
+                                    e.key === "Enter" &&
+                                    handleConnect(connector)
+                                  }
+                                  className="font-mono text-sm h-9"
+                                  autoFocus
+                                />
+                                <Button
+                                  onClick={() => handleConnect(connector)}
+                                  disabled={
+                                    !inputValue.trim() || saving
+                                  }
+                                  size="sm"
+                                  className="h-9 gap-1 px-4"
+                                >
+                                  {saving ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <ArrowRight className="h-3 w-3" />
+                                  )}
+                                  Save
+                                </Button>
+                              </div>
+                              {isConnected && (
+                                <button
+                                  onClick={() =>
+                                    handleDisconnect(connector)
+                                  }
+                                  className="text-xs text-destructive hover:underline"
+                                >
+                                  Disconnect
+                                </button>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              );
+            })}
+          </div>
 
-              {/* Agent Actions */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Zap className="h-4 w-4 text-emerald-500" />
-                    Agent Actions
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {result.agentActions.map((action, i) => (
-                      <div key={i} className="flex items-center gap-2 text-sm p-2 rounded-lg bg-muted/30">
-                        <Zap className="h-3 w-3 text-emerald-500 shrink-0" />
-                        {action}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* UI Module */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Code2 className="h-4 w-4 text-pink-500" />
-                    UI Module
-                  </CardTitle>
-                  <CardDescription className="text-xs">Suggested connector component</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <code className="text-sm font-mono bg-muted px-3 py-2 rounded-lg block">
-                    {result.uiModule}
-                  </code>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {/* Empty state */}
-          {!result && !loading && !error && (
-            <div className="text-center py-16">
-              <Globe className="h-16 w-16 text-muted-foreground/20 mx-auto mb-4" />
-              <h2 className="text-lg font-semibold mb-2">Generate an Integration Blueprint</h2>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-                Enter any website URL above to generate a connectivity setup with API pathways,
-                authentication methods, database entities, and agent actions.
-              </p>
-              <div className="flex flex-wrap justify-center gap-2">
-                {["stripe.com", "github.com", "shopify.com", "notion.so"].map((example) => (
-                  <Button
-                    key={example}
-                    variant="outline"
-                    size="sm"
-                    className="text-xs"
-                    onClick={() => setUrl(example)}
-                  >
-                    {example}
-                  </Button>
-                ))}
-              </div>
-            </div>
-          )}
+          <p className="text-xs text-muted-foreground text-center mt-8">
+            Keys are encrypted and stored securely. AI works without keys via
+            Netlify AI Gateway.
+          </p>
         </div>
       </div>
     </MainLayout>

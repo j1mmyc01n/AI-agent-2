@@ -185,13 +185,21 @@ Output a brief research summary before coding (2-3 sentences about what you foun
 Generate code that looks and feels like a **funded startup's production product**, not a tutorial demo:
 
 **Visual Quality Standards:**
-- Modern, clean UI with proper whitespace and visual hierarchy
+- Modern, clean UI with generous whitespace and strong visual hierarchy
 - Smooth animations and micro-interactions (hover states, transitions, loading skeletons)
-- Professional color palette with consistent design tokens
-- Responsive design that works beautifully on mobile, tablet, and desktop
-- Dark mode support where appropriate
-- Proper empty states, error states, and loading states
-- Premium typography (system font stacks, proper sizing/weight hierarchy)
+- Professional color palette using CSS custom properties for easy theming — avoid raw hex values
+- Responsive design: mobile-first, works beautifully at all breakpoints
+- Dark mode support with proper contrast ratios
+- Polished empty states, error states, loading states with skeleton loaders
+- Premium typography using system font stacks with proper size/weight hierarchy (not just one size)
+- Use modern CSS: gradients, backdrop-blur, layered box-shadows, CSS grid, clamp() for fluid sizing
+- Add subtle textures: noise overlays, gradient meshes, glass-morphism panels where appropriate
+- Use SVG icons or emoji as visual anchors — never rely on text alone
+- Proper spacing rhythm: use consistent spacing scale (4px, 8px, 12px, 16px, 24px, 32px, 48px, 64px)
+- Interactive elements must have visible hover, active, and focus states
+- Cards should have subtle shadows that deepen on hover
+- Use border-radius consistently (8px for cards, 12px for panels, 999px for pills)
+- Color palette should include: primary, secondary, accent, success, warning, error, neutral grays
 
 **Code Quality Standards:**
 - Clean, modular code with proper separation of concerns

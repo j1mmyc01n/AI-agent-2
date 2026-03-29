@@ -113,7 +113,6 @@ export default function MainLayout({
             </span>
           </div>
 
-          <div className="ml-auto" />
         </header>
 
         {/* Content */}

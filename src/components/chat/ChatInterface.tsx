@@ -615,7 +615,7 @@ export default function ChatInterface({
               title="SaaS upgrade - convert to full multi-page SaaS structure"
             >
               <Sparkles className="h-3 w-3" />
-              <span className="hidden sm:inline">SaaS</span>
+              <span className="hidden sm:inline">Upgrade</span>
             </button>
           </div>
 
@@ -647,6 +647,7 @@ export default function ChatInterface({
               isLoading={isLoading}
               selectedModel={selectedModel}
               onModelChange={setSelectedModel}
+              showSuggestions={messages.length === 0}
               placeholder={
                 chatMode === "build"
                   ? "Describe what you want to build... (code will appear in Code & Preview tabs)"
