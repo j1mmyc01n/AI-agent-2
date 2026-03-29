@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 import type { ChatCompletionMessageFunctionToolCall } from "openai/resources/chat/completions";
 import { tools } from "./tools";
-import { SYSTEM_PROMPT } from "./prompts";
+import { buildSystemPrompt } from "./prompts";
 import { searchWeb } from "@/lib/integrations/search";
 import {
   createRepository,
@@ -13,6 +13,14 @@ import { createProject as createVercelProject } from "@/lib/integrations/vercel"
 import { db } from "@/lib/db";
 
 export type AIProvider = "openai" | "anthropic" | "grok";
+
+interface ProjectContext {
+  projects?: { id: string; name: string; description?: string | null; type: string; status: string; githubRepo?: string | null; vercelUrl?: string | null }[];
+  currentProjectId?: string;
+  currentProjectName?: string;
+  conversationCount?: number;
+  userName?: string;
+}
 
 interface AgentConfig {
   openaiKey?: string;
@@ -25,6 +33,7 @@ interface AgentConfig {
   conversationId: string;
   model?: string;
   provider?: AIProvider;
+  projectContext?: ProjectContext;
 }
 
 interface MessageParam {
@@ -59,7 +68,8 @@ async function runOpenAIAgent(
   const openai = new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
   const model = config.model || (baseURL ? "grok-2-latest" : "gpt-4o");
 
-  const systemMessage: MessageParam = { role: "system", content: SYSTEM_PROMPT };
+  const systemPrompt = buildSystemPrompt(config.projectContext);
+  const systemMessage: MessageParam = { role: "system", content: systemPrompt };
   const allMessages: MessageParam[] = [systemMessage, ...messages];
 
   let finalResponse = "";
@@ -147,6 +157,8 @@ async function runAnthropicAgent(
   const model = config.model || "claude-3-5-sonnet-20241022";
   const anthropicTools = toAnthropicTools();
 
+  const systemPrompt = buildSystemPrompt(config.projectContext);
+
   type AnthropicMessage = Anthropic.MessageParam;
   const allMessages: AnthropicMessage[] = messages
     .filter((m) => m.role !== "system")
@@ -158,7 +170,7 @@ async function runAnthropicAgent(
   while (continueLoop) {
     const stream = await anthropic.messages.create({
       model,
-      system: SYSTEM_PROMPT,
+      system: systemPrompt,
       messages: allMessages,
       tools: anthropicTools,
       max_tokens: 4096,

@@ -15,11 +15,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { message, conversationId, model, provider } = body as {
+    const { message, conversationId, model, provider, projectId } = body as {
       message: string;
       conversationId?: string;
       model?: string;
       provider?: AIProvider;
+      projectId?: string;
       history?: { role: string; content: string }[];
     };
 
@@ -29,8 +30,9 @@ export async function POST(req: NextRequest) {
 
     const hasDb = !!getDatabaseUrl();
 
-    // Get user's API keys from DB or fall back to env vars
+    // Get user's API keys and project context from DB
     let user: {
+      name?: string | null;
       openaiKey?: string | null;
       anthropicKey?: string | null;
       grokKey?: string | null;
@@ -39,11 +41,24 @@ export async function POST(req: NextRequest) {
       tavilyKey?: string | null;
     } | null = null;
 
+    let userProjects: {
+      id: string;
+      name: string;
+      description: string | null;
+      type: string;
+      status: string;
+      githubRepo: string | null;
+      vercelUrl: string | null;
+    }[] = [];
+
+    let conversationCount = 0;
+
     if (hasDb) {
       try {
         user = await db.user.findUnique({
           where: { id: userId },
           select: {
+            name: true,
             openaiKey: true,
             anthropicKey: true,
             grokKey: true,
@@ -52,8 +67,28 @@ export async function POST(req: NextRequest) {
             tavilyKey: true,
           },
         });
+
+        // Fetch user's projects for context
+        userProjects = await db.project.findMany({
+          where: { userId },
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            type: true,
+            status: true,
+            githubRepo: true,
+            vercelUrl: true,
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 20,
+        });
+
+        conversationCount = await db.conversation.count({
+          where: { userId },
+        });
       } catch (e) {
-        console.error("Failed to fetch user keys from DB:", e);
+        console.error("Failed to fetch user data from DB:", e);
       }
     }
 
@@ -83,20 +118,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Get or create conversation (works with or without DB)
+    // Get or create conversation
     let conversation: { id: string; title: string; messages: { role: string; content: string }[] };
     const localMode = !hasDb;
 
+    // Find current project name if projectId provided
+    let currentProjectName: string | undefined;
+    if (projectId) {
+      const proj = userProjects.find(p => p.id === projectId);
+      if (proj) currentProjectName = proj.name;
+    }
+
     if (localMode) {
-      // In local mode, the client manages conversation persistence via IndexedDB
-      // Server just needs a conversation ID for the streaming response
       const convId = conversationId || `local-${Date.now()}`;
       conversation = {
         id: convId,
         title: message.slice(0, 60) + (message.length > 60 ? "..." : ""),
         messages: [],
       };
-      // Client sends history in local mode via the messages field
       if (body.history && Array.isArray(body.history)) {
         conversation.messages = body.history;
       }
@@ -142,6 +181,15 @@ export async function POST(req: NextRequest) {
     let fullResponse = "";
     const toolCallsData: { name: string; args: Record<string, unknown>; result: string }[] = [];
 
+    // Build context for the agent
+    const projectContext = {
+      projects: userProjects,
+      currentProjectId: projectId,
+      currentProjectName,
+      conversationCount,
+      userName: user?.name || undefined,
+    };
+
     const stream = new ReadableStream({
       async start(controller) {
         try {
@@ -158,6 +206,7 @@ export async function POST(req: NextRequest) {
               conversationId: conversation.id,
               model,
               provider: activeProvider,
+              projectContext,
             },
             (chunk) => {
               fullResponse += chunk;

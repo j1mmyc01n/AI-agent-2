@@ -59,9 +59,9 @@ export default function MessageInput({
   };
 
   return (
-    <div className="border-t bg-background p-3 sm:p-4 safe-area-bottom">
+    <div className="border-t border-border/50 bg-card/30 backdrop-blur-sm p-3 sm:p-4 safe-area-bottom">
       <div className="max-w-3xl mx-auto">
-        <div className="flex flex-col bg-muted/50 border rounded-xl p-2 gap-2">
+        <div className="flex flex-col bg-background border border-border/50 rounded-xl p-2 gap-2 shadow-sm focus-within:border-primary/30 focus-within:shadow-md focus-within:shadow-primary/5 transition-all">
           {/* Model selector row */}
           <div className="flex items-center gap-2 px-1">
             <ModelSelector selectedModel={activeModel} onSelect={handleModelChange} />
@@ -84,13 +84,13 @@ export default function MessageInput({
               onClick={handleSend}
               disabled={!message.trim() || isLoading || disabled}
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-lg"
+              className="h-9 w-9 shrink-0 rounded-lg bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20 disabled:shadow-none"
             >
               <SendHorizonal className="h-4 w-4" />
             </Button>
           </div>
         </div>
-        <p className="text-[10px] sm:text-xs text-muted-foreground text-center mt-2">
+        <p className="text-[10px] sm:text-xs text-muted-foreground/60 text-center mt-2">
           DoBetter Viber can make mistakes. Verify important information.
         </p>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import MessageList from "./MessageList";
 import MessageInput from "./MessageInput";
 import { toast } from "@/components/ui/use-toast";
@@ -10,7 +10,7 @@ import CodePanel from "@/components/workspace/CodePanel";
 import TodoPanel, { type TodoItem } from "@/components/workspace/TodoPanel";
 import PreviewPanel from "@/components/workspace/PreviewPanel";
 import { Button } from "@/components/ui/button";
-import { Code2, ListTodo, Eye, MessageSquare } from "lucide-react";
+import { Code2, ListTodo, Eye, MessageSquare, Brain, Loader2, Sparkles } from "lucide-react";
 
 interface ToolCallData {
   name: string;
@@ -36,7 +36,11 @@ interface CodeBlock {
 interface ChatInterfaceProps {
   conversationId?: string;
   initialMessages?: Message[];
+  projectId?: string;
+  projectName?: string;
 }
+
+type AgentStatus = "idle" | "thinking" | "coding" | "searching" | "deploying" | "saving";
 
 // Extract code blocks from assistant messages
 function extractCodeBlocks(messages: Message[]): CodeBlock[] {
@@ -64,7 +68,6 @@ function extractTodos(messages: Message[]): TodoItem[] {
 
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
-    // Match lines like: - [ ] task, - [x] task, 1. task, ✅ task
     const lines = msg.content.split("\n");
     for (const line of lines) {
       const pendingMatch = line.match(/^[-*]\s+\[\s\]\s+(.+)$/);
@@ -79,7 +82,6 @@ function extractTodos(messages: Message[]): TodoItem[] {
       } else if (inProgressMatch) {
         todos.push({ id: `todo-${idCounter++}`, title: inProgressMatch[1].trim(), status: "in-progress" });
       } else if (numberedMatch && todos.length === 0) {
-        // Only add numbered lists if no checkbox todos found yet
         todos.push({ id: `todo-${idCounter++}`, title: numberedMatch[1].trim(), status: "pending" });
       }
     }
@@ -88,16 +90,33 @@ function extractTodos(messages: Message[]): TodoItem[] {
   return todos;
 }
 
-const panelTabs = [
-  { id: "chat" as PanelView, label: "Chat", icon: MessageSquare },
-  { id: "code" as PanelView, label: "Code", icon: Code2 },
-  { id: "todo" as PanelView, label: "Tasks", icon: ListTodo },
-  { id: "preview" as PanelView, label: "Preview", icon: Eye },
-];
+function getAgentStatusFromToolCalls(streamingToolCalls: { name: string; args: Record<string, unknown> }[] | undefined): AgentStatus {
+  if (!streamingToolCalls || streamingToolCalls.length === 0) return "thinking";
+  const lastTool = streamingToolCalls[streamingToolCalls.length - 1].name;
+  switch (lastTool) {
+    case "web_search": return "searching";
+    case "create_github_repo":
+    case "push_code_to_github": return "coding";
+    case "create_vercel_project": return "deploying";
+    case "create_project_record": return "saving";
+    default: return "thinking";
+  }
+}
+
+const statusLabels: Record<AgentStatus, { label: string; icon: React.ReactNode }> = {
+  idle: { label: "", icon: null },
+  thinking: { label: "Thinking...", icon: <Brain className="h-3 w-3 animate-pulse" /> },
+  coding: { label: "Writing code...", icon: <Code2 className="h-3 w-3 animate-pulse" /> },
+  searching: { label: "Searching web...", icon: <Sparkles className="h-3 w-3 animate-pulse" /> },
+  deploying: { label: "Deploying...", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
+  saving: { label: "Saving project...", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
+};
 
 export default function ChatInterface({
   conversationId: initialConversationId,
   initialMessages = [],
+  projectId,
+  projectName,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
@@ -107,6 +126,18 @@ export default function ChatInterface({
   const [selectedModel, setSelectedModel] = useState<AIModel>(DEFAULT_MODEL);
   const [activePanel, setActivePanel] = useState<PanelView>("chat");
   const [previewUrl, setPreviewUrl] = useState<string | undefined>();
+  const [agentStatus, setAgentStatus] = useState<AgentStatus>("idle");
+
+  // Auto-switch to code tab when code is generated
+  const codeBlocks = extractCodeBlocks(messages);
+  const todos = extractTodos(messages);
+  const prevCodeCount = useState(0);
+
+  useEffect(() => {
+    if (codeBlocks.length > 0 && codeBlocks.length !== prevCodeCount[0]) {
+      prevCodeCount[0] = codeBlocks.length;
+    }
+  }, [codeBlocks.length, prevCodeCount]);
 
   const sendMessage = useCallback(
     async (content: string, model: AIModel) => {
@@ -115,6 +146,7 @@ export default function ChatInterface({
       const userMessage: Message = { role: "user", content };
       setMessages((prev) => [...prev, userMessage]);
       setIsLoading(true);
+      setAgentStatus("thinking");
 
       try {
         const response = await fetch("/api/chat", {
@@ -125,6 +157,7 @@ export default function ChatInterface({
             conversationId: currentConversationId,
             model: model.id,
             provider: model.provider,
+            projectId,
           }),
         });
 
@@ -171,6 +204,7 @@ export default function ChatInterface({
               const chunk = JSON.parse(jsonStr);
 
               if (chunk.type === "text") {
+                setAgentStatus("thinking");
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMessageId
@@ -181,6 +215,11 @@ export default function ChatInterface({
               } else if (chunk.type === "tool_call") {
                 const newTc = { name: chunk.toolName, args: chunk.toolArgs };
                 activeToolCalls.push({ ...newTc });
+
+                // Update agent status based on tool being used
+                const status = getAgentStatusFromToolCalls([newTc]);
+                setAgentStatus(status);
+
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMessageId
@@ -203,6 +242,7 @@ export default function ChatInterface({
                 newConversationId = chunk.conversationId;
                 setCurrentConversationId(chunk.conversationId);
                 if (chunk.previewUrl) setPreviewUrl(chunk.previewUrl);
+                setAgentStatus("idle");
                 setMessages((prev) =>
                   prev.map((m) =>
                     m.id === assistantMessageId
@@ -231,6 +271,7 @@ export default function ChatInterface({
         }
       } catch (error) {
         setIsLoading(false);
+        setAgentStatus("idle");
         setMessages((prev) => prev.filter((m) => !m.isStreaming));
 
         const errorMsg = error instanceof Error ? error.message : "An error occurred";
@@ -241,47 +282,71 @@ export default function ChatInterface({
         });
       }
     },
-    [isLoading, currentConversationId, initialConversationId]
+    [isLoading, currentConversationId, initialConversationId, projectId]
   );
 
-  const codeBlocks = extractCodeBlocks(messages);
-  const todos = extractTodos(messages);
+  const panelTabs = [
+    { id: "chat" as PanelView, label: "Chat", icon: MessageSquare, count: messages.filter(m => m.role !== "system").length },
+    { id: "code" as PanelView, label: "Code", icon: Code2, count: codeBlocks.length },
+    { id: "todo" as PanelView, label: "Tasks", icon: ListTodo, count: todos.length },
+    { id: "preview" as PanelView, label: "Preview", icon: Eye, count: previewUrl ? 1 : 0 },
+  ];
 
   return (
     <div className="flex flex-col h-full">
-      {/* In-panel view tabs */}
-      <div className="flex items-center gap-1 px-2 sm:px-4 py-2 border-b bg-muted/20 shrink-0 overflow-x-auto">
-        {panelTabs.map(({ id, label, icon: Icon }) => (
-          <Button
-            key={id}
-            variant={activePanel === id ? "default" : "ghost"}
-            size="sm"
-            className={`gap-1 sm:gap-1.5 px-2 sm:px-3 h-8 text-xs font-medium shrink-0 ${
-              activePanel === id ? "shadow-sm" : ""
-            }`}
-            onClick={() => setActivePanel(id)}
-          >
-            <Icon className="h-3.5 w-3.5" />
-            <span className="hidden xs:inline sm:inline">{label}</span>
-            {id === "code" && codeBlocks.length > 0 && (
-              <span className="ml-0.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold">
-                {codeBlocks.length}
-              </span>
-            )}
-            {id === "todo" && todos.length > 0 && (
-              <span className="ml-0.5 rounded-full bg-primary/20 px-1.5 py-0.5 text-[10px] font-semibold">
-                {todos.length}
-              </span>
-            )}
-          </Button>
-        ))}
+      {/* Agent status bar + panel tabs */}
+      <div className="flex items-center justify-between px-2 sm:px-4 py-1.5 border-b bg-card/50 shrink-0">
+        {/* Panel tabs */}
+        <div className="flex items-center gap-0.5 overflow-x-auto">
+          {panelTabs.map(({ id, label, icon: Icon, count }) => (
+            <Button
+              key={id}
+              variant={activePanel === id ? "default" : "ghost"}
+              size="sm"
+              className={`gap-1 sm:gap-1.5 px-2 sm:px-3 h-8 text-xs font-medium shrink-0 ${
+                activePanel === id
+                  ? "bg-primary text-primary-foreground shadow-sm"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => setActivePanel(id)}
+            >
+              <Icon className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">{label}</span>
+              {count > 0 && id !== "chat" && (
+                <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                  activePanel === id
+                    ? "bg-primary-foreground/20"
+                    : "bg-primary/15 text-primary"
+                }`}>
+                  {count}
+                </span>
+              )}
+            </Button>
+          ))}
+        </div>
+
+        {/* Agent status indicator */}
+        {agentStatus !== "idle" && (
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium shrink-0 ml-2">
+            {statusLabels[agentStatus].icon}
+            <span className="hidden sm:inline">{statusLabels[agentStatus].label}</span>
+          </div>
+        )}
+
+        {/* Project badge */}
+        {projectName && (
+          <div className="hidden md:flex items-center gap-1 px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-xs shrink-0 ml-2">
+            <span className="opacity-60">Project:</span>
+            <span className="font-medium truncate max-w-[120px]">{projectName}</span>
+          </div>
+        )}
       </div>
 
       {/* Panel content */}
       <div className="flex-1 overflow-hidden">
         {activePanel === "chat" && (
           <div className="flex flex-col h-full">
-            <MessageList messages={messages} isLoading={isLoading} />
+            <MessageList messages={messages} isLoading={isLoading} agentStatus={agentStatus} />
             <MessageInput
               onSend={sendMessage}
               isLoading={isLoading}
@@ -293,7 +358,7 @@ export default function ChatInterface({
         {activePanel === "code" && <CodePanel codeBlocks={codeBlocks} />}
         {activePanel === "todo" && <TodoPanel todos={todos} />}
         {activePanel === "preview" && (
-          <PreviewPanel previewUrl={previewUrl} projectName="Current Project" />
+          <PreviewPanel previewUrl={previewUrl} projectName={projectName || "Current Project"} />
         )}
       </div>
     </div>

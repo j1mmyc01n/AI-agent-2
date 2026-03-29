@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { Bot, User, Globe, Github, Zap, Database, Loader2 } from "lucide-react";
+import { Bot, User, Globe, Github, Zap, Database, Loader2, Brain, Code2, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 interface ToolCallData {
@@ -19,9 +19,12 @@ interface Message {
   streamingToolCalls?: { name: string; args: Record<string, unknown> }[];
 }
 
+type AgentStatus = "idle" | "thinking" | "coding" | "searching" | "deploying" | "saving";
+
 interface MessageListProps {
   messages: Message[];
   isLoading?: boolean;
+  agentStatus?: AgentStatus;
 }
 
 function getToolIcon(toolName: string) {
@@ -62,7 +65,6 @@ function parseToolCalls(toolCalls: string | ToolCallData[] | null | undefined): 
 }
 
 function formatContent(content: string) {
-  // Simple markdown-like formatting
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
   let inCodeBlock = false;
@@ -80,7 +82,8 @@ function formatContent(content: string) {
         elements.push(
           <div key={`code-${i}`} className="my-3">
             {codeLanguage && (
-              <div className="bg-zinc-700 text-zinc-300 text-xs px-3 py-1 rounded-t-md">
+              <div className="bg-zinc-700 text-zinc-300 text-xs px-3 py-1 rounded-t-md flex items-center gap-1.5">
+                <Code2 className="h-3 w-3" />
                 {codeLanguage}
               </div>
             )}
@@ -145,14 +148,13 @@ function formatContent(content: string) {
 }
 
 function InlineFormatted({ text }: { text: string }) {
-  // Handle inline code, bold, and italic
   const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*)/);
   return (
     <>
       {parts.map((part, i) => {
         if (part.startsWith("`") && part.endsWith("`")) {
           return (
-            <code key={i} className="bg-muted px-1 py-0.5 rounded text-xs font-mono">
+            <code key={i} className="bg-primary/10 text-primary px-1 py-0.5 rounded text-xs font-mono">
               {part.slice(1, -1)}
             </code>
           );
@@ -167,7 +169,7 @@ function InlineFormatted({ text }: { text: string }) {
   );
 }
 
-export default function MessageList({ messages, isLoading }: MessageListProps) {
+export default function MessageList({ messages, isLoading, agentStatus = "idle" }: MessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -178,24 +180,28 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
     return (
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="text-center max-w-lg">
-          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6">
+          <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-6 glow-primary">
             <Bot className="h-8 w-8 text-primary" />
           </div>
-          <h2 className="text-xl sm:text-2xl font-bold mb-3">Welcome to DoBetter Viber</h2>
+          <h2 className="text-xl sm:text-2xl font-bold mb-3">
+            <span className="bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
+              DoBetter Viber
+            </span>
+          </h2>
           <p className="text-muted-foreground mb-8 text-sm sm:text-base leading-relaxed">
             Your AI-powered workspace. Describe what you want to build and the agent will
-            help you design, code, and ship it.
+            help you design, code, and ship it. Ask about the platform itself for help!
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
             {[
               { icon: "🚀", text: "Build a SaaS MVP from a prompt" },
               { icon: "🔍", text: "Research topics with web search" },
               { icon: "💻", text: "Generate & push code to GitHub" },
-              { icon: "⚡", text: "Deploy live to Vercel/Netlify" },
+              { icon: "💡", text: "Ask about DoBetter platform features" },
             ].map((item, i) => (
               <div
                 key={i}
-                className="flex items-center gap-3 p-3 rounded-xl border bg-card hover:bg-accent/50 transition-colors text-sm"
+                className="flex items-center gap-3 p-3 rounded-xl border border-border/50 bg-card hover:bg-primary/5 hover:border-primary/20 transition-all text-sm cursor-default"
               >
                 <span className="text-lg">{item.icon}</span>
                 <span>{item.text}</span>
@@ -220,8 +226,10 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
           >
             {/* Avatar */}
             <div
-              className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-white ${
-                message.role === "user" ? "bg-primary" : "bg-emerald-600"
+              className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center text-white shadow-sm ${
+                message.role === "user"
+                  ? "bg-gradient-to-br from-blue-500 to-blue-700"
+                  : "bg-gradient-to-br from-emerald-500 to-emerald-700"
               }`}
             >
               {message.role === "user" ? (
@@ -246,7 +254,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                       <Badge
                         key={i}
                         variant="secondary"
-                        className="text-xs flex items-center gap-1"
+                        className="text-xs flex items-center gap-1 bg-primary/10 text-primary border-primary/20"
                       >
                         {getToolIcon(tc.name)}
                         {getToolLabel(tc.name)}
@@ -263,7 +271,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                     <Badge
                       key={i}
                       variant="outline"
-                      className="text-xs flex items-center gap-1 animate-pulse"
+                      className="text-xs flex items-center gap-1 agent-pulse border-primary/30 text-primary"
                     >
                       {getToolIcon(tc.name)}
                       {getToolLabel(tc.name)}...
@@ -277,8 +285,8 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                 <div
                   className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     message.role === "user"
-                      ? "bg-primary text-primary-foreground rounded-tr-sm"
-                      : "bg-muted rounded-tl-sm"
+                      ? "bg-gradient-to-br from-blue-600 to-blue-700 text-white rounded-tr-sm"
+                      : "bg-card border border-border/50 rounded-tl-sm"
                   }`}
                 >
                   {message.role === "user" ? (
@@ -289,7 +297,7 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
                     </div>
                   )}
                   {message.isStreaming && (
-                    <span className="inline-block w-1.5 h-4 bg-current ml-0.5 animate-pulse" />
+                    <span className="inline-block w-1.5 h-4 bg-primary ml-0.5 animate-pulse rounded-full" />
                   )}
                 </div>
               )}
@@ -299,11 +307,27 @@ export default function MessageList({ messages, isLoading }: MessageListProps) {
 
       {isLoading && (
         <div className="flex gap-3">
-          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-emerald-600 flex items-center justify-center">
+          <div className="flex-shrink-0 h-8 w-8 rounded-full bg-gradient-to-br from-emerald-500 to-emerald-700 flex items-center justify-center shadow-sm">
             <Bot className="h-4 w-4 text-white" />
           </div>
-          <div className="bg-muted rounded-2xl rounded-tl-sm px-4 py-3">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+          <div className="bg-card border border-border/50 rounded-2xl rounded-tl-sm px-4 py-3 flex items-center gap-2">
+            {agentStatus === "thinking" ? (
+              <Brain className="h-4 w-4 text-primary animate-pulse" />
+            ) : agentStatus === "coding" ? (
+              <Code2 className="h-4 w-4 text-primary animate-pulse" />
+            ) : agentStatus === "searching" ? (
+              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+            ) : (
+              <Loader2 className="h-4 w-4 animate-spin text-primary" />
+            )}
+            <span className="text-sm text-muted-foreground">
+              {agentStatus === "thinking" && "Thinking..."}
+              {agentStatus === "coding" && "Writing code..."}
+              {agentStatus === "searching" && "Searching..."}
+              {agentStatus === "deploying" && "Deploying..."}
+              {agentStatus === "saving" && "Saving..."}
+              {agentStatus === "idle" && "Processing..."}
+            </span>
           </div>
         </div>
       )}
