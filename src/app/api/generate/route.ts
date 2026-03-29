@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, getDatabaseUrl } from "@/lib/db";
+import { getStore } from "@netlify/blobs";
 import OpenAI from "openai";
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -215,6 +216,22 @@ export async function POST(req: NextRequest) {
       });
       userKeys = u ?? {};
     } catch {
+      // Fall through to Blobs / env keys
+    }
+  }
+
+  // Try Blobs if no keys from DB
+  if (!userKeys.openaiKey && !userKeys.anthropicKey) {
+    try {
+      const store = getStore({ name: "user-settings", consistency: "strong" });
+      const blobKeys = await store.get(`keys:${userId}`, { type: "json" }) as Record<string, string> | null;
+      if (blobKeys) {
+        userKeys = {
+          openaiKey: blobKeys.openaiKey || null,
+          anthropicKey: blobKeys.anthropicKey || null,
+        };
+      }
+    } catch {
       // Fall through to env keys
     }
   }
@@ -244,9 +261,12 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const clientOptions: { apiKey: string; baseURL?: string } = { apiKey: anthropicKey };
-      if (process.env.ANTHROPIC_BASE_URL) clientOptions.baseURL = process.env.ANTHROPIC_BASE_URL;
-      const anthropic = new Anthropic(clientOptions);
+      // Use zero-config constructor when env vars match (Netlify AI Gateway)
+      const envKey = process.env.ANTHROPIC_API_KEY;
+      const envBase = process.env.ANTHROPIC_BASE_URL;
+      const anthropic = (envKey && envBase && anthropicKey === envKey)
+        ? new Anthropic()
+        : new Anthropic({ apiKey: anthropicKey, ...(process.env.ANTHROPIC_BASE_URL ? { baseURL: process.env.ANTHROPIC_BASE_URL } : {}) });
       usedModel = model ?? "claude-sonnet-4-5";
       const response = await anthropic.messages.create({
         model: usedModel,
@@ -267,9 +287,12 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const clientOptions: { apiKey: string; baseURL?: string } = { apiKey: openaiKey };
-      if (process.env.OPENAI_BASE_URL) clientOptions.baseURL = process.env.OPENAI_BASE_URL;
-      const openai = new OpenAI(clientOptions);
+      // Use zero-config constructor when env vars match (Netlify AI Gateway)
+      const envOaiKey = process.env.OPENAI_API_KEY;
+      const envOaiBase = process.env.OPENAI_BASE_URL;
+      const openai = (envOaiKey && envOaiBase && openaiKey === envOaiKey)
+        ? new OpenAI()
+        : new OpenAI({ apiKey: openaiKey, ...(process.env.OPENAI_BASE_URL ? { baseURL: process.env.OPENAI_BASE_URL } : {}) });
       usedModel = model ?? "gpt-4o";
       const response = await openai.chat.completions.create({
         model: usedModel,

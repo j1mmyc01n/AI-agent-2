@@ -94,9 +94,13 @@ async function runOpenAIAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  const clientOptions: { apiKey: string; baseURL?: string } = { apiKey };
-  if (baseURL) clientOptions.baseURL = baseURL;
-  const openai = new OpenAI(clientOptions);
+  // Use zero-config constructor if env vars are set (Netlify AI Gateway),
+  // otherwise pass explicit credentials
+  const envKey = process.env.OPENAI_API_KEY;
+  const envBase = process.env.OPENAI_BASE_URL;
+  const openai = (envKey && envBase && apiKey === envKey)
+    ? new OpenAI()
+    : new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
   // For Grok, use grok model; otherwise use the configured or default OpenAI model
   const model = config.model || (config.provider === "grok" ? "grok-2-latest" : "gpt-4o");
@@ -187,10 +191,13 @@ async function runAnthropicAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use zero-config constructor to leverage Netlify AI Gateway auto-injected env vars
-  const clientOptions: { apiKey: string; baseURL?: string } = { apiKey };
-  if (baseURL) clientOptions.baseURL = baseURL;
-  const anthropic = new Anthropic(clientOptions);
+  // Use zero-config constructor if env vars are set (Netlify AI Gateway),
+  // otherwise pass explicit credentials
+  const envKey = process.env.ANTHROPIC_API_KEY;
+  const envBase = process.env.ANTHROPIC_BASE_URL;
+  const anthropic = (envKey && envBase && apiKey === envKey)
+    ? new Anthropic()
+    : new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
 
   const model = config.model || "claude-sonnet-4-5";
   const anthropicTools = toAnthropicTools();
@@ -378,6 +385,47 @@ async function executeToolCall(
         args.githubRepo as string | undefined
       );
       return `Successfully created Vercel project!\n- Project ID: ${project.id}\n- URL: ${project.url}`;
+    }
+
+    case "save_artifact": {
+      const title = args.title as string || "Untitled";
+      const files = args.files as { path: string; content: string }[];
+      const artifactProjectId = args.projectId as string | undefined;
+
+      if (!files || files.length === 0) {
+        return "No files provided to save.";
+      }
+
+      try {
+        const store = getStore("artifacts");
+        const artifactId = `art_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+        const artifact = {
+          id: artifactId,
+          userId: config.userId,
+          projectId: artifactProjectId || config.projectContext?.currentProjectId || null,
+          title,
+          type: "code",
+          files,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Save individual artifact
+        await store.setJSON(artifactId, artifact);
+
+        // Add to user's artifact index
+        const indexKey = `user:${config.userId}`;
+        const existing = await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] || [];
+        const existingArr = Array.isArray(existing) ? existing : [];
+        existingArr.unshift({ id: artifactId, title, fileCount: files.length, createdAt: artifact.createdAt });
+        await store.setJSON(indexKey, existingArr);
+
+        const fileList = files.map(f => `  - ${f.path}`).join("\n");
+        return `Saved ${files.length} file(s) as "${title}" (ID: ${artifactId}):\n${fileList}\n\nThese files are now stored and available in the Code panel.`;
+      } catch (error) {
+        console.error("Failed to save artifact:", error);
+        return `Generated ${files.length} file(s) for "${title}" — displayed in the Code panel. (Storage unavailable, but code is visible in the conversation.)`;
+      }
     }
 
     case "create_project_record": {

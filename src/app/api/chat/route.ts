@@ -364,7 +364,7 @@ export async function POST(req: NextRequest) {
               console.error("Failed to save message to DB:", e);
             }
           } else {
-            // Update conversation in Blobs with new message count
+            // Update conversation in Blobs with new message count and save messages
             try {
               const convStore = getStore("conversations");
               const existing = await convStore.get(`user:${userId}`, { type: "json" }) as { id: string; updatedAt: string; messageCount: number }[] || [];
@@ -375,6 +375,21 @@ export async function POST(req: NextRequest) {
                 conv.messageCount = (conv.messageCount || 0) + 2; // user + assistant
                 await convStore.setJSON(`user:${userId}`, existingArr);
               }
+
+              // Save messages to Blobs for persistence across sessions
+              const msgStore = getStore("conversation-messages");
+              let existingMessages: { role: string; content: string; createdAt: string }[] = [];
+              try {
+                const stored = await msgStore.get(`conv:${conversation.id}`, { type: "json" }) as typeof existingMessages | null;
+                if (stored) existingMessages = stored;
+              } catch {
+                // No existing messages
+              }
+              existingMessages.push(
+                { role: "user", content: message, createdAt: new Date().toISOString() },
+                { role: "assistant", content: fullResponse, createdAt: new Date().toISOString() }
+              );
+              await msgStore.setJSON(`conv:${conversation.id}`, existingMessages);
             } catch {
               // Non-critical
             }

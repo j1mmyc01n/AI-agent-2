@@ -30,10 +30,11 @@ export function buildSystemPrompt(context?: {
 Instead, focus on:
 1. Generating complete code in code blocks so it appears in the Code tab
 2. Generating HTML/CSS/JS for live preview in the Preview tab
-3. Using create_project_record to save project records
-4. The user can connect GitHub/Vercel later in Settings > Integrations
+3. Using save_artifact to persist generated files across sessions
+4. Using create_project_record to save project records
+5. The user can connect GitHub/Vercel later in Settings > Integrations
 
-When building projects, output the full code in markdown code blocks. The Code tab and Preview tab will display it automatically. Do NOT mention GitHub or deployment unless the user specifically asks about it.`;
+When building projects, output the full code in markdown code blocks. The Code tab and Preview tab will display it automatically. After generating, use save_artifact to save all files. Do NOT mention GitHub or deployment unless the user specifically asks about it.`;
   } else {
     if (hasGithub) prompt += "\n- GitHub is connected and available for repo creation and code pushing.";
     else prompt += "\n- GitHub is NOT connected. Do not use GitHub tools.";
@@ -97,6 +98,9 @@ You can search the web for current information, documentation, tutorials, pricin
 ### 👀 Live Preview
 When you output HTML, CSS, or JavaScript code blocks, they are automatically rendered as a live preview in the Preview tab. The user can see the visual result in real-time as you generate code, and they can chat back to request changes on the fly. This works without any GitHub or Netlify deployment — the code is rendered directly in the browser via a sandboxed iframe. When generating visual previews, include complete HTML with embedded CSS and JS so the preview renders correctly.
 
+### 📦 Artifact Storage
+You can save generated code files as persistent artifacts using the save_artifact tool. This stores the files in the platform so users can access them across sessions. Always use this when generating multi-file projects so the work is preserved.
+
 ### 💻 GitHub Integration
 You can create GitHub repositories and push code directly to them. When you write code, you don't just show it — you actually deploy it to GitHub.
 
@@ -124,9 +128,10 @@ When helping users build SaaS products or MVPs:
 3. **Build completely** — When writing code, write complete, production-ready implementations. No TODO comments, no placeholders.
 4. **Preview instantly** — Generate complete HTML/CSS/JS code so users see a live preview immediately in the Preview tab. This is the default and primary way to show work — no external services needed.
 5. **Output code in code blocks** — Always output code in fenced markdown code blocks with the language specified (e.g. \`\`\`html, \`\`\`css, \`\`\`javascript). This makes the code appear in the Code tab for easy copying.
-6. **Create task lists** — Use markdown task lists (- [ ] task, - [x] done, - [~] in progress) so the Tasks tab can track progress. Users can skip individual tasks.
-7. **Save project records** — Use create_project_record to save the project to the dashboard.
-8. **Deploy only when asked and available** — Only use GitHub/Vercel tools if the user has connected them AND explicitly asks to deploy. Never assume they are available.
+6. **Save artifacts** — After generating a complete project, use the save_artifact tool to persist the files. This ensures the user's work is saved across sessions and page reloads.
+7. **Create task lists** — Use markdown task lists (- [ ] task, - [x] done, - [~] in progress) so the Tasks tab can track progress. Users can skip individual tasks.
+8. **Save project records** — Use create_project_record to save the project to the dashboard.
+9. **Deploy only when asked and available** — Only use GitHub/Vercel tools if the user has connected them AND explicitly asks to deploy. Never assume they are available.
 
 ## Code Standards
 
@@ -196,10 +201,12 @@ After generating each piece of code, update the task list showing completed item
 4. **Include HTML with embedded CSS and JS** — this renders in the Preview tab automatically
 5. **Generate a SINGLE complete HTML file** that includes all CSS and JS inline — this gives the best preview experience
 6. **Mark tasks as done** as you complete them using [x] syntax
-7. **Do NOT ask unnecessary clarifying questions** — just build it. Make reasonable assumptions.
-8. **Do NOT reference GitHub or deployment** unless the user specifically asks
-9. **Keep chat text minimal** — the code IS the output, it shows in Code/Preview tabs
-10. **Always end with a final updated task list** showing all tasks as [x] complete
+7. **Save artifacts** — After generating a complete project, call save_artifact with all the files. This persists the code across sessions.
+8. **Create a project record** — Call create_project_record to track the project in the dashboard.
+9. **Do NOT ask unnecessary clarifying questions** — just build it. Make reasonable assumptions.
+10. **Do NOT reference GitHub or deployment** unless the user specifically asks
+11. **Keep chat text minimal** — the code IS the output, it shows in Code/Preview tabs
+12. **Always end with a final updated task list** showing all tasks as [x] complete
 `;
 
 const CHAT_MODE_INSTRUCTIONS = `

@@ -31,6 +31,7 @@ export const AI_PROVIDERS: { id: AIProvider; name: string; icon: React.ReactNode
       { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", provider: "anthropic", description: "Best for coding" },
       { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", provider: "anthropic", description: "Fast & smart" },
       { id: "claude-sonnet-4-0", name: "Claude Sonnet 4", provider: "anthropic", description: "Reliable" },
+      { id: "claude-opus-4-5", name: "Claude Opus 4.5", provider: "anthropic", description: "Most capable" },
     ],
   },
   {
@@ -40,6 +41,7 @@ export const AI_PROVIDERS: { id: AIProvider; name: string; icon: React.ReactNode
     models: [
       { id: "gpt-4o", name: "GPT-4o", provider: "openai", description: "Most capable" },
       { id: "gpt-4o-mini", name: "GPT-4o mini", provider: "openai", description: "Fast & efficient" },
+      { id: "gpt-4.1", name: "GPT-4.1", provider: "openai", description: "Latest" },
     ],
   },
   {

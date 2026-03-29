@@ -32,16 +32,25 @@ export async function GET(
     }
   }
 
-  // Fallback: check Blobs for conversation metadata
+  // Fallback: check Blobs for conversation metadata and messages
   try {
     const store = getStore("conversations");
     const convList = await store.get(`user:${userId}`, { type: "json" }) as { id: string; title: string; projectId?: string | null; userId: string; createdAt: string; updatedAt: string; messageCount: number }[] | null;
     const conv = convList?.find(c => c.id === id);
     if (conv) {
+      // Try to load messages from Blobs
+      let messages: { role: string; content: string; createdAt: string }[] = [];
+      try {
+        const msgStore = getStore("conversation-messages");
+        const storedMessages = await msgStore.get(`conv:${id}`, { type: "json" }) as typeof messages | null;
+        if (storedMessages) messages = storedMessages;
+      } catch {
+        // Messages not available in blobs
+      }
       return NextResponse.json({
         ...conv,
-        messages: [], // Messages are in browser memory for Blob conversations
-        _count: { messages: conv.messageCount || 0 },
+        messages,
+        _count: { messages: messages.length || conv.messageCount || 0 },
       });
     }
   } catch {
