@@ -32,6 +32,42 @@ async function saveBlobProjects(userId: string, projects: BlobProject[]): Promis
   await store.setJSON(`user:${userId}`, projects);
 }
 
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = (session.user as { id: string }).id;
+  const { id } = await params;
+
+  // Try database first
+  if (getDatabaseUrl()) {
+    try {
+      const project = await db.project.findFirst({
+        where: { id, userId },
+      });
+      if (project) {
+        return NextResponse.json(project);
+      }
+    } catch (error) {
+      console.error("DB error in GET /api/projects/[id]:", error);
+    }
+  }
+
+  // Fallback to Blobs
+  try {
+    const projects = await getBlobProjects(userId);
+    const project = projects.find((p) => p.id === id);
+    if (project) {
+      return NextResponse.json(project);
+    }
+  } catch (error) {
+    console.error("Blobs error in GET /api/projects/[id]:", error);
+  }
+
+  return NextResponse.json({ error: "Project not found" }, { status: 404 });
+}
+
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {

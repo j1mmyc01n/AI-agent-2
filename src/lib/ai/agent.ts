@@ -88,17 +88,17 @@ async function runOpenAIAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Always use zero-config constructor when gateway env vars are present —
-  // this lets the SDK pick up OPENAI_BASE_URL automatically, which is
-  // required for Netlify AI Gateway to proxy the request correctly.
+  // Use user's own API key directly when provided (bypasses Netlify AI Gateway = cheaper).
+  // Fall back to zero-config gateway constructor when only env vars are present.
   const envKey = process.env.OPENAI_API_KEY;
   const envBase = process.env.OPENAI_BASE_URL;
-  const useGateway = !!(envKey && envBase);
+  const hasUserKey = !!config.openaiKey && config.openaiKey !== envKey;
+  const useGateway = !hasUserKey && !!(envKey && envBase);
   const openai = useGateway
     ? new OpenAI()
-    : new OpenAI({ apiKey, ...(baseURL ? { baseURL } : {}) });
+    : new OpenAI({ apiKey: hasUserKey ? config.openaiKey : apiKey, ...(hasUserKey ? {} : baseURL ? { baseURL } : {}) });
 
-  const model = config.model || "gpt-4o";
+  const model = config.model || "gpt-4o-mini";
 
   // Reasoning models (o-series) don't support system messages or max_tokens
   const isReasoningModel = model.startsWith("o");
@@ -118,7 +118,7 @@ async function runOpenAIAgent(
       tools,
       tool_choice: "auto",
       stream: true,
-      ...(isReasoningModel ? {} : { max_tokens: 16384 }),
+      ...(isReasoningModel ? {} : { max_tokens: 8192 }),
     });
 
     let currentContent = "";
@@ -190,16 +190,17 @@ async function runAnthropicAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Always use zero-config constructor when gateway env vars are present —
-  // this lets the SDK pick up ANTHROPIC_BASE_URL automatically.
+  // Use user's own API key directly when provided (bypasses Netlify AI Gateway = cheaper).
+  // Fall back to zero-config gateway constructor when only env vars are present.
   const envKey = process.env.ANTHROPIC_API_KEY;
   const envBase = process.env.ANTHROPIC_BASE_URL;
-  const useGateway = !!(envKey && envBase);
+  const hasUserKey = !!config.anthropicKey && config.anthropicKey !== envKey;
+  const useGateway = !hasUserKey && !!(envKey && envBase);
   const anthropic = useGateway
     ? new Anthropic()
-    : new Anthropic({ apiKey, ...(baseURL ? { baseURL } : {}) });
+    : new Anthropic({ apiKey: hasUserKey ? config.anthropicKey : apiKey, ...(hasUserKey ? {} : baseURL ? { baseURL } : {}) });
 
-  const model = config.model || "claude-sonnet-4-5";
+  const model = config.model || "claude-haiku-4-5";
   const anthropicTools = toAnthropicTools();
 
   const systemPrompt = buildSystemPrompt(config.projectContext);
@@ -218,7 +219,7 @@ async function runAnthropicAgent(
       system: systemPrompt,
       messages: allMessages,
       tools: anthropicTools,
-      max_tokens: 16384,
+      max_tokens: 8192,
       stream: true,
     });
 
@@ -312,13 +313,13 @@ export async function runAgent(
         const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
         if (anthropicKey) {
           // Override the model to a valid Anthropic model when falling back
-          const fallbackConfig = { ...config, model: "claude-sonnet-4-5", provider: "anthropic" as AIProvider };
+          const fallbackConfig = { ...config, model: "claude-haiku-4-5", provider: "anthropic" as AIProvider };
           return await runAnthropicAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, anthropicKey, process.env.ANTHROPIC_BASE_URL);
         }
       } else {
         const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
         if (openaiKey) {
-          const fallbackConfig = { ...config, model: "gpt-4o", provider: "openai" as AIProvider };
+          const fallbackConfig = { ...config, model: "gpt-4o-mini", provider: "openai" as AIProvider };
           return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, openaiKey, process.env.OPENAI_BASE_URL);
         }
       }

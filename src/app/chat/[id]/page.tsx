@@ -26,6 +26,7 @@ export default async function ConversationPage({ params }: PageProps) {
     toolCalls?: string | null;
   }[] = [];
 
+  let projectId: string | undefined;
   let projectName: string | undefined;
 
   // Try database first
@@ -43,6 +44,10 @@ export default async function ConversationPage({ params }: PageProps) {
           content: m.content,
           toolCalls: m.toolCalls,
         }));
+        // Get projectId from the conversation record
+        if ((conversation as { projectId?: string | null }).projectId) {
+          projectId = (conversation as { projectId?: string | null }).projectId!;
+        }
       }
     } catch (err) {
       console.error("Conversation load error:", err);
@@ -67,33 +72,39 @@ export default async function ConversationPage({ params }: PageProps) {
     }
   }
 
-  // Try to get project name from conversation metadata
-  try {
-    const convStore = getStore("conversations");
-    const convList = await convStore.get(`user:${userId}`, { type: "json" }) as { id: string; projectId?: string | null }[] | null;
-    const conv = convList?.find(c => c.id === id);
-    if (conv?.projectId) {
-      // Look up project name
-      if (getDatabaseUrl()) {
-        try {
-          const project = await db.project.findFirst({
-            where: { id: conv.projectId, userId },
-            select: { name: true },
-          });
-          if (project) projectName = project.name;
-        } catch { /* ignore */ }
+  // Try to get project info from conversation metadata (Blobs)
+  if (!projectId) {
+    try {
+      const convStore = getStore("conversations");
+      const convList = await convStore.get(`user:${userId}`, { type: "json" }) as { id: string; projectId?: string | null }[] | null;
+      const conv = convList?.find(c => c.id === id);
+      if (conv?.projectId) {
+        projectId = conv.projectId;
       }
-      if (!projectName) {
-        try {
-          const projStore = getStore("projects");
-          const projects = await projStore.get(`user:${userId}`, { type: "json" }) as { id: string; name: string }[] | null;
-          const proj = projects?.find(p => p.id === conv.projectId);
-          if (proj) projectName = proj.name;
-        } catch { /* ignore */ }
-      }
+    } catch {
+      // Non-critical
     }
-  } catch {
-    // Non-critical
+  }
+
+  // Look up project name if we have a projectId
+  if (projectId) {
+    if (getDatabaseUrl()) {
+      try {
+        const project = await db.project.findFirst({
+          where: { id: projectId, userId },
+          select: { name: true },
+        });
+        if (project) projectName = project.name;
+      } catch { /* ignore */ }
+    }
+    if (!projectName) {
+      try {
+        const projStore = getStore("projects");
+        const projects = await projStore.get(`user:${userId}`, { type: "json" }) as { id: string; name: string }[] | null;
+        const proj = projects?.find(p => p.id === projectId);
+        if (proj) projectName = proj.name;
+      } catch { /* ignore */ }
+    }
   }
 
   return (
@@ -101,6 +112,7 @@ export default async function ConversationPage({ params }: PageProps) {
       <ChatInterface
         conversationId={id}
         initialMessages={initialMessages}
+        projectId={projectId}
         projectName={projectName}
       />
     </MainLayout>

@@ -48,9 +48,74 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     notFound();
   }
 
+  // Try to load the latest conversation for this project so the user sees their previous work
+  let latestConversationId: string | undefined;
+  let initialMessages: {
+    id?: string;
+    role: "user" | "assistant" | "system" | "tool";
+    content: string;
+    toolCalls?: string | null;
+  }[] = [];
+
+  // Check DB for conversations linked to this project
+  if (getDatabaseUrl()) {
+    try {
+      const conv = await db.conversation.findFirst({
+        where: { userId, projectId: id },
+        orderBy: { updatedAt: "desc" },
+        include: { messages: { orderBy: { createdAt: "asc" } } },
+      });
+      if (conv) {
+        latestConversationId = conv.id;
+        initialMessages = conv.messages.map((m) => ({
+          id: m.id,
+          role: m.role as "user" | "assistant" | "system" | "tool",
+          content: m.content,
+          toolCalls: m.toolCalls,
+        }));
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Also check Blobs for conversations linked to this project
+  if (!latestConversationId) {
+    try {
+      const convStore = getStore("conversations");
+      const convList = await convStore.get(`user:${userId}`, { type: "json" }) as { id: string; projectId?: string | null; updatedAt: string }[] | null;
+      const projectConvs = convList?.filter(c => c.projectId === id).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      if (projectConvs && projectConvs.length > 0) {
+        latestConversationId = projectConvs[0].id;
+        // Load messages from Blobs
+        try {
+          const msgStore = getStore("conversation-messages");
+          const storedMessages = await msgStore.get(`conv:${latestConversationId}`, { type: "json" }) as { role: string; content: string; createdAt: string }[] | null;
+          if (storedMessages && storedMessages.length > 0) {
+            initialMessages = storedMessages.map((m, idx) => ({
+              id: `blob-msg-${idx}`,
+              role: m.role as "user" | "assistant" | "system" | "tool",
+              content: m.content,
+              toolCalls: null,
+            }));
+          }
+        } catch {
+          // Messages not available
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return (
     <MainLayout>
-      <ChatInterface projectId={project.id} projectName={project.name} />
+      <ChatInterface
+        conversationId={latestConversationId}
+        initialMessages={initialMessages}
+        projectId={project.id}
+        projectName={project.name}
+      />
     </MainLayout>
   );
 }

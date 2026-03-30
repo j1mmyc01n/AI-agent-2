@@ -41,7 +41,7 @@ interface AgentMonitorProps {
   onStop?: () => void;
 }
 
-const STALL_THRESHOLD_MS = 90_000; // 90 seconds without activity = stalled
+const STALL_THRESHOLD_MS = 45_000; // 45 seconds without activity = stalled
 
 export default function AgentMonitor({
   isLoading,

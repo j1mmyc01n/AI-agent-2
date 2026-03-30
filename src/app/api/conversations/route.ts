@@ -40,18 +40,14 @@ export async function GET() {
         select: {
           id: true,
           title: true,
+          projectId: true,
           createdAt: true,
           updatedAt: true,
           _count: { select: { messages: true } },
         },
       });
 
-      // DB schema doesn't have projectId yet - add null for frontend compatibility
-      const withProjectId = conversations.map(c => ({
-        ...c,
-        projectId: null,
-      }));
-      return NextResponse.json(withProjectId);
+      return NextResponse.json(conversations);
     } catch (error) {
       console.error("Database error in GET /api/conversations:", error);
       // Fall through to Blobs
