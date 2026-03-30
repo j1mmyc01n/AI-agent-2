@@ -290,6 +290,7 @@ export default function ChatInterface({
     currentIdx: number;
   } | null>(null);
   const streamingContentRef = useRef("");
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Load user's default model preference and configured keys
   useEffect(() => {
@@ -472,9 +473,13 @@ export default function ChatInterface({
       }
 
       try {
+        const abortController = new AbortController();
+        abortControllerRef.current = abortController;
+
         const response = await fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
+          signal: abortController.signal,
           body: JSON.stringify({
             message: content,
             conversationId: currentConversationId,
@@ -634,8 +639,22 @@ export default function ChatInterface({
           }
         }
       } catch (error) {
+        abortControllerRef.current = null;
         setIsLoading(false);
         setAgentStatus("idle");
+
+        // If user aborted, keep streaming content and don't show error
+        if (error instanceof DOMException && error.name === "AbortError") {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.isStreaming
+                ? { ...m, isStreaming: false, streamingToolCalls: undefined }
+                : m
+            )
+          );
+          return;
+        }
+
         setMessages((prev) => prev.filter((m) => !m.isStreaming));
 
         if (chatMode === "build") {
@@ -652,6 +671,27 @@ export default function ChatInterface({
     },
     [isLoading, currentConversationId, initialConversationId, projectId, messages, chatMode, parseWorkflowTasks, updateAgentTasks]
   );
+
+  const handleStop = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsLoading(false);
+    setAgentStatus("idle");
+    // Finalize any streaming message
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.isStreaming
+          ? { ...m, isStreaming: false, streamingToolCalls: undefined }
+          : m
+      )
+    );
+    if (chatMode === "build" || chatMode === "saas-upgrade") {
+      updateAgentTasks("idle");
+    }
+    userHasManuallySelectedPanel.current = false;
+  }, [chatMode, updateAgentTasks]);
 
   const sendMessage = useCallback(
     async (content: string, model: AIModel) => {
@@ -829,6 +869,7 @@ export default function ChatInterface({
         codeBlockCount={codeBlocks.length}
         toolCallCount={toolCallCount}
         onNudge={handleQuickPrompt}
+        onStop={handleStop}
       />
 
       {/* Panel content */}

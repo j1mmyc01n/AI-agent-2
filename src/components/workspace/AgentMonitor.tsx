@@ -12,6 +12,8 @@ import {
   Shield,
   ChevronDown,
   ChevronUp,
+  Square,
+  Play,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -36,6 +38,7 @@ interface AgentMonitorProps {
   toolCallCount: number;
   onRetry?: () => void;
   onNudge?: (prompt: string) => void;
+  onStop?: () => void;
 }
 
 const STALL_THRESHOLD_MS = 90_000; // 90 seconds without activity = stalled
@@ -48,6 +51,7 @@ export default function AgentMonitor({
   toolCallCount,
   onRetry,
   onNudge,
+  onStop,
 }: AgentMonitorProps) {
   const [metrics, setMetrics] = useState<AgentMetrics>({
     status: "idle",
@@ -214,6 +218,34 @@ export default function AgentMonitor({
               </span>
             </div>
           )}
+
+          {/* Always-visible action buttons */}
+          <div className="flex items-center gap-1">
+            {(isLoading || agentStatus !== "idle") && onStop && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[10px] border-red-500/30 hover:bg-red-500/10 text-red-400"
+                onClick={(e) => { e.stopPropagation(); onStop(); }}
+                title="Stop/pause the agent"
+              >
+                <Square className="h-2.5 w-2.5 mr-1 fill-current" />
+                Stop
+              </Button>
+            )}
+            {!(isLoading || agentStatus !== "idle") && messageCount > 0 && onNudge && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[10px] border-primary/30 hover:bg-primary/10 text-primary"
+                onClick={(e) => { e.stopPropagation(); handleNudge(); }}
+                title="Nudge the agent to continue working"
+              >
+                <Play className="h-2.5 w-2.5 mr-1 fill-current" />
+                Nudge
+              </Button>
+            )}
+          </div>
 
           {expanded ? (
             <ChevronUp className="h-3 w-3 text-muted-foreground/40" />

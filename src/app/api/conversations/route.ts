@@ -46,7 +46,12 @@ export async function GET() {
         },
       });
 
-      return NextResponse.json(conversations);
+      // DB schema doesn't have projectId yet - add null for frontend compatibility
+      const withProjectId = conversations.map(c => ({
+        ...c,
+        projectId: null,
+      }));
+      return NextResponse.json(withProjectId);
     } catch (error) {
       console.error("Database error in GET /api/conversations:", error);
       // Fall through to Blobs
