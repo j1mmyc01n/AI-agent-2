@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
   SendHorizonal,
+  Wand2,
+  Loader2,
   Layout,
   ShoppingCart,
   BarChart3,
@@ -102,6 +104,13 @@ const BUILD_IDEAS = [
   },
 ];
 
+// Split ideas into two rows for alternating scroll
+const ROW1_IDEAS = BUILD_IDEAS.filter((_, i) => i < 5);
+const ROW2_IDEAS = BUILD_IDEAS.filter((_, i) => i >= 5);
+// Duplicate for seamless loop
+const ROW1_DOUBLED = [...ROW1_IDEAS, ...ROW1_IDEAS];
+const ROW2_DOUBLED = [...ROW2_IDEAS, ...ROW2_IDEAS];
+
 export default function MessageInput({
   onSend,
   isLoading = false,
@@ -112,6 +121,7 @@ export default function MessageInput({
   showSuggestions = false,
 }: MessageInputProps) {
   const [message, setMessage] = useState("");
+  const [isEnhancing, setIsEnhancing] = useState(false);
   const [internalModel, setInternalModel] = useState<AIModel>(DEFAULT_MODEL);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -142,7 +152,7 @@ export default function MessageInput({
     const el = textareaRef.current;
     if (el) {
       el.style.height = "auto";
-      const maxH = window.innerHeight < 700 ? 80 : 120;
+      const maxH = window.innerHeight < 700 ? 120 : 200;
       el.style.height = Math.min(el.scrollHeight, maxH) + "px";
     }
   };
@@ -152,15 +162,47 @@ export default function MessageInput({
     onSend(prompt, activeModel);
   };
 
+  const enhancePrompt = async () => {
+    const text = message.trim();
+    if (!text || isEnhancing || isLoading) return;
+    setIsEnhancing(true);
+    try {
+      const res = await fetch("/api/enhance", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: text }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.enhanced) {
+          setMessage(data.enhanced);
+          // Auto-resize textarea
+          setTimeout(() => {
+            const el = textareaRef.current;
+            if (el) {
+              el.style.height = "auto";
+              const maxH = window.innerHeight < 700 ? 120 : 200;
+              el.style.height = Math.min(el.scrollHeight, maxH) + "px";
+            }
+          }, 50);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to enhance prompt:", err);
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
   return (
     <div
-      className="border-t border-border/50 bg-card/30 backdrop-blur-sm p-1.5 sm:p-2 shrink-0"
+      className="border-t border-border/50 bg-card/30 backdrop-blur-sm p-2 sm:p-3 shrink-0"
       style={{
         paddingBottom: "max(0.75rem, env(safe-area-inset-bottom, 0.75rem))",
       }}
     >
-      <div className="max-w-3xl mx-auto">
-        <div className="flex flex-col bg-background border border-border/50 rounded-xl p-1.5 gap-1 shadow-sm focus-within:border-primary/30 focus-within:shadow-md focus-within:shadow-primary/5 transition-all">
+      <div className="w-full max-w-5xl mx-auto px-2 sm:px-4">
+        <div className="flex flex-col bg-background border border-border/50 rounded-xl p-2 sm:p-3 gap-1.5 shadow-sm focus-within:border-primary/30 focus-within:shadow-md focus-within:shadow-primary/5 transition-all">
           {/* Model selector row */}
           <div className="flex items-center gap-2 px-1">
             <ModelSelector
@@ -179,34 +221,67 @@ export default function MessageInput({
               placeholder={placeholder}
               disabled={isLoading || disabled}
               rows={1}
-              className="flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[40px] max-h-[100px] py-2 px-1 text-base sm:text-sm leading-snug"
+              className="flex-1 bg-transparent border-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[60px] max-h-[200px] py-3 px-2 text-base sm:text-base leading-relaxed"
             />
+            <Button
+              onClick={enhancePrompt}
+              disabled={!message.trim() || isEnhancing || isLoading || disabled}
+              size="icon"
+              variant="ghost"
+              className="h-10 w-10 shrink-0 rounded-lg text-muted-foreground hover:text-primary hover:bg-primary/10 transition-all"
+              title="Enhance prompt with AI"
+            >
+              {isEnhancing ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Wand2 className="h-4 w-4" />
+              )}
+            </Button>
             <Button
               onClick={handleSend}
               disabled={!message.trim() || isLoading || disabled}
               size="icon"
-              className="h-9 w-9 shrink-0 rounded-lg bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20 disabled:shadow-none"
+              className="h-10 w-10 shrink-0 rounded-lg bg-primary hover:bg-primary/90 shadow-sm shadow-primary/20 disabled:shadow-none"
             >
-              <SendHorizonal className="h-4 w-4" />
+              <SendHorizonal className="h-5 w-5" />
             </Button>
           </div>
         </div>
 
-        {/* Build idea thumbnails - shown below chat box */}
+        {/* Build idea marquee - two rows scrolling in opposite directions */}
         {showSuggestions && (
-          <div className="mt-2 mb-0.5">
-            <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
-              {BUILD_IDEAS.map((idea, i) => (
-                <button
-                  key={i}
-                  onClick={() => handleIdeaClick(idea.prompt)}
-                  disabled={isLoading || disabled}
-                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer disabled:opacity-50 ${idea.bg}`}
-                >
-                  <idea.icon className={`h-3 w-3 ${idea.color}`} />
-                  <span className="text-foreground/80">{idea.label}</span>
-                </button>
-              ))}
+          <div className="mt-3 mb-1 space-y-2 overflow-hidden">
+            {/* Row 1: scrolls right to left */}
+            <div className="relative overflow-hidden mask-marquee">
+              <div className="flex gap-2 animate-marquee-rtl w-max">
+                {ROW1_DOUBLED.map((idea, i) => (
+                  <button
+                    key={`r1-${i}`}
+                    onClick={() => handleIdeaClick(idea.prompt)}
+                    disabled={isLoading || disabled}
+                    className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer disabled:opacity-50 hover:scale-105 hover:shadow-md ${idea.bg}`}
+                  >
+                    <idea.icon className={`h-4 w-4 ${idea.color}`} />
+                    <span className="text-foreground/80">{idea.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Row 2: scrolls left to right */}
+            <div className="relative overflow-hidden mask-marquee">
+              <div className="flex gap-2 animate-marquee-ltr w-max">
+                {ROW2_DOUBLED.map((idea, i) => (
+                  <button
+                    key={`r2-${i}`}
+                    onClick={() => handleIdeaClick(idea.prompt)}
+                    disabled={isLoading || disabled}
+                    className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-sm font-medium whitespace-nowrap transition-all shrink-0 cursor-pointer disabled:opacity-50 hover:scale-105 hover:shadow-md ${idea.bg}`}
+                  >
+                    <idea.icon className={`h-4 w-4 ${idea.color}`} />
+                    <span className="text-foreground/80">{idea.label}</span>
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

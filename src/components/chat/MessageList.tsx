@@ -119,39 +119,29 @@ function formatContent(content: string) {
   const lines = content.split("\n");
   const elements: React.ReactNode[] = [];
   let inCodeBlock = false;
-  let codeLines: string[] = [];
   let codeLanguage = "";
 
   lines.forEach((line, i) => {
     if (line.startsWith("```")) {
       if (!inCodeBlock) {
         inCodeBlock = true;
-        codeLanguage = line.slice(3).trim();
-        codeLines = [];
+        codeLanguage = line.slice(3).split(":")[0].trim();
       } else {
         inCodeBlock = false;
+        // Show a compact reference instead of inline code
         elements.push(
-          <div key={`code-${i}`} className="my-3">
-            {codeLanguage && (
-              <div className="bg-zinc-700 text-zinc-300 text-xs px-3 py-1 rounded-t-md flex items-center gap-1.5">
-                <Code2 className="h-3 w-3" />
-                {codeLanguage}
-              </div>
-            )}
-            <pre className="bg-zinc-800 text-zinc-100 p-3 rounded-b-md overflow-x-auto text-xs leading-relaxed">
-              <code>{codeLines.join("\n")}</code>
-            </pre>
+          <div key={`code-ref-${i}`} className="my-1.5 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-primary/5 border border-primary/15 text-[11px] text-primary/80">
+            <Code2 className="h-3 w-3" />
+            <span>{codeLanguage || "code"} — view in Code tab</span>
           </div>
         );
-        codeLines = [];
         codeLanguage = "";
       }
       return;
     }
 
     if (inCodeBlock) {
-      codeLines.push(line);
-      return;
+      return; // Skip code block content in chat view
     }
 
     if (line.startsWith("### ")) {

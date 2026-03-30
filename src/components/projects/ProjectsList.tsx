@@ -489,8 +489,8 @@ export default function ProjectsList() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((project) => (
               <Card key={project.id} className="border-border/50 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group overflow-hidden">
-                {/* Clickable project thumbnail - navigates to chat with this project */}
-                <Link href={`/chat?project=${project.id}`} className="block cursor-pointer">
+                {/* Clickable project thumbnail - navigates to project workspace */}
+                <Link href={`/projects/${project.id}`} className="block cursor-pointer">
                   <ProjectThumbnail project={project} />
                 </Link>
 
@@ -517,7 +517,7 @@ export default function ProjectsList() {
                         </Button>
                       </div>
                     ) : (
-                      <Link href={`/chat?project=${project.id}`} className="flex-1 min-w-0">
+                      <Link href={`/projects/${project.id}`} className="flex-1 min-w-0">
                         <CardTitle className="text-base leading-tight truncate hover:text-primary transition-colors cursor-pointer">
                           {project.name}
                         </CardTitle>
@@ -586,11 +586,11 @@ export default function ProjectsList() {
                       </a>
                     )}
                     <Link
-                      href={`/chat?project=${project.id}`}
+                      href={`/projects/${project.id}`}
                       className="inline-flex items-center gap-1 text-[11px] text-primary border border-primary/20 rounded-md px-2 py-0.5 hover:bg-primary/10 transition-all font-medium"
                     >
                       <MessageSquare className="h-3 w-3" />
-                      Build with AI
+                      Open Project
                     </Link>
                   </div>
                   <p className="text-[11px] text-muted-foreground mt-2">

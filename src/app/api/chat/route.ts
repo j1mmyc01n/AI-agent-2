@@ -239,6 +239,7 @@ export async function POST(req: NextRequest) {
             data: {
               userId,
               title: generateShortTitle(message),
+              projectId: projectId || null,
             },
             include: { messages: true },
           });
@@ -296,13 +297,13 @@ export async function POST(req: NextRequest) {
         // Set a timeout to prevent stalling
         const timeout = setTimeout(() => {
           try {
-            const errorData = JSON.stringify({ type: "error", error: "Request timed out. The AI provider may be unavailable. Please try again or switch to a different model in the model selector." });
+            const errorData = JSON.stringify({ type: "error", error: "Request timed out after 60 seconds. Try again or switch to a faster model like Claude Haiku or GPT-4o mini." });
             controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
             controller.close();
           } catch {
             // Controller may already be closed
           }
-        }, 120000); // 2 minute timeout
+        }, 60000); // 60 second timeout (reduced from 2 min)
 
         try {
           await runAgent(

@@ -41,6 +41,8 @@ interface Conversation {
 interface Project {
   id: string;
   name: string;
+  type?: string;
+  status?: string;
 }
 
 interface ConversationSidebarProps {
@@ -231,7 +233,7 @@ export default function ConversationSidebar({
         )}
       </div>
 
-      {/* Conversations list */}
+      {/* Projects & Conversations list */}
       {!collapsed && (
         <ScrollArea className="flex-1 py-2">
           {loading ? (
@@ -242,30 +244,115 @@ export default function ConversationSidebar({
                 <div className="h-1.5 w-1.5 rounded-full bg-primary agent-dot-3" />
               </div>
             </div>
-          ) : conversations.length === 0 ? (
-            <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-              <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-20" />
-              <p className="text-xs">No conversations yet</p>
-              <p className="text-xs opacity-60 mt-0.5">Start a new chat!</p>
-            </div>
           ) : (
-            <div className="space-y-1">
-              {/* Header with clear all */}
-              <div className="flex items-center justify-between px-3 mb-1">
-                <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
-                  Conversations ({conversations.length})
-                </span>
-                <button
-                  onClick={handleClearAll}
-                  disabled={clearingAll}
-                  className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-destructive transition-colors"
-                  title="Clear all conversations"
-                >
-                  <Eraser className="h-3 w-3" />
-                  <span>{clearingAll ? "Clearing..." : "Clear all"}</span>
-                </button>
-              </div>
-              {conversations.map(renderConversation)}
+            <div className="space-y-3">
+              {/* Projects section - prominently listed */}
+              {projects.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between px-3 mb-1.5">
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
+                      Projects ({projects.length})
+                    </span>
+                    <Link href="/projects">
+                      <span className="text-[10px] text-primary/60 hover:text-primary transition-colors cursor-pointer">View all</span>
+                    </Link>
+                  </div>
+                  <div className="space-y-0.5">
+                    {projects.map((project) => {
+                      const projectConvs = conversations.filter(c => c.projectId === project.id);
+                      const isOnProjectPage = pathname === `/projects/${project.id}`;
+                      return (
+                        <div key={project.id}>
+                          <Link
+                            href={`/projects/${project.id}`}
+                            className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg mx-1 transition-colors ${
+                              isOnProjectPage
+                                ? "bg-primary/15 text-primary border border-primary/20"
+                                : "text-foreground/80 hover:bg-accent hover:text-foreground"
+                            }`}
+                          >
+                            <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary/70" />
+                            <span className="truncate flex-1 text-xs font-medium">{project.name}</span>
+                            {project.status && (
+                              <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
+                                project.status === "active" ? "bg-green-400" : "bg-muted-foreground/40"
+                              }`} />
+                            )}
+                          </Link>
+                          {/* Conversations belonging to this project - nested */}
+                          {projectConvs.length > 0 && (
+                            <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/30 pl-2">
+                              {projectConvs.map((conv) => (
+                                <div key={conv.id} className="group relative">
+                                  <Link
+                                    href={`/chat/${conv.id}`}
+                                    className={`flex items-center gap-2 px-2 py-1 text-xs rounded-md transition-colors ${
+                                      currentConversationId === conv.id
+                                        ? "bg-primary/10 text-primary"
+                                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
+                                    }`}
+                                  >
+                                    <MessageSquare className="h-3 w-3 shrink-0 opacity-50" />
+                                    <span className="truncate flex-1">{conv.title}</span>
+                                  </Link>
+                                  <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button
+                                      onClick={(e) => handleDelete(conv.id, e)}
+                                      disabled={deletingId === conv.id}
+                                      className="h-4 w-4 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                                      title="Delete conversation"
+                                    >
+                                      <Trash2 className="h-2.5 w-2.5" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Unlinked conversations (not attached to a project) */}
+              {(() => {
+                const projectIds = new Set(projects.map(p => p.id));
+                const unlinkedConvs = conversations.filter(c => !c.projectId || !projectIds.has(c.projectId));
+                if (unlinkedConvs.length === 0 && projects.length > 0) return null;
+                return (
+                  <div>
+                    <div className="flex items-center justify-between px-3 mb-1">
+                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
+                        Chats ({unlinkedConvs.length})
+                      </span>
+                      {unlinkedConvs.length > 0 && (
+                        <button
+                          onClick={handleClearAll}
+                          disabled={clearingAll}
+                          className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-destructive transition-colors"
+                          title="Clear all conversations"
+                        >
+                          <Eraser className="h-3 w-3" />
+                          <span>{clearingAll ? "Clearing..." : "Clear all"}</span>
+                        </button>
+                      )}
+                    </div>
+                    {unlinkedConvs.length === 0 ? (
+                      <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                        <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-20" />
+                        <p className="text-xs">No conversations yet</p>
+                        <p className="text-xs opacity-60 mt-0.5">Start a new chat!</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-0.5">
+                        {unlinkedConvs.map(renderConversation)}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </ScrollArea>

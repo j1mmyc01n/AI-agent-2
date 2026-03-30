@@ -40,6 +40,7 @@ export async function GET() {
         select: {
           id: true,
           title: true,
+          projectId: true,
           createdAt: true,
           updatedAt: true,
           _count: { select: { messages: true } },
