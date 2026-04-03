@@ -3,24 +3,18 @@
 import { useState, useEffect } from "react";
 import ConversationSidebar from "@/components/chat/ConversationSidebar";
 import { Button } from "@/components/ui/button";
-import { Menu, X, ChevronLeft, ChevronRight, Code2, ListTodo, Eye, MessageSquare, Bot } from "lucide-react";
+import { Menu, X, ChevronLeft, ChevronRight, Bot } from "lucide-react";
 
 export type PanelView = "chat" | "code" | "todo" | "preview";
 
 interface MainLayoutProps {
   children: React.ReactNode;
   currentConversationId?: string;
-  activePanel?: PanelView;
-  onPanelChange?: (panel: PanelView) => void;
-  showPanelTabs?: boolean;
 }
 
 export default function MainLayout({
   children,
   currentConversationId,
-  activePanel = "chat",
-  onPanelChange,
-  showPanelTabs = false,
 }: MainLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -37,19 +31,12 @@ export default function MainLayout({
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
-  const panelTabs = [
-    { id: "chat" as PanelView, label: "Chat", icon: MessageSquare },
-    { id: "code" as PanelView, label: "Code", icon: Code2 },
-    { id: "todo" as PanelView, label: "Tasks", icon: ListTodo },
-    { id: "preview" as PanelView, label: "Preview", icon: Eye },
-  ];
-
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-background" style={{ height: "100dvh", maxHeight: "100dvh" }}>
       {/* Mobile overlay */}
       {sidebarOpen && isMobile && (
         <div
-          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -80,7 +67,7 @@ export default function MainLayout({
           <Button
             variant="ghost"
             size="icon"
-            className="absolute -right-3 top-4 z-50 h-6 w-6 rounded-full border bg-background shadow-md hover:bg-accent"
+            className="absolute -right-3 top-4 z-50 h-6 w-6 rounded-full border border-border/50 bg-background shadow-md hover:bg-accent hover:shadow-lg transition-all"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
           >
             {sidebarCollapsed ? (
@@ -93,63 +80,43 @@ export default function MainLayout({
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         {/* Top header bar */}
-        <header className="relative flex items-center justify-between px-4 border-b bg-background shrink-0 h-14">
-          {/* Left: mobile menu toggle + title */}
+        <header className="relative flex items-center justify-between px-4 border-b border-border/50 bg-card/30 backdrop-blur-sm shrink-0 h-11">
+          {/* Left: mobile menu toggle */}
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="md:hidden h-8 w-8"
               onClick={() => setSidebarOpen(!sidebarOpen)}
             >
               {sidebarOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
             <div className="flex items-center gap-2 md:hidden">
-              <Bot className="h-5 w-5 text-primary" />
-              <span className="font-bold text-base bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">
+              <div className="h-6 w-6 rounded-md bg-primary/15 flex items-center justify-center">
+                <Bot className="h-3.5 w-3.5 text-primary" />
+              </div>
+              <span className="font-bold text-sm bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
                 DoBetter Viber
               </span>
             </div>
           </div>
 
-          {/* Center: DoBetter Viber title on desktop */}
+          {/* Center: title on desktop */}
           <div className="hidden md:flex items-center gap-2 absolute left-1/2 -translate-x-1/2">
-            <Bot className="h-5 w-5 text-primary" />
-            <span className="font-bold text-lg bg-gradient-to-r from-primary to-blue-500 bg-clip-text text-transparent">
+            <div className="h-6 w-6 rounded-md bg-primary/15 flex items-center justify-center">
+              <Bot className="h-3.5 w-3.5 text-primary" />
+            </div>
+            <span className="font-bold text-sm bg-gradient-to-r from-blue-400 to-blue-600 bg-clip-text text-transparent">
               DoBetter Viber
             </span>
           </div>
 
-          {/* Right: Panel view tabs */}
-          <div className="ml-auto">
-            {showPanelTabs ? (
-              <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
-                {panelTabs.map(({ id, label, icon: Icon }) => (
-                  <Button
-                    key={id}
-                    variant={activePanel === id ? "default" : "ghost"}
-                    size="sm"
-                    className={`gap-1.5 px-2.5 h-8 text-xs font-medium transition-all ${
-                      activePanel === id ? "shadow-sm" : "hover:bg-background/60"
-                    }`}
-                    onClick={() => onPanelChange?.(id)}
-                    title={label}
-                  >
-                    <Icon className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">{label}</span>
-                  </Button>
-                ))}
-              </div>
-            ) : (
-              <div />
-            )}
-          </div>
         </header>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">{children}</div>
+        <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
       </div>
     </div>
   );

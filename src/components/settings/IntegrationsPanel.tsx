@@ -25,6 +25,7 @@ import {
   Database,
   Cloud,
   Cpu,
+  Star,
 } from "lucide-react";
 
 interface IntegrationStatus {
@@ -44,6 +45,8 @@ interface IntegrationStatus {
   tavilyKey: string | null;
   neonKey: string | null;
   netlifyToken: string | null;
+  defaultModel: string | null;
+  defaultProvider: string | null;
 }
 
 type StatusKey = keyof Pick<
@@ -78,6 +81,8 @@ interface Integration {
   helpText: string;
   statusKey: StatusKey;
   category: "ai-models" | "integrations" | "connectivity";
+  defaultModel?: string;
+  defaultProvider?: string;
 }
 
 const integrations: Integration[] = [
@@ -91,17 +96,21 @@ const integrations: Integration[] = [
     helpText: "Get your API key from OpenAI Platform",
     statusKey: "hasOpenaiKey",
     category: "ai-models",
+    defaultModel: "gpt-4o",
+    defaultProvider: "openai",
   },
   {
     id: "anthropicKey",
     title: "Anthropic (Claude)",
-    description: "Powers Claude 3.5 Sonnet, Claude 3 Opus and Haiku models.",
+    description: "Powers Claude Sonnet 4.5, Claude Haiku and more. Also available via Netlify AI Gateway.",
     icon: <Cpu className="h-5 w-5" />,
     placeholder: "sk-ant-...",
     helpUrl: "https://console.anthropic.com/settings/keys",
     helpText: "Get your API key from Anthropic Console",
     statusKey: "hasAnthropicKey",
     category: "ai-models",
+    defaultModel: "claude-sonnet-4-5",
+    defaultProvider: "anthropic",
   },
   {
     id: "grokKey",
@@ -113,6 +122,8 @@ const integrations: Integration[] = [
     helpText: "Get your API key from xAI Console",
     statusKey: "hasGrokKey",
     category: "ai-models",
+    defaultModel: "grok-2-latest",
+    defaultProvider: "grok",
   },
   {
     id: "githubToken",
@@ -191,6 +202,7 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
   const [values, setValues] = useState<Record<ValueKey, string>>(emptyValues);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [settingDefault, setSettingDefault] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchStatus = async () => {
@@ -219,6 +231,24 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
     fetchStatus();
   }, []);
 
+  const refreshStatus = async () => {
+    const statusRes = await fetch("/api/integrations");
+    if (statusRes.ok) {
+      const data = await statusRes.json();
+      setStatus(data);
+      setValues({
+        openaiKey: data.openaiKey || "",
+        anthropicKey: data.anthropicKey || "",
+        grokKey: data.grokKey || "",
+        githubToken: data.githubToken || "",
+        vercelToken: data.vercelToken || "",
+        tavilyKey: data.tavilyKey || "",
+        neonKey: data.neonKey || "",
+        netlifyToken: data.netlifyToken || "",
+      });
+    }
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -228,36 +258,85 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
         body: JSON.stringify(values),
       });
 
-      if (!res.ok) throw new Error("Failed to save");
-
-      const statusRes = await fetch("/api/integrations");
-      if (statusRes.ok) {
-        const data = await statusRes.json();
-        setStatus(data);
-        setValues({
-          openaiKey: data.openaiKey || "",
-          anthropicKey: data.anthropicKey || "",
-          grokKey: data.grokKey || "",
-          githubToken: data.githubToken || "",
-          vercelToken: data.vercelToken || "",
-          tavilyKey: data.tavilyKey || "",
-          neonKey: data.neonKey || "",
-          netlifyToken: data.netlifyToken || "",
-        });
+      const result = await res.json();
+      if (!res.ok || result.success === false) {
+        throw new Error(result.error || "Failed to save");
       }
+
+      await refreshStatus();
 
       toast({
         title: "Settings saved",
         description: "Your API keys have been securely saved.",
       });
-    } catch {
+    } catch (err) {
       toast({
         title: "Error",
-        description: "Failed to save settings. Please try again.",
+        description: err instanceof Error ? err.message : "Failed to save settings. Please try again.",
         variant: "destructive",
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleRemoveKey = async (keyId: ValueKey) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [keyId]: "" }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.success === false) {
+        throw new Error(result.error || "Failed to remove key");
+      }
+      await refreshStatus();
+      toast({
+        title: "Key removed",
+        description: "The API key has been removed.",
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to remove key.",
+        variant: "destructive",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSetDefault = async (integration: Integration) => {
+    if (!integration.defaultModel || !integration.defaultProvider) return;
+    setSettingDefault(integration.id);
+    try {
+      const res = await fetch("/api/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          defaultModel: integration.defaultModel,
+          defaultProvider: integration.defaultProvider,
+        }),
+      });
+      const result = await res.json();
+      if (!res.ok || result.success === false) {
+        throw new Error(result.error || "Failed to set default");
+      }
+      await refreshStatus();
+      toast({
+        title: "Default model updated",
+        description: `${integration.title} is now your default AI provider.`,
+      });
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "Failed to set default.",
+        variant: "destructive",
+      });
+    } finally {
+      setSettingDefault(null);
     }
   };
 
@@ -296,14 +375,23 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
       <div className="space-y-4">
         {filteredIntegrations.map((integration) => {
           const isConnected = status?.[integration.statusKey] || false;
+          const isDefault = status?.defaultProvider === integration.defaultProvider && !!integration.defaultProvider;
           return (
-            <Card key={integration.id}>
+            <Card key={integration.id} className={isDefault ? "ring-2 ring-primary/30" : ""}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2 rounded-lg bg-muted">{integration.icon}</div>
                     <div>
-                      <CardTitle className="text-base">{integration.title}</CardTitle>
+                      <CardTitle className="text-base flex items-center gap-2">
+                        {integration.title}
+                        {isDefault && (
+                          <Badge variant="default" className="bg-primary text-[10px] h-5 px-1.5">
+                            <Star className="h-2.5 w-2.5 mr-0.5 fill-current" />
+                            Default
+                          </Badge>
+                        )}
+                      </CardTitle>
                       <CardDescription className="text-xs mt-0.5">
                         {integration.description}
                       </CardDescription>
@@ -338,15 +426,47 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
                   }
                   className="font-mono text-sm"
                 />
-                <a
-                  href={integration.helpUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                  {integration.helpText}
-                </a>
+                <div className="flex items-center justify-between">
+                  <a
+                    href={integration.helpUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                  >
+                    <ExternalLink className="h-3 w-3" />
+                    {integration.helpText}
+                  </a>
+                  <div className="flex items-center gap-1">
+                    {/* Set as Default button for AI model keys */}
+                    {isConnected && integration.defaultModel && !isDefault && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1"
+                        onClick={() => handleSetDefault(integration)}
+                        disabled={settingDefault === integration.id}
+                      >
+                        {settingDefault === integration.id ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <Star className="h-3 w-3" />
+                        )}
+                        Set Default
+                      </Button>
+                    )}
+                    {isConnected && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleRemoveKey(integration.id)}
+                        disabled={saving}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                </div>
               </CardContent>
             </Card>
           );
