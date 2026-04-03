@@ -97,7 +97,23 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
       }
     }
   }
-  return blocks;
+
+  // Deduplicate named files: keep the last occurrence of each filename across all messages.
+  // This prevents files from appearing multiple times when the agent is nudged and re-generates
+  // the same files in a subsequent message.
+  const normalizeFilename = (name: string) =>
+    name.replace(/\s*\(generating\.\.\.\)\s*/i, "").toLowerCase().trim();
+
+  const namedLastIdx = new Map<string, number>();
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].filename) {
+      namedLastIdx.set(normalizeFilename(blocks[i].filename!), i);
+    }
+  }
+  return blocks.filter((block, i) => {
+    if (!block.filename) return true; // keep unnamed blocks as-is
+    return namedLastIdx.get(normalizeFilename(block.filename)) === i;
+  });
 }
 
 // Extract todo items from assistant messages
@@ -638,6 +654,19 @@ export default function ChatInterface({
             }
           }
         }
+
+        // Stream closed — ensure any message still flagged as streaming is finalized.
+        // This handles the case where the connection drops or the server closes the
+        // stream without sending a "done" event, which would otherwise leave the
+        // "(generating...)" file permanently stuck in the sidebar and the preview
+        // frozen in "BUILDING" mode.
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.isStreaming ? { ...m, isStreaming: false, streamingToolCalls: undefined } : m
+          )
+        );
+        setAgentStatus("idle");
+        setIsLoading(false);
       } catch (error) {
         abortControllerRef.current = null;
         setIsLoading(false);
