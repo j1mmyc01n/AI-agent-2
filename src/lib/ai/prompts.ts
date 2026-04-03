@@ -63,7 +63,7 @@ When building projects, output the full code in markdown code blocks. The Code t
       // Add type-specific proactive suggestion guidance
       const typeGuide = PROJECT_TYPE_SUGGESTION_GUIDES[context.currentProjectType ?? ""] ?? "";
       if (typeGuide) {
-        prompt += `\n\n### ${context.currentProjectName} — Suggested Enhancements\nBased on the project type (${context.currentProjectType}), proactively suggest relevant next features after each build. Prioritise:\n${typeGuide}`;
+        prompt += `\n\n### ${context.currentProjectName} — Suggested Enhancements\nBased on the project type (${context.currentProjectType}), proactively suggest relevant next features after each build. Prioritize:\n${typeGuide}`;
       }
     }
 

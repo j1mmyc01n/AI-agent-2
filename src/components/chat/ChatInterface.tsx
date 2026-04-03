@@ -346,61 +346,68 @@ export default function ChatInterface({
     loadDefaultModel();
   }, [defaultModelLoaded]);
 
+  // Shared label map used both for display and in the init prompt
+  const PROJECT_TYPE_LABELS: Record<string, string> = {
+    saas: "SaaS",
+    mvp: "MVP",
+    "landing-page": "Landing Page",
+    api: "API",
+    tool: "Tool",
+    other: "Project",
+  };
+
+  // Required features per project type, aligned with BUILD_MODE_INSTRUCTIONS
+  const PROJECT_TYPE_FEATURES: Record<string, string> = {
+    saas:
+      "- User authentication UI (login/register modals, hash-routed)\n" +
+      "- Dashboard with analytics stats cards, recent activity feed, and data table\n" +
+      "- Pricing section with tiered plans (Free / Pro / Enterprise)\n" +
+      "- Settings page with profile, billing, and notifications tabs\n" +
+      "- Collapsible sidebar navigation with active state highlighting",
+    mvp:
+      "- Clean onboarding / welcome screen with setup steps\n" +
+      "- Core feature interface with functional UI controls\n" +
+      "- Stats overview section with key metrics cards\n" +
+      "- Simple profile and settings panel\n" +
+      "- Mobile-responsive layout throughout",
+    "landing-page":
+      "- Hero section with bold headline, subheadline, and primary CTA button\n" +
+      "- Features section with 3-6 icon-backed feature cards\n" +
+      "- Social proof / testimonials carousel or grid\n" +
+      "- Pricing table with 2-3 comparison tiers\n" +
+      "- FAQ accordion and newsletter signup footer",
+    api:
+      "- Interactive API explorer / request builder UI\n" +
+      "- Endpoint reference with request/response code examples\n" +
+      "- Authentication guide with token display\n" +
+      "- Multi-language code snippet tabs\n" +
+      "- Rate limit status indicator and usage meter",
+    tool:
+      "- Clean single-page tool interface with clear input controls\n" +
+      "- Real-time output / preview panel\n" +
+      "- Copy-to-clipboard and download result actions\n" +
+      "- Usage guide and example inputs\n" +
+      "- Mobile-responsive layout",
+    other:
+      "- Landing page with clear value proposition and CTA\n" +
+      "- Core feature interface\n" +
+      "- Clean navigation and responsive layout",
+  };
+
+  // Required file structure hint for the init prompt (matches BUILD_MODE folder layout)
+  const BUILD_FILE_STRUCTURE =
+    "```html:index.html\n```css:src/css/styles.css\n" +
+    "```javascript:src/js/components.js\n```javascript:src/js/api.js\n```javascript:src/js/app.js";
+
   // Build the initialization prompt for a new project — type-aware, aligned with BUILD_MODE_INSTRUCTIONS
   function buildProjectInitPrompt(name: string, type?: string, description?: string): string {
-    const typeLabel =
-      type === "saas" ? "SaaS"
-      : type === "mvp" ? "MVP"
-      : type === "landing-page" ? "Landing Page"
-      : type === "api" ? "API"
-      : type === "tool" ? "Tool"
-      : "SaaS";
-
+    const typeLabel = PROJECT_TYPE_LABELS[type ?? ""] ?? "SaaS";
     const descPart = description ? `\n\nProject Description: ${description}` : "";
-
-    const typeFeatures: Record<string, string> = {
-      saas:
-        "- User authentication UI (login/register modals, hash-routed)\n" +
-        "- Dashboard with analytics stats cards, recent activity feed, and data table\n" +
-        "- Pricing section with tiered plans (Free / Pro / Enterprise)\n" +
-        "- Settings page with profile, billing, and notifications tabs\n" +
-        "- Collapsible sidebar navigation with active state highlighting",
-      mvp:
-        "- Clean onboarding / welcome screen with setup steps\n" +
-        "- Core feature interface with functional UI controls\n" +
-        "- Stats overview section with key metrics cards\n" +
-        "- Simple profile and settings panel\n" +
-        "- Mobile-responsive layout throughout",
-      "landing-page":
-        "- Hero section with bold headline, subheadline, and primary CTA button\n" +
-        "- Features section with 3-6 icon-backed feature cards\n" +
-        "- Social proof / testimonials carousel or grid\n" +
-        "- Pricing table with 2-3 comparison tiers\n" +
-        "- FAQ accordion and newsletter signup footer",
-      api:
-        "- Interactive API explorer / request builder UI\n" +
-        "- Endpoint reference with request/response code examples\n" +
-        "- Authentication guide with token display\n" +
-        "- Multi-language code snippet tabs\n" +
-        "- Rate limit status indicator and usage meter",
-      tool:
-        "- Clean single-page tool interface with clear input controls\n" +
-        "- Real-time output / preview panel\n" +
-        "- Copy-to-clipboard and download result actions\n" +
-        "- Usage guide and example inputs\n" +
-        "- Mobile-responsive layout",
-      other:
-        "- Landing page with clear value proposition and CTA\n" +
-        "- Core feature interface\n" +
-        "- Clean navigation and responsive layout",
-    };
-
-    const features = typeFeatures[type ?? "other"] ?? typeFeatures.other;
+    const features = PROJECT_TYPE_FEATURES[type ?? "other"] ?? PROJECT_TYPE_FEATURES.other;
 
     return (
       `Build my ${typeLabel} project "${name}" as a complete, premium web application.${descPart}\n\n` +
-      `Generate ALL 5 files in the required multi-file folder structure:\n` +
-      "```html:index.html\n```css:src/css/styles.css\n```javascript:src/js/components.js\n```javascript:src/js/api.js\n```javascript:src/js/app.js\n\n" +
+      `Generate ALL 5 files in the required multi-file folder structure:\n${BUILD_FILE_STRUCTURE}\n\n` +
       `Required features for this ${typeLabel}:\n${features}\n\n` +
       `Use the dark premium color system (surface/accent tokens), Tailwind CDN, and function declarations throughout. ` +
       `After generating all files, call save_artifact with the full folder paths and create_project_record with type="${type ?? "saas"}".`
