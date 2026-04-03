@@ -356,60 +356,154 @@ export default function ChatInterface({
     other: "Project",
   };
 
-  // Required features per project type, aligned with BUILD_MODE_INSTRUCTIONS
-  const PROJECT_TYPE_FEATURES: Record<string, string> = {
+  // Navigation/menu structure requirements per project type
+  const PROJECT_TYPE_NAV: Record<string, string> = {
     saas:
-      "- User authentication UI (login/register modals, hash-routed)\n" +
-      "- Dashboard with analytics stats cards, recent activity feed, and data table\n" +
-      "- Pricing section with tiered plans (Free / Pro / Enterprise)\n" +
-      "- Settings page with profile, billing, and notifications tabs\n" +
-      "- Collapsible sidebar navigation with active state highlighting",
+      "Sidebar nav (collapsible, dark): Logo + brand name at top, nav items: Dashboard, Analytics, Projects, Team, Integrations, Billing, Settings, Help. " +
+      "User avatar + name + plan badge at bottom with 'Upgrade' CTA. Active state with accent color left-border. " +
+      "Top header bar: search input, notification bell with badge, user menu dropdown.",
     mvp:
-      "- Clean onboarding / welcome screen with setup steps\n" +
-      "- Core feature interface with functional UI controls\n" +
-      "- Stats overview section with key metrics cards\n" +
-      "- Simple profile and settings panel\n" +
-      "- Mobile-responsive layout throughout",
+      "Top navbar (sticky): Logo left, nav links center (Home, Features, How It Works, Pricing, Changelog), " +
+      "Sign In + Get Started buttons right. Mobile: hamburger icon with slide-in drawer. " +
+      "Inside app: breadcrumb trail + page title heading on every page.",
     "landing-page":
-      "- Hero section with bold headline, subheadline, and primary CTA button\n" +
-      "- Features section with 3-6 icon-backed feature cards\n" +
-      "- Social proof / testimonials carousel or grid\n" +
-      "- Pricing table with 2-3 comparison tiers\n" +
-      "- FAQ accordion and newsletter signup footer",
+      "Fixed top navbar with blur backdrop: Logo left, nav links (Features, Pricing, About, Blog, Docs), " +
+      "Sign In + Get Started (accent) CTA buttons right. Sticky on scroll with shadow. " +
+      "Footer: 4-column grid — Product, Company, Resources, Legal — with social icons and copyright.",
     api:
-      "- Interactive API explorer / request builder UI\n" +
-      "- Endpoint reference with request/response code examples\n" +
-      "- Authentication guide with token display\n" +
-      "- Multi-language code snippet tabs\n" +
-      "- Rate limit status indicator and usage meter",
+      "Left sidebar (fixed): Logo + version badge, sections: Getting Started, Authentication, Endpoints, SDKs, Webhooks, Rate Limits, Errors, Changelog. " +
+      "Search bar at top of sidebar. API status badge (green/operational). " +
+      "Top bar: version selector dropdown, language selector, GitHub link.",
     tool:
-      "- Clean single-page tool interface with clear input controls\n" +
-      "- Real-time output / preview panel\n" +
-      "- Copy-to-clipboard and download result actions\n" +
-      "- Usage guide and example inputs\n" +
-      "- Mobile-responsive layout",
+      "Minimal top header: Logo/tool name left, tagline center, action buttons right (Share, Export, Settings icon, GitHub). " +
+      "No heavy sidebar — keep interface clean and focused. Optional collapsible help panel.",
     other:
-      "- Landing page with clear value proposition and CTA\n" +
-      "- Core feature interface\n" +
-      "- Clean navigation and responsive layout",
+      "Header: Logo left, nav links (Features, About, Pricing, Contact), CTA button right. " +
+      "Footer with links, social icons, and copyright. Clean minimal design.",
   };
 
-  // Required file structure hint for the init prompt (matches BUILD_MODE folder layout)
-  const BUILD_FILE_STRUCTURE =
-    "```html:index.html\n```css:src/css/styles.css\n" +
-    "```javascript:src/js/components.js\n```javascript:src/js/api.js\n```javascript:src/js/app.js";
+  // Required features per project type — comprehensive with specific UI, pages, and integrations
+  const PROJECT_TYPE_FEATURES: Record<string, string> = {
+    saas:
+      "PAGES & SECTIONS:\n" +
+      "• index.html — Landing page: hero (headline + subheadline + CTA + product screenshot mockup), " +
+        "Features grid (6 cards with icons), How It Works (3-step process), Metrics/social-proof bar (user count, uptime, NPS), " +
+        "Pricing table (Free/Pro/Enterprise tiers with feature comparison checkmarks), Testimonials carousel, FAQ accordion, CTA banner, Footer\n" +
+      "• app.html — App shell: sidebar nav + top header + main content area\n" +
+      "AUTH FLOWS (hash-routed in app.js):\n" +
+      "• #login — modal or full-page with email/password, social buttons (Google, GitHub — UI only), forgot password link\n" +
+      "• #register — multi-field signup with name, email, password, confirm, terms checkbox\n" +
+      "APP PAGES (hash-routed):\n" +
+      "• #dashboard — KPI stat cards (Total Users, MRR, Active Now, Churn Rate with trend arrows), " +
+        "line/bar chart placeholder (canvas element with realistic mock data drawn via JS), Recent Activity feed, Quick Actions panel\n" +
+      "• #analytics — Date range picker, metrics grid, table with sortable columns, export button\n" +
+      "• #projects — project cards grid with status badges, create new button, search/filter bar\n" +
+      "• #team — members table (avatar, name, role, status, last active), invite by email form, role dropdown\n" +
+      "• #integrations — cards for popular integrations (Slack, GitHub, Stripe, Zapier — connect/disconnect toggle)\n" +
+      "• #settings — tabbed panel: Profile (avatar, name, email, bio), Security (password change, 2FA toggle), " +
+        "Billing (current plan, usage bar, invoice list), API Keys (generate/revoke/copy), Notifications (email/push/Slack toggles)\n" +
+      "DESIGN: dark theme, premium glassmorphism cards, smooth page transitions, skeleton loaders, empty states with CTAs",
+    mvp:
+      "PAGES & SECTIONS:\n" +
+      "• index.html — Marketing page: hero (bold headline + benefit subheadline + 2 CTAs + product mockup), " +
+        "Features section (6 icon cards), How It Works (numbered steps with illustrations), " +
+        "Stats bar (users, time saved, satisfaction), Pricing (2-3 tiers), Early access signup form, Footer\n" +
+      "• app.html — App shell with top navbar + breadcrumb\n" +
+      "APP PAGES (hash-routed):\n" +
+      "• #onboarding — step-by-step wizard (3-4 steps: welcome → setup → preferences → done), progress bar, skip option\n" +
+      "• #home — welcome banner with user name, quick-start cards, recent activity, tip of the day\n" +
+      "• #feature — core feature UI with input controls, action buttons, real-time output/results panel, " +
+        "history list (localStorage), empty state with illustration\n" +
+      "• #analytics — usage stats, streak counter, achievements/badges grid\n" +
+      "• #settings — profile edit form (avatar, name, email), preferences toggles, data export button, delete account\n" +
+      "DESIGN: clean modern light/dark, skeleton loading states, smooth transitions, toast notifications, mobile-first responsive",
+    "landing-page":
+      "SECTIONS (single index.html with smooth scroll, all in one page):\n" +
+      "• Navbar — logo, nav links, sticky with backdrop-blur on scroll\n" +
+      "• Hero — H1 headline, H2 subheadline, primary + secondary CTAs, product screenshot/mockup, background gradient or particles\n" +
+      "• Logos bar — 'Trusted by teams at...' with 5-6 company logo placeholders\n" +
+      "• Features — section title, 6 feature cards (icon, title, description), alternating layout or grid\n" +
+      "• How It Works — numbered 3-step process with icons/illustrations\n" +
+      "• Product screenshot — large mockup image placeholder with caption\n" +
+      "• Metrics — 3-4 stat counters (e.g. 10k+ users, 99.9% uptime, 4.9★ rating, 50+ integrations)\n" +
+      "• Testimonials — 3 cards with avatar, name, role, company, star rating, quote\n" +
+      "• Pricing — 3 tiers (Starter/Pro/Enterprise), monthly/annual toggle, feature rows with checkmarks/crosses, popular badge\n" +
+      "• FAQ — accordion with 6-8 Q&As relevant to the product\n" +
+      "• CTA banner — bold final call to action with email capture form\n" +
+      "• Footer — 4-column: Product/Company/Resources/Legal links, social icons, newsletter input, copyright\n" +
+      "DESIGN: modern gradient hero, smooth scroll animations (Intersection Observer), hover micro-animations, mobile responsive",
+    api:
+      "PAGES & SECTIONS:\n" +
+      "• index.html — Docs landing: sidebar + content area layout\n" +
+      "• Sidebar: logo + API version badge, search input, nav sections (Overview, Auth, Endpoints, SDKs, Webhooks, Rate Limits, Errors, Changelog)\n" +
+      "• API status bar at top: green dot + 'All systems operational' + link to status page\n" +
+      "CONTENT PAGES (hash-routed):\n" +
+      "• #overview — introduction, quickstart code block, base URL display, feature highlights\n" +
+      "• #authentication — API key setup steps, token generation UI (show/hide input), code examples, OAuth flow diagram\n" +
+      "• #endpoints — grouped endpoint reference: method badge (GET/POST/PUT/DELETE color-coded), " +
+        "path, description, expandable request/response schema, try-it panel with real inputs\n" +
+      "• #sdks — language tabs (cURL, JavaScript, Python, Go, Ruby), install command, usage example per language\n" +
+      "• #webhooks — endpoint config form (URL, secret, event types checkboxes), payload example, retry policy info\n" +
+      "• #rate-limits — tier limits table (Free/Pro/Enterprise), real-time usage meter (progress bar), headers reference\n" +
+      "• #errors — error code table (code, name, description, resolution), common scenarios\n" +
+      "• #changelog — versioned list of changes with date badges and type labels (New/Fixed/Breaking)\n" +
+      "DESIGN: developer-focused dark theme, syntax-highlighted code blocks with copy button, clean monospace typography",
+    tool:
+      "LAYOUT (single-page, no routing needed):\n" +
+      "• Header: tool name + tagline, action buttons (Share link, Export result, Settings)\n" +
+      "• Main panel (2-column on desktop, stacked on mobile): Input panel left, Output/Result panel right\n" +
+      "INPUT PANEL:\n" +
+      "• Prominent textarea or structured input form\n" +
+      "• Tool-specific controls (sliders, dropdowns, toggles, checkboxes for options)\n" +
+      "• Preset/example inputs dropdown with 3-5 quick-start examples\n" +
+      "• Clear input button, character/word count if applicable\n" +
+      "• Submit/Run button (accent color, full width on mobile) with keyboard shortcut hint (Cmd+Enter)\n" +
+      "OUTPUT PANEL:\n" +
+      "• Result display area with syntax highlight if applicable\n" +
+      "• Copy to clipboard button (with success feedback), Download button\n" +
+      "• Processing time display, output stats (word count, chars, lines)\n" +
+      "• History of last 5 runs (localStorage) with timestamps, re-run option\n" +
+      "BELOW FOLD:\n" +
+      "• Usage guide section with 3-4 steps, example input/output pairs\n" +
+      "• FAQ section (3-5 Q&As)\n" +
+      "DESIGN: clean and focused, fast feel, immediate feedback on input, mobile-first",
+    other:
+      "PAGES & SECTIONS:\n" +
+      "• index.html — Main page: navbar, hero with CTA, core feature section, how it works, CTA banner, footer\n" +
+      "• App/feature page with clean layout and intuitive controls\n" +
+      "• About/info section with value proposition\n" +
+      "DESIGN: clean modern design, proper heading hierarchy (H1→H2→H3), responsive layout, accessible color contrast",
+  };
 
-  // Build the initialization prompt for a new project — type-aware, aligned with BUILD_MODE_INSTRUCTIONS
+  // Required file structure (plain text — no raw backtick fences to avoid parser confusion)
+  const BUILD_FILE_STRUCTURE =
+    "1. index.html           → code block lang:html, path:index.html\n" +
+    "2. src/css/styles.css   → code block lang:css, path:src/css/styles.css\n" +
+    "3. src/js/components.js → code block lang:javascript, path:src/js/components.js\n" +
+    "4. src/js/api.js        → code block lang:javascript, path:src/js/api.js\n" +
+    "5. src/js/app.js        → code block lang:javascript, path:src/js/app.js";
+
+  // Build the initialization prompt for a new project — type-aware, with research step
   function buildProjectInitPrompt(name: string, type?: string, description?: string): string {
     const typeLabel = PROJECT_TYPE_LABELS[type ?? ""] ?? "SaaS";
     const descPart = description ? `\n\nProject Description: ${description}` : "";
     const features = PROJECT_TYPE_FEATURES[type ?? "other"] ?? PROJECT_TYPE_FEATURES.other;
+    const nav = PROJECT_TYPE_NAV[type ?? "other"] ?? PROJECT_TYPE_NAV.other;
 
     return (
-      `Build my ${typeLabel} project "${name}" as a complete, premium web application.${descPart}\n\n` +
-      `Generate ALL 5 files in the required multi-file folder structure:\n${BUILD_FILE_STRUCTURE}\n\n` +
-      `Required features for this ${typeLabel}:\n${features}\n\n` +
-      `Use the dark premium color system (surface/accent tokens), Tailwind CDN, and function declarations throughout. ` +
+      `Build my ${typeLabel} project "${name}" as a complete, premium, production-quality web application.${descPart}\n\n` +
+      `STEP 1 — RESEARCH (required): Use web_search to look up current design trends, feature expectations, and inspiration for ${typeLabel} products named or similar to "${name}". ` +
+      `Use what you find to make the copy, features, and design feel authentic and current — not generic.\n\n` +
+      `STEP 2 — BUILD ALL 5 FILES in this exact order:\n${BUILD_FILE_STRUCTURE}\n\n` +
+      `NAVIGATION & MENU STRUCTURE:\n${nav}\n\n` +
+      `REQUIRED PAGES, FEATURES & INTEGRATIONS:\n${features}\n\n` +
+      `QUALITY REQUIREMENTS:\n` +
+      `• Every page must have proper H1/H2/H3 heading hierarchy\n` +
+      `• All navigation items must be functional (hash routing or smooth scroll)\n` +
+      `• Use realistic placeholder content — no "Lorem ipsum", no "Coming soon" placeholders\n` +
+      `• Dark premium color system: surface tokens (#0a0a0f base, #12121a secondary, #1a1a2e card), accent: #6366f1\n` +
+      `• Tailwind CDN + custom CSS variables. All JS as function declarations (no const/arrow at top level)\n` +
+      `• Total code must be 600+ lines across all 5 files\n\n` +
       `After generating all files, call save_artifact with the full folder paths and create_project_record with type="${type ?? "saas"}".`
     );
   }

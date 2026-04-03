@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check, Link2, Code2, Layout, Server, Wrench, Box, Globe, Rocket } from "lucide-react";
+import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check, Link2, Code2, Layout, Server, Wrench, Box, Globe, Rocket, ChevronRight, Star, Users, BarChart3, Settings, Plug, BookOpen } from "lucide-react";
 
 interface Project {
   id: string;
@@ -53,13 +53,57 @@ const typeIcons: Record<string, React.ReactNode> = {
 };
 
 const projectTypes = [
-  { value: "saas", label: "SaaS" },
-  { value: "mvp", label: "MVP" },
-  { value: "landing-page", label: "Landing Page" },
-  { value: "api", label: "API" },
-  { value: "tool", label: "Tool" },
-  { value: "other", label: "Other" },
+  { value: "saas", label: "SaaS", icon: <Layout className="h-3.5 w-3.5" /> },
+  { value: "mvp", label: "MVP", icon: <Box className="h-3.5 w-3.5" /> },
+  { value: "landing-page", label: "Landing Page", icon: <Globe className="h-3.5 w-3.5" /> },
+  { value: "api", label: "API", icon: <Server className="h-3.5 w-3.5" /> },
+  { value: "tool", label: "Tool", icon: <Wrench className="h-3.5 w-3.5" /> },
+  { value: "other", label: "Other", icon: <Code2 className="h-3.5 w-3.5" /> },
 ];
+
+// What each project type includes — shown in the create form
+const typeFeatureHighlights: Record<string, { label: string; icon: React.ReactNode }[]> = {
+  saas: [
+    { label: "Auth (login/register/dashboard)", icon: <Users className="h-3 w-3" /> },
+    { label: "Analytics & KPI stats cards", icon: <BarChart3 className="h-3 w-3" /> },
+    { label: "Pricing table (3 tiers)", icon: <Star className="h-3 w-3" /> },
+    { label: "Settings with 5 tabs", icon: <Settings className="h-3 w-3" /> },
+    { label: "Integrations panel", icon: <Plug className="h-3 w-3" /> },
+  ],
+  mvp: [
+    { label: "Onboarding wizard (3-4 steps)", icon: <ChevronRight className="h-3 w-3" /> },
+    { label: "Core feature UI + output panel", icon: <Code2 className="h-3 w-3" /> },
+    { label: "Usage stats & achievements", icon: <BarChart3 className="h-3 w-3" /> },
+    { label: "Profile & settings", icon: <Settings className="h-3 w-3" /> },
+    { label: "Mobile-first responsive", icon: <Globe className="h-3 w-3" /> },
+  ],
+  "landing-page": [
+    { label: "Hero + CTA sections", icon: <Star className="h-3 w-3" /> },
+    { label: "Features grid (6 cards)", icon: <Layout className="h-3 w-3" /> },
+    { label: "Pricing table + testimonials", icon: <Users className="h-3 w-3" /> },
+    { label: "FAQ accordion + newsletter", icon: <BookOpen className="h-3 w-3" /> },
+    { label: "4-column footer", icon: <Globe className="h-3 w-3" /> },
+  ],
+  api: [
+    { label: "Sidebar doc navigation", icon: <BookOpen className="h-3 w-3" /> },
+    { label: "Auth & endpoint reference", icon: <Server className="h-3 w-3" /> },
+    { label: "Multi-language SDK tabs", icon: <Code2 className="h-3 w-3" /> },
+    { label: "Webhook config UI", icon: <Plug className="h-3 w-3" /> },
+    { label: "Rate limits & changelog", icon: <BarChart3 className="h-3 w-3" /> },
+  ],
+  tool: [
+    { label: "Input + output split panel", icon: <Layout className="h-3 w-3" /> },
+    { label: "Copy, download, share actions", icon: <ChevronRight className="h-3 w-3" /> },
+    { label: "Run history (5 recent)", icon: <BarChart3 className="h-3 w-3" /> },
+    { label: "Preset examples & usage guide", icon: <BookOpen className="h-3 w-3" /> },
+    { label: "Keyboard shortcut support", icon: <Settings className="h-3 w-3" /> },
+  ],
+  other: [
+    { label: "Landing page with hero + CTA", icon: <Star className="h-3 w-3" /> },
+    { label: "Core feature interface", icon: <Code2 className="h-3 w-3" /> },
+    { label: "Clean nav + footer", icon: <Globe className="h-3 w-3" /> },
+  ],
+};
 
 function ProjectThumbnail({ project }: { project: Project }) {
   const gradient = typeGradients[project.type] || typeGradients.other;
@@ -371,7 +415,7 @@ export default function ProjectsList() {
                   </div>
                   <div>
                     <CardTitle className="text-lg">New Project</CardTitle>
-                    <CardDescription className="text-xs mt-0.5">AI will scaffold the full structure on launch</CardDescription>
+                    <CardDescription className="text-xs mt-0.5">AI will research, plan and scaffold the full structure</CardDescription>
                   </div>
                 </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setShowCreateForm(false); setError(null); }}>
@@ -395,13 +439,13 @@ export default function ProjectsList() {
                 </div>
                 <div>
                   <label htmlFor="project-description" className="text-sm font-medium mb-1.5 block">
-                    Description <span className="text-muted-foreground font-normal">(helps AI scaffold better)</span>
+                    Description <span className="text-muted-foreground font-normal">(helps AI research & build better)</span>
                   </label>
                   <textarea
                     id="project-description"
                     value={formData.description}
                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="What does this project do? Who is it for?"
+                    placeholder="What does this project do? Who is it for? Any specific features you want?"
                     rows={2}
                     className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 resize-none transition-shadow"
                   />
@@ -414,17 +458,37 @@ export default function ProjectsList() {
                         key={t.value}
                         type="button"
                         onClick={() => setFormData((prev) => ({ ...prev, type: t.value }))}
-                        className={`px-3 py-2 rounded-md border text-xs font-medium transition-all ${
+                        className={`px-3 py-2 rounded-md border text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                           formData.type === t.value
                             ? "border-primary bg-primary/10 text-primary shadow-sm"
                             : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
                         }`}
                       >
+                        {t.icon}
                         {t.label}
                       </button>
                     ))}
                   </div>
                 </div>
+
+                {/* Feature highlights for selected type */}
+                {typeFeatureHighlights[formData.type] && (
+                  <div className="rounded-md border border-border/50 bg-muted/30 p-3">
+                    <p className="text-[11px] font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                      <Rocket className="h-3 w-3" />
+                      What AI will build for you:
+                    </p>
+                    <ul className="space-y-1">
+                      {typeFeatureHighlights[formData.type].map((f, i) => (
+                        <li key={i} className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                          <span className="text-primary/70 shrink-0">{f.icon}</span>
+                          {f.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex gap-2 justify-end pt-1">
                   <Button type="button" variant="ghost" onClick={() => { setShowCreateForm(false); setError(null); }}>Cancel</Button>
@@ -510,9 +574,11 @@ export default function ProjectsList() {
               <FolderOpen className="h-8 w-8 text-primary opacity-50" />
             </div>
             <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm">
-              Create a project here or start a chat and ask the AI to build something.
-              Projects will appear here with visual previews.
+            <p className="text-muted-foreground mb-2 max-w-md mx-auto text-sm">
+              Create a project and AI will research it, then build a complete, premium web application with proper navigation, pages, and integrations.
+            </p>
+            <p className="text-muted-foreground mb-6 max-w-sm mx-auto text-xs opacity-70">
+              SaaS · MVP · Landing Page · API Docs · Tools — all generated as production-quality code.
             </p>
             <div className="flex gap-3 justify-center flex-wrap">
               <Button onClick={() => setShowCreateForm(true)} className="gap-2 shadow-md shadow-primary/10">
@@ -602,7 +668,7 @@ export default function ProjectsList() {
                   )}
                 </CardHeader>
                 <CardContent className="pt-0 pb-3">
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5 mb-2">
                     {project.githubRepo && (
                       <a
                         href={project.githubRepo}
@@ -627,16 +693,17 @@ export default function ProjectsList() {
                         <ExternalLink className="h-2.5 w-2.5" />
                       </a>
                     )}
-                    <Link
-                      href={`/projects/${project.id}`}
-                      className="inline-flex items-center gap-1 text-[11px] text-primary border border-primary/20 rounded-md px-2 py-0.5 hover:bg-primary/10 transition-all font-medium"
-                    >
-                      <MessageSquare className="h-3 w-3" />
-                      Open Project
-                    </Link>
                   </div>
-                  <p className="text-[11px] text-muted-foreground mt-2">
-                    Created {new Date(project.createdAt).toLocaleDateString()}
+                  <Link
+                    href={`/projects/${project.id}`}
+                    className="flex items-center justify-center gap-1.5 w-full text-xs text-primary border border-primary/20 rounded-md px-3 py-1.5 hover:bg-primary/10 hover:border-primary/40 transition-all font-medium group-hover:bg-primary/5"
+                  >
+                    <MessageSquare className="h-3.5 w-3.5" />
+                    Open in Workspace
+                    <ChevronRight className="h-3 w-3 opacity-50 group-hover:translate-x-0.5 transition-transform" />
+                  </Link>
+                  <p className="text-[10px] text-muted-foreground mt-2 text-center">
+                    Created {new Date(project.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}
                   </p>
                 </CardContent>
               </Card>
