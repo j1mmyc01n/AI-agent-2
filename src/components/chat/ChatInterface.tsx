@@ -101,18 +101,18 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
   // Deduplicate named files: keep the last occurrence of each filename across all messages.
   // This prevents files from appearing multiple times when the agent is nudged and re-generates
   // the same files in a subsequent message.
+  const normalizeFilename = (name: string) =>
+    name.replace(/\s*\(generating\.\.\.\)\s*/i, "").toLowerCase().trim();
+
   const namedLastIdx = new Map<string, number>();
   for (let i = 0; i < blocks.length; i++) {
-    const raw = blocks[i].filename;
-    if (raw) {
-      const key = raw.replace(/\s*\(generating\.\.\.\)\s*/i, "").toLowerCase().trim();
-      namedLastIdx.set(key, i);
+    if (blocks[i].filename) {
+      namedLastIdx.set(normalizeFilename(blocks[i].filename!), i);
     }
   }
   return blocks.filter((block, i) => {
     if (!block.filename) return true; // keep unnamed blocks as-is
-    const key = block.filename.replace(/\s*\(generating\.\.\.\)\s*/i, "").toLowerCase().trim();
-    return namedLastIdx.get(key) === i;
+    return namedLastIdx.get(normalizeFilename(block.filename)) === i;
   });
 }
 
