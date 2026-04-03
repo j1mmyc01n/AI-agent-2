@@ -116,23 +116,23 @@ export const tools: ChatCompletionTool[] = [
     function: {
       name: "save_artifact",
       description:
-        "Save generated code files as a persistent artifact. Use this after generating code to save the project files. The files will be stored and available across sessions. Always use this when building a project so the user's work is preserved.",
+        "Save generated code files as a persistent artifact using the proper folder structure. Always call this after generating a project. Files are stored and available across sessions. Use folder paths matching the project structure (e.g. 'index.html', 'src/css/styles.css', 'src/js/components.js', 'src/js/api.js', 'src/js/app.js').",
       parameters: {
         type: "object",
         properties: {
           title: {
             type: "string",
-            description: "A descriptive title for the artifact. Example: 'Landing Page for TaskFlow'",
+            description: "A descriptive title for the artifact. Example: 'TaskFlow SaaS App'",
           },
           files: {
             type: "array",
-            description: "Array of files to save",
+            description: "Array of files to save. Use proper folder paths: 'index.html', 'src/css/styles.css', 'src/js/components.js', 'src/js/api.js', 'src/js/app.js'",
             items: {
               type: "object",
               properties: {
                 path: {
                   type: "string",
-                  description: "File path. Example: 'index.html', 'styles.css', 'app.js'",
+                  description: "File path with folder structure. Examples: 'index.html', 'src/css/styles.css', 'src/js/app.js', 'src/js/components.js', 'src/js/api.js'",
                 },
                 content: {
                   type: "string",

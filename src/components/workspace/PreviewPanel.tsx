@@ -109,6 +109,13 @@ try {
 </html>`;
 }
 
+/** Priority values for JS block ordering in the preview assembler. */
+const JS_PRIORITY_UTILS = 0;       // utilities, helpers, config, constants
+const JS_PRIORITY_COMPONENTS = 1;  // components, widgets, UI elements
+const JS_PRIORITY_API = 2;         // api, service, data, store, model
+const JS_PRIORITY_DEFAULT = 3;     // unclassified / misc
+const JS_PRIORITY_APP = 4;         // app, main, index, init — always last
+
 /**
  * Sort JS blocks so utility/component files come before the main app file.
  * This ensures that when all JS is concatenated into one <script>, functions
@@ -117,11 +124,11 @@ try {
 function sortJsBlocks(blocks: CodeBlock[]): CodeBlock[] {
   const priority = (b: CodeBlock): number => {
     const name = (b.filename || "").toLowerCase().replace(/\s*\(generating\.\.\.\)\s*/i, "");
-    if (/\b(util|helper|constant|config|type)/.test(name)) return 0;
-    if (/\b(component|widget|element|ui)/.test(name)) return 1;
-    if (/\b(api|service|data|store|model)/.test(name)) return 2;
-    if (/\b(app|main|index|init)/.test(name)) return 4;
-    return 3;
+    if (/\b(util|helper|constant|config|type)/.test(name)) return JS_PRIORITY_UTILS;
+    if (/\b(component|widget|element|ui)/.test(name)) return JS_PRIORITY_COMPONENTS;
+    if (/\b(api|service|data|store|model)/.test(name)) return JS_PRIORITY_API;
+    if (/\b(app|main|index|init)/.test(name)) return JS_PRIORITY_APP;
+    return JS_PRIORITY_DEFAULT;
   };
   return [...blocks].sort((a, b) => priority(a) - priority(b));
 }

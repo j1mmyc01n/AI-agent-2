@@ -39,7 +39,7 @@ function getFileIcon(language: string) {
 
 function getCleanFilename(block: CodeBlock): string {
   if (block.filename) {
-    return block.filename.replace(" (generating...)", "");
+    return block.filename.replace(/\s*\(generating\.\.\.\)\s*/i, "");
   }
   // Derive a name from language if no filename
   const extensions: Record<string, string> = {
@@ -47,6 +47,17 @@ function getCleanFilename(block: CodeBlock): string {
     typescript: "index.ts", tsx: "component.tsx", json: "data.json", text: "file.txt",
   };
   return extensions[block.language] || `file.${block.language}`;
+}
+
+/** Returns just the file basename for compact display (e.g. 'src/js/app.js' → 'app.js') */
+function getBasename(filepath: string): string {
+  return filepath.split("/").pop() || filepath;
+}
+
+/** Returns the directory prefix for display (e.g. 'src/js/app.js' → 'src/js/') */
+function getDirPrefix(filepath: string): string {
+  const lastSlash = filepath.lastIndexOf("/");
+  return lastSlash >= 0 ? filepath.slice(0, lastSlash + 1) : "";
 }
 
 export default function CodePanel({ codeBlocks = [], isGenerating = false }: CodePanelProps) {
@@ -121,7 +132,7 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
     <div className="flex h-full">
       {/* File tree sidebar */}
       <div className={`border-r border-border/50 bg-card/30 flex flex-col shrink-0 transition-all duration-200 ${
-        sidebarCollapsed ? "w-10" : "w-48"
+        sidebarCollapsed ? "w-10" : "w-52"
       }`}>
         {/* Sidebar header */}
         <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/30">
@@ -165,6 +176,8 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
               {/* Individual files */}
               {codeBlocks.map((block, idx) => {
                 const filename = getCleanFilename(block);
+                const basename = getBasename(filename);
+                const dirPrefix = getDirPrefix(filename);
                 const isGeneratingFile = block.filename?.includes("(generating...)");
                 return (
                   <button
@@ -178,7 +191,12 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
                     title={filename}
                   >
                     {getFileIcon(block.language)}
-                    <span className="truncate flex-1">{filename}</span>
+                    <span className="truncate flex-1 min-w-0">
+                      {dirPrefix && (
+                        <span className="opacity-50 text-[11px]">{dirPrefix}</span>
+                      )}
+                      <span>{basename}</span>
+                    </span>
                     {isGeneratingFile && (
                       <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
                     )}
