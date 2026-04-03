@@ -203,6 +203,8 @@ export default function ProjectsList() {
       setProjects((prev) => [newProject, ...prev]);
       setFormData({ name: "", description: "", type: "saas" });
       setShowCreateForm(false);
+      // Notify sidebar to refresh its project list
+      window.dispatchEvent(new Event("dobetter-projects-updated"));
       // Navigate to the new project and auto-initialize it
       router.push(`/projects/${newProject.id}?init=true`);
     } catch (err) {

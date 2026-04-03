@@ -185,11 +185,15 @@ export async function POST(req: NextRequest) {
     let conversation: { id: string; title: string; messages: { role: string; content: string }[] };
     const localMode = !hasDb;
 
-    // Find current project name if projectId provided
+    // Find current project name and type if projectId provided
     let currentProjectName: string | undefined;
+    let currentProjectType: string | undefined;
     if (projectId) {
       const proj = userProjects.find(p => p.id === projectId);
-      if (proj) currentProjectName = proj.name;
+      if (proj) {
+        currentProjectName = proj.name;
+        currentProjectType = proj.type;
+      }
     }
 
     if (localMode) {
@@ -285,6 +289,7 @@ export async function POST(req: NextRequest) {
       projects: userProjects,
       currentProjectId: projectId,
       currentProjectName,
+      currentProjectType,
       conversationCount,
       userName: user?.name || undefined,
       hasGithub: !!(user?.githubToken),
