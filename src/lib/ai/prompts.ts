@@ -2,6 +2,7 @@ export function buildSystemPrompt(context?: {
   projects?: { id: string; name: string; description?: string | null; type: string; status: string; githubRepo?: string | null; vercelUrl?: string | null }[];
   currentProjectId?: string;
   currentProjectName?: string;
+  currentProjectType?: string;
   conversationCount?: number;
   userName?: string;
   hasGithub?: boolean;
@@ -54,7 +55,16 @@ When building projects, output the full code in markdown code blocks. The Code t
 
     if (context.currentProjectName) {
       prompt += `\n**Current Project:** ${context.currentProjectName} (ID: ${context.currentProjectId})`;
-      prompt += "\nYou are currently assisting with this specific project. Keep context relevant to this project.";
+      if (context.currentProjectType) {
+        prompt += `\n**Project Type:** ${context.currentProjectType}`;
+      }
+      prompt += "\nYou are currently assisting with this specific project. Keep all responses focused on this project.";
+
+      // Add type-specific proactive suggestion guidance
+      const typeGuide = PROJECT_TYPE_SUGGESTION_GUIDES[context.currentProjectType ?? ""] ?? "";
+      if (typeGuide) {
+        prompt += `\n\n### ${context.currentProjectName} — Suggested Enhancements\nBased on the project type (${context.currentProjectType}), proactively suggest relevant next features after each build. Prioritize:\n${typeGuide}`;
+      }
     }
 
     if (context.projects && context.projects.length > 0) {
@@ -75,6 +85,49 @@ When building projects, output the full code in markdown code blocks. The Code t
 
   return prompt;
 }
+
+/** Per-type next-feature suggestion guides injected into the system prompt. */
+const PROJECT_TYPE_SUGGESTION_GUIDES: Record<string, string> = {
+  saas:
+    "- User authentication (login/register modals, session handling)\n" +
+    "- Subscription/pricing page with tiered plans and upgrade CTAs\n" +
+    "- Dashboard analytics with charts and KPI cards\n" +
+    "- Team/member management UI\n" +
+    "- Email notification preferences panel\n" +
+    "- Dark/light mode toggle\n" +
+    "- Onboarding wizard for new users\n" +
+    "- Activity / audit log feed",
+  mvp:
+    "- Onboarding flow with progressive setup steps\n" +
+    "- Core feature with real data operations (localStorage)\n" +
+    "- Simple settings and user profile page\n" +
+    "- Empty states with helpful CTAs\n" +
+    "- Loading skeletons for async operations\n" +
+    "- Mobile-responsive improvements\n" +
+    "- Basic usage analytics display",
+  "landing-page":
+    "- Animated hero section with scroll-triggered effects\n" +
+    "- Interactive feature demo or product screenshot carousel\n" +
+    "- Customer testimonials or logo wall\n" +
+    "- Comparison table vs competitors\n" +
+    "- Live chat widget placeholder\n" +
+    "- Newsletter signup with success state\n" +
+    "- Cookie consent banner",
+  api:
+    "- Interactive request builder / try-it-out panel\n" +
+    "- Authentication flow examples (API key, OAuth)\n" +
+    "- Rate limit and quota usage meter\n" +
+    "- Webhook configuration UI\n" +
+    "- SDK code snippet tabs (JS, Python, cURL)\n" +
+    "- Error code reference table",
+  tool:
+    "- History of previous tool runs (localStorage)\n" +
+    "- Shareable output link (copy URL)\n" +
+    "- Export to file (TXT, CSV, JSON)\n" +
+    "- Input presets / saved templates\n" +
+    "- Keyboard shortcut for submit\n" +
+    "- Responsive mobile layout improvements",
+};
 
 export const SYSTEM_PROMPT = `You are DoBetter Viber, an advanced AI vibe coding agent and platform assistant. You are embedded in the DoBetter Viber workspace — an AI-powered development platform for building SaaS products and MVPs.
 

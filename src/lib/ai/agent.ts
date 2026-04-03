@@ -19,10 +19,12 @@ interface ProjectContext {
   projects?: { id: string; name: string; description?: string | null; type: string; status: string; githubRepo?: string | null; vercelUrl?: string | null }[];
   currentProjectId?: string;
   currentProjectName?: string;
+  currentProjectType?: string;
   conversationCount?: number;
   userName?: string;
   hasGithub?: boolean;
   hasVercel?: boolean;
+  mode?: "chat" | "build" | "saas-upgrade";
 }
 
 interface AgentConfig {
