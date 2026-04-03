@@ -346,13 +346,9 @@ export default function PreviewPanel({
             onClick={() => {
               const blob = new Blob([inlineHtml!], { type: "text/html" });
               const url = URL.createObjectURL(blob);
-              const win = window.open(url, "_blank");
-              // Revoke after the browser has had time to load it
-              if (win) {
-                win.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
-              } else {
-                setTimeout(() => URL.revokeObjectURL(url), 10_000);
-              }
+              window.open(url, "_blank");
+              // Give the browser enough time to load the blob before revoking it
+              setTimeout(() => URL.revokeObjectURL(url), 10_000);
             }}
           >
             <ExternalLink className="h-3.5 w-3.5" />
