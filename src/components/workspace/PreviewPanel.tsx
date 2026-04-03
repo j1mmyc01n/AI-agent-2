@@ -44,14 +44,20 @@ function isAbsoluteUrl(url: string): boolean {
 /**
  * Strip local-file <link> and <script src> references that will 404 inside a
  * srcDoc iframe (no base URL).  CDN / absolute URLs are preserved.
+ *
+ * Note: CDN <script> tags are intentionally kept in the output — they are
+ * not user-supplied sanitization targets; this function is a srcDoc
+ * transformation, not an XSS sanitizer.
  */
 function stripLocalExternalRefs(html: string, hasCssReplacement: boolean, hasJsReplacement: boolean): string {
   if (hasCssReplacement) {
-    html = html.replace(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*>/gi, (match, href) =>
+    // Handle both self-closing (<link ... />) and non-self-closing (<link ...>)
+    html = html.replace(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\/?>/gi, (match, href) =>
       isAbsoluteUrl(href) ? match : ""
     );
   }
   if (hasJsReplacement) {
+    // Only remove script tags whose src is a local file; CDN scripts are kept
     html = html.replace(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*><\/script>/gi, (match, src) =>
       isAbsoluteUrl(src) ? match : ""
     );
