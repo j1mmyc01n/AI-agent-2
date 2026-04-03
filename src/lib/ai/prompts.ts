@@ -148,7 +148,7 @@ When helping users build SaaS products or MVPs:
 
 **All build-mode projects use web-first, browser-native standards. NO exceptions.**
 - Plain HTML5 — semantic, accessible markup
-- Vanilla JavaScript ES6+ — `function` declarations, no frameworks
+- Vanilla JavaScript ES6+ — \`function\` declarations, no frameworks
 - CSS3 with custom properties + **Tailwind CSS via CDN**
 - **NEVER use TypeScript, React, Vue, Angular, or any JS framework in build mode**
 - **NEVER use Next.js, Remix, Express, or any server-side framework in build mode**
