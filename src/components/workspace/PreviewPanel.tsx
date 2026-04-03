@@ -36,6 +36,79 @@ const viewportSizes: Record<ViewportMode, { width: string; label: string }> = {
   mobile: { width: "375px", label: "Mobile" },
 };
 
+/** Returns true if the URL is absolute / CDN (should be kept in srcDoc iframes). */
+function isAbsoluteUrl(url: string): boolean {
+  return /^(https?:|\/\/)/.test(url);
+}
+
+/**
+ * Strip local-file <link> and <script src> references that will 404 inside a
+ * srcDoc iframe (no base URL).  CDN / absolute URLs are preserved.
+ *
+ * Note: CDN <script> tags are intentionally kept in the output — they are
+ * not user-supplied sanitization targets; this function is a srcDoc
+ * transformation, not an XSS sanitizer.
+ */
+function stripLocalExternalRefs(html: string, hasCssReplacement: boolean, hasJsReplacement: boolean): string {
+  if (hasCssReplacement) {
+    // Handle both self-closing (<link ... />) and non-self-closing (<link ...>)
+    html = html.replace(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\/?>/gi, (match, href) =>
+      isAbsoluteUrl(href) ? match : ""
+    );
+  }
+  if (hasJsReplacement) {
+    // Only remove script tags whose src is a local file; CDN scripts are kept
+    html = html.replace(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*><\/script>/gi, (match, src) =>
+      isAbsoluteUrl(src) ? match : ""
+    );
+  }
+  return html;
+}
+
+/** Build a React/JSX preview wrapper using Babel standalone + React 18 CDN. */
+function buildReactPreview(reactBlocks: CodeBlock[], cssBlocks: CodeBlock[]): string {
+  const cssContent = cssBlocks.map((b) => b.content).join("\n");
+  const jsxContent = reactBlocks.map((b) => b.content).join("\n\n");
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; }
+  ${cssContent}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react,env">
+${jsxContent}
+
+// Auto-render the top-level component if the root is still empty
+try {
+  const rootEl = document.getElementById('root');
+  if (rootEl && !rootEl.hasChildNodes()) {
+    const Component =
+      typeof App !== 'undefined' ? App
+      : typeof Dashboard !== 'undefined' ? Dashboard
+      : typeof Home !== 'undefined' ? Home
+      : typeof Page !== 'undefined' ? Page
+      : null;
+    if (Component) {
+      ReactDOM.createRoot(rootEl).render(React.createElement(Component));
+    }
+  }
+} catch (e) { console.error('Preview render error:', e); }
+</script>
+</body>
+</html>`;
+}
+
 /** Build a full HTML document from code blocks for inline preview */
 function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): string | null {
   if (!codeBlocks || codeBlocks.length === 0) return null;
@@ -48,6 +121,15 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
         b.content.includes("<html") ||
         b.content.includes("<body"))
   );
+
+  // React/JSX-only: no full HTML file but JSX/TSX blocks present → React preview
+  const jsxBlocks = codeBlocks.filter(
+    (b) => b.language === "jsx" || b.language === "tsx"
+  );
+  if (jsxBlocks.length > 0 && htmlFileBlocks.length === 0) {
+    const cssBlocks = codeBlocks.filter((b) => b.language === "css");
+    return buildReactPreview(jsxBlocks, cssBlocks);
+  }
 
   // If a specific page is selected, use that; otherwise use the first (or best) HTML block
   let htmlBlock: CodeBlock | undefined;
@@ -79,6 +161,9 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
         b !== htmlBlock
     );
 
+    // Strip broken local-file references before injecting inline replacements
+    html = stripLocalExternalRefs(html, cssBlocks.length > 0, jsBlocks.length > 0);
+
     if (cssBlocks.length > 0) {
       const cssTag = `<style>\n${cssBlocks.map((b) => b.content).join("\n")}\n</style>`;
       if (html.includes("</head>")) {
@@ -100,11 +185,15 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
     return html;
   }
 
-  // Build HTML from individual blocks
+  // Build HTML from individual blocks (no full HTML file found)
   const cssBlocks = codeBlocks.filter((b) => b.language === "css");
   const jsBlocks = codeBlocks.filter(
     (b) =>
-      b.language === "javascript" || b.language === "js" || b.language === "jsx"
+      b.language === "javascript" ||
+      b.language === "js" ||
+      b.language === "jsx" ||
+      b.language === "typescript" ||
+      b.language === "ts"
   );
   const htmlSnippets = codeBlocks.filter(
     (b) =>
@@ -233,6 +322,22 @@ export default function PreviewPanel({
   }, []);
 
   if (!hasAnyPreview) {
+    if (isStreaming) {
+      return (
+        <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 p-6">
+          <div className="h-16 w-16 rounded-2xl bg-orange-500/10 flex items-center justify-center">
+            <Loader2 className="h-8 w-8 text-orange-500 animate-spin" />
+          </div>
+          <div className="text-center max-w-sm">
+            <p className="font-medium mb-1 text-orange-500">Building your project...</p>
+            <p className="text-sm opacity-70">
+              The live preview will appear here as soon as HTML code is
+              generated. Keep watching — it won&apos;t be long!
+            </p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-3 p-6">
         <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">

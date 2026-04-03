@@ -601,7 +601,8 @@ export default function ChatInterface({
                 );
 
                 if (shouldBuild && isInsideCodeBlock && fenceCount === 1 && !userHasManuallySelectedPanel.current) {
-                  setActivePanel("code");
+                  // Switch to preview so the user sees the live rendering as code streams in
+                  setActivePanel("preview");
                 }
 
                 if (shouldBuild) {
