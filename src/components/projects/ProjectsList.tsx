@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check, Link2, Code2, Layout, Server, Wrench, Box, Globe } from "lucide-react";
+import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check, Link2, Code2, Layout, Server, Wrench, Box, Globe, Rocket } from "lucide-react";
 
 interface Project {
   id: string;
@@ -136,6 +137,7 @@ function ProjectThumbnail({ project }: { project: Project }) {
 }
 
 export default function ProjectsList() {
+  const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -201,6 +203,8 @@ export default function ProjectsList() {
       setProjects((prev) => [newProject, ...prev]);
       setFormData({ name: "", description: "", type: "saas" });
       setShowCreateForm(false);
+      // Navigate to the new project and auto-initialize it
+      router.push(`/projects/${newProject.id}?init=true`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project");
     } finally {
@@ -309,6 +313,8 @@ export default function ProjectsList() {
       setProjects((prev) => [newProject, ...prev]);
       setRecreateUrl("");
       setShowRecreateForm(false);
+      // Navigate to the new project and auto-initialize it
+      router.push(`/projects/${newProject.id}?init=true`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create project from URL");
     } finally {
@@ -354,10 +360,18 @@ export default function ProjectsList() {
 
         {/* Create project form */}
         {showCreateForm && (
-          <Card className="mb-6 border-primary/20 shadow-lg shadow-primary/5">
+          <Card className="mb-6 border-primary/30 shadow-xl shadow-primary/10 bg-gradient-to-br from-card via-card to-primary/5">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Create New Project</CardTitle>
+                <div className="flex items-center gap-2.5">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                    <Rocket className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">New Project</CardTitle>
+                    <CardDescription className="text-xs mt-0.5">AI will scaffold the full structure on launch</CardDescription>
+                  </div>
+                </div>
                 <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => { setShowCreateForm(false); setError(null); }}>
                   <X className="h-4 w-4" />
                 </Button>
@@ -373,40 +387,57 @@ export default function ProjectsList() {
                     value={formData.name}
                     onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                     placeholder="My Awesome SaaS"
-                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 transition-shadow"
                     autoFocus
                   />
                 </div>
                 <div>
-                  <label htmlFor="project-description" className="text-sm font-medium mb-1.5 block">Description</label>
+                  <label htmlFor="project-description" className="text-sm font-medium mb-1.5 block">
+                    Description <span className="text-muted-foreground font-normal">(helps AI scaffold better)</span>
+                  </label>
                   <textarea
                     id="project-description"
                     value={formData.description}
                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Brief description of what this project does..."
+                    placeholder="What does this project do? Who is it for?"
                     rows={2}
-                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 resize-none"
+                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50 resize-none transition-shadow"
                   />
                 </div>
                 <div>
-                  <label htmlFor="project-type" className="text-sm font-medium mb-1.5 block">Type</label>
-                  <select
-                    id="project-type"
-                    value={formData.type}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, type: e.target.value }))}
-                    className="w-full px-3 py-2 rounded-md border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/50"
-                  >
+                  <label className="text-sm font-medium mb-2 block">Project Type</label>
+                  <div className="grid grid-cols-3 gap-2">
                     {projectTypes.map((t) => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setFormData((prev) => ({ ...prev, type: t.value }))}
+                        className={`px-3 py-2 rounded-md border text-xs font-medium transition-all ${
+                          formData.type === t.value
+                            ? "border-primary bg-primary/10 text-primary shadow-sm"
+                            : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground"
+                        }`}
+                      >
+                        {t.label}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
-                <div className="flex gap-2 justify-end">
+                <div className="flex gap-2 justify-end pt-1">
                   <Button type="button" variant="ghost" onClick={() => { setShowCreateForm(false); setError(null); }}>Cancel</Button>
-                  <Button type="submit" disabled={creating} className="gap-2">
-                    {creating && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Create Project
+                  <Button type="submit" disabled={creating} className="gap-2 shadow-md shadow-primary/20">
+                    {creating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Launching...
+                      </>
+                    ) : (
+                      <>
+                        <Rocket className="h-4 w-4" />
+                        Launch Project
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
@@ -448,9 +479,18 @@ export default function ProjectsList() {
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <div className="flex gap-2 justify-end">
                   <Button type="button" variant="ghost" onClick={() => { setShowRecreateForm(false); setError(null); }}>Cancel</Button>
-                  <Button type="submit" disabled={recreating || !recreateUrl.trim()} className="gap-2">
-                    {recreating && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Create Project
+                  <Button type="submit" disabled={recreating || !recreateUrl.trim()} className="gap-2 shadow-md shadow-primary/20">
+                    {recreating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Launching...
+                      </>
+                    ) : (
+                      <>
+                        <Rocket className="h-4 w-4" />
+                        Launch Project
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
@@ -474,8 +514,8 @@ export default function ProjectsList() {
             </p>
             <div className="flex gap-3 justify-center flex-wrap">
               <Button onClick={() => setShowCreateForm(true)} className="gap-2 shadow-md shadow-primary/10">
-                <Plus className="h-4 w-4" />
-                Create Project
+                <Rocket className="h-4 w-4" />
+                Launch First Project
               </Button>
               <Link href="/chat">
                 <Button variant="outline" className="gap-2">

@@ -39,6 +39,9 @@ interface ChatInterfaceProps {
   initialMessages?: Message[];
   projectId?: string;
   projectName?: string;
+  projectDescription?: string;
+  projectType?: string;
+  autoInit?: boolean;
 }
 
 type AgentStatus = "idle" | "thinking" | "coding" | "searching" | "deploying" | "saving";
@@ -283,6 +286,9 @@ export default function ChatInterface({
   initialMessages = [],
   projectId,
   projectName,
+  projectDescription,
+  projectType,
+  autoInit = false,
 }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isLoading, setIsLoading] = useState(false);
@@ -339,6 +345,37 @@ export default function ChatInterface({
     };
     loadDefaultModel();
   }, [defaultModelLoaded]);
+
+  // Build the initialization prompt for a new project
+  function buildProjectInitPrompt(name: string, type?: string, description?: string): string {
+    const typeLabel = type || "project";
+    const descPart = description ? `\n\nDescription: ${description}` : "";
+    return (
+      `Initialize my ${typeLabel} project "${name}".${descPart}\n\n` +
+      `Scaffold the complete project from scratch with proper files and folder structure:\n` +
+      `- README.md (overview, features, tech stack, setup instructions)\n` +
+      `- package.json with all required dependencies\n` +
+      `- Correct src/ folder layout for the project type\n` +
+      `- Core entry point and main pages with premium UI\n` +
+      `- Key reusable components\n` +
+      `- Basic config files (tsconfig, tailwind, etc.)\n\n` +
+      `Make it production-ready with a clean, modern, premium design.`
+    );
+  }
+
+  // Auto-initialize new projects: when autoInit=true and no messages, kick off a build
+  const autoInitSentRef = useRef(false);
+  useEffect(() => {
+    if (!autoInit || !projectName || !defaultModelLoaded) return;
+    if (initialMessages.length > 0 || autoInitSentRef.current) return;
+    autoInitSentRef.current = true;
+
+    const initPrompt = buildProjectInitPrompt(projectName, projectType, projectDescription);
+    sendMessageToAgent(initPrompt, selectedModel, false, true);
+  // Intentionally omit sendMessageToAgent and selectedModel from deps — the ref guard
+  // prevents duplicate sends and we only want this to fire once when the model loads.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoInit, defaultModelLoaded, projectName, projectType, projectDescription]);
 
   // Extract code blocks and todos from messages (include partial for streaming)
   const isStreaming = messages.some(m => m.isStreaming);

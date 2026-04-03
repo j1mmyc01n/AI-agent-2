@@ -8,15 +8,18 @@ import { getStore } from "@netlify/blobs";
 
 interface ProjectPageProps {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ init?: string }>;
 }
 
-export default async function ProjectPage({ params }: ProjectPageProps) {
+export default async function ProjectPage({ params, searchParams }: ProjectPageProps) {
   const session = await getServerSession(authOptions);
   if (!session?.user) {
     redirect("/login");
   }
 
   const { id } = await params;
+  const resolvedSearch = searchParams ? await searchParams : {};
+  const isNewProject = resolvedSearch.init === "true";
   const userId = (session.user as { id: string }).id;
 
   let project: { id: string; name: string; description: string | null; type: string; status: string } | null = null;
@@ -108,6 +111,9 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
     }
   }
 
+  // Auto-init only when explicitly requested and the project truly has no history
+  const shouldAutoInit = isNewProject && initialMessages.length === 0;
+
   return (
     <MainLayout>
       <ChatInterface
@@ -115,7 +121,11 @@ export default async function ProjectPage({ params }: ProjectPageProps) {
         initialMessages={initialMessages}
         projectId={project.id}
         projectName={project.name}
+        projectDescription={project.description ?? undefined}
+        projectType={project.type}
+        autoInit={shouldAutoInit}
       />
     </MainLayout>
   );
 }
+
