@@ -109,6 +109,68 @@ try {
 </html>`;
 }
 
+/** Priority values for JS block ordering in the preview assembler. */
+const JS_PRIORITY_UTILS = 0;       // utilities, helpers, config, constants
+const JS_PRIORITY_COMPONENTS = 1;  // components, widgets, UI elements
+const JS_PRIORITY_API = 2;         // api, service, data, store, model
+const JS_PRIORITY_DEFAULT = 3;     // unclassified / misc
+const JS_PRIORITY_APP = 4;         // app, main, index, init — always last
+
+/**
+ * Sort JS blocks so utility/component files come before the main app file.
+ * This ensures that when all JS is concatenated into one <script>, functions
+ * defined in components.js / api.js are available when app.js runs.
+ */
+function sortJsBlocks(blocks: CodeBlock[]): CodeBlock[] {
+  const priority = (b: CodeBlock): number => {
+    const name = (b.filename || "").toLowerCase().replace(/\s*\(generating\.\.\.\)\s*/i, "");
+    if (/\b(util|helper|constant|config|type)/.test(name)) return JS_PRIORITY_UTILS;
+    if (/\b(component|widget|element|ui)/.test(name)) return JS_PRIORITY_COMPONENTS;
+    if (/\b(api|service|data|store|model)/.test(name)) return JS_PRIORITY_API;
+    if (/\b(app|main|index|init)/.test(name)) return JS_PRIORITY_APP;
+    return JS_PRIORITY_DEFAULT;
+  };
+  return [...blocks].sort((a, b) => priority(a) - priority(b));
+}
+
+/**
+ * Extract any tailwind.config object literal from JS blocks so it can be
+ * injected as an inline script BEFORE the Tailwind CDN tag.  This is
+ * required because the CDN processes the DOM on load — any config must
+ * already be on `window` at that point.
+ *
+ * Uses brace counting to correctly match nested objects.
+ */
+function extractTailwindConfig(jsContent: string): string | null {
+  const startIdx = jsContent.search(/tailwind\.config\s*=/);
+  if (startIdx === -1) return null;
+
+  // Find the opening brace
+  const braceIdx = jsContent.indexOf("{", startIdx);
+  if (braceIdx === -1) return null;
+
+  // Count braces to find the matching closing brace
+  let depth = 0;
+  let endIdx = -1;
+  for (let i = braceIdx; i < jsContent.length; i++) {
+    if (jsContent[i] === "{") depth++;
+    else if (jsContent[i] === "}") {
+      depth--;
+      if (depth === 0) { endIdx = i; break; }
+    }
+  }
+  if (endIdx === -1) return null;
+
+  const configValue = jsContent.slice(braceIdx, endIdx + 1);
+  return `tailwind.config = ${configValue};`;
+}
+
+/** Returns true if the HTML string contains the official Tailwind CDN script tag. */
+function hasTailwindCdnScript(html: string): boolean {
+  // Require the exact CDN hostname to avoid partial/spoofed matches
+  return /src=["']https:\/\/cdn\.tailwindcss\.com["']/.test(html);
+}
+
 /** Build a full HTML document from code blocks for inline preview */
 function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): string | null {
   if (!codeBlocks || codeBlocks.length === 0) return null;
@@ -150,7 +212,8 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
     const cssBlocks = codeBlocks.filter(
       (b) => b.language === "css" && b !== htmlBlock
     );
-    const jsBlocks = codeBlocks.filter(
+    // Sort JS blocks so utility/component files are defined before the main app runs
+    const jsBlocks = sortJsBlocks(codeBlocks.filter(
       (b) =>
         (b.language === "javascript" ||
           b.language === "js" ||
@@ -159,7 +222,7 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
           b.language === "jsx" ||
           b.language === "tsx") &&
         b !== htmlBlock
-    );
+    ));
 
     // Strip broken local-file references before injecting inline replacements
     html = stripLocalExternalRefs(html, cssBlocks.length > 0, jsBlocks.length > 0);
@@ -174,7 +237,18 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
     }
 
     if (jsBlocks.length > 0) {
-      const jsTag = `<script>\n${jsBlocks.map((b) => b.content).join("\n")}\n</script>`;
+      const combinedJs = jsBlocks.map((b) => b.content).join("\n\n");
+
+      // Hoist any tailwind.config definition before the Tailwind CDN script tag
+      const twConfig = extractTailwindConfig(combinedJs);
+      if (twConfig && hasTailwindCdnScript(html)) {
+        html = html.replace(
+          /(<script\b[^>]*src=["']https:\/\/cdn\.tailwindcss\.com["'][^>]*><\/script>)/i,
+          `<script>${twConfig}</script>\n$1`
+        );
+      }
+
+      const jsTag = `<script>\n${combinedJs}\n</script>`;
       if (html.includes("</body>")) {
         html = html.replace("</body>", `${jsTag}\n</body>`);
       } else {
@@ -187,14 +261,14 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
 
   // Build HTML from individual blocks (no full HTML file found)
   const cssBlocks = codeBlocks.filter((b) => b.language === "css");
-  const jsBlocks = codeBlocks.filter(
+  const jsBlocks = sortJsBlocks(codeBlocks.filter(
     (b) =>
       b.language === "javascript" ||
       b.language === "js" ||
       b.language === "jsx" ||
       b.language === "typescript" ||
       b.language === "ts"
-  );
+  ));
   const htmlSnippets = codeBlocks.filter(
     (b) =>
       b.language === "html" &&
@@ -210,7 +284,7 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
     return null;
 
   const css = cssBlocks.map((b) => b.content).join("\n");
-  const js = jsBlocks.map((b) => b.content).join("\n");
+  const combinedJs = jsBlocks.map((b) => b.content).join("\n\n");
   const htmlContent = htmlSnippets.map((b) => b.content).join("\n");
 
   return `<!DOCTYPE html>
@@ -226,7 +300,7 @@ function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): strin
 </head>
 <body>
 ${htmlContent}
-${js ? `<script>\n${js}\n</script>` : ""}
+${combinedJs ? `<script>\n${combinedJs}\n</script>` : ""}
 </body>
 </html>`;
 }
