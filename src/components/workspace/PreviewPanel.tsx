@@ -326,7 +326,7 @@ export default function PreviewPanel({
             <Maximize2 className="h-3.5 w-3.5" />
           )}
         </Button>
-        {hasDeployedPreview && (
+        {hasDeployedPreview ? (
           <a href={previewUrl} target="_blank" rel="noopener noreferrer">
             <Button
               variant="ghost"
@@ -337,7 +337,27 @@ export default function PreviewPanel({
               <ExternalLink className="h-3.5 w-3.5" />
             </Button>
           </a>
-        )}
+        ) : hasInlinePreview && !isStreaming ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 shrink-0"
+            title="Open preview in new tab"
+            onClick={() => {
+              const blob = new Blob([inlineHtml!], { type: "text/html" });
+              const url = URL.createObjectURL(blob);
+              const win = window.open(url, "_blank");
+              // Revoke after the browser has had time to load it
+              if (win) {
+                win.addEventListener("load", () => URL.revokeObjectURL(url), { once: true });
+              } else {
+                setTimeout(() => URL.revokeObjectURL(url), 10_000);
+              }
+            }}
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </Button>
+        ) : null}
       </div>
 
       {/* Multi-page tabs for SaaS projects */}
