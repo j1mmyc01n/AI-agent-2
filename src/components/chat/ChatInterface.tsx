@@ -347,9 +347,18 @@ export default function ChatInterface({
   // Merge: agent-generated activity todos + workflow parsed todos + chat-extracted todos
   const todos = agentTodos.length > 0 ? agentTodos : workflowTodos.length > 0 ? workflowTodos : chatTodos;
   const hasPreviewableCode = codeBlocks.some(
-    (b) => b.language === "html" || b.language === "css" || b.language === "javascript" || b.language === "js"
+    (b) =>
+      b.language === "html" ||
+      b.language === "css" ||
+      b.language === "javascript" ||
+      b.language === "js" ||
+      b.language === "jsx" ||
+      b.language === "tsx" ||
+      b.language === "typescript" ||
+      b.language === "ts"
   );
   const prevCodeCount = useRef(0);
+  const wasStreaming = useRef(false);
   const userHasManuallySelectedPanel = useRef(false);
 
   // Track when user manually clicks a tab - respect their choice
@@ -358,17 +367,37 @@ export default function ChatInterface({
     setActivePanel(panel);
   }, []);
 
-  // Auto-switch panels ONLY on first code appearance in build mode, and only if user hasn't manually selected
+  // Auto-switch panels on first code appearance, and respect user's manual selections
   useEffect(() => {
     if (userHasManuallySelectedPanel.current) return;
-    if (codeBlocks.length > 0 && prevCodeCount.current === 0 && (chatMode === "build" || chatMode === "saas-upgrade")) {
+    if (codeBlocks.length > 0 && prevCodeCount.current === 0) {
       prevCodeCount.current = codeBlocks.length;
-      // Show code tab first so users can see the agent coding
-      setActivePanel("code");
+      if (chatMode === "build" || chatMode === "saas-upgrade") {
+        // During an active build, show the code tab so the user can watch generation in real-time
+        setActivePanel("code");
+      } else if (initialMessages.length > 0) {
+        // Loading an existing project — jump straight to the preview
+        setActivePanel("preview");
+      }
     } else {
       prevCodeCount.current = codeBlocks.length;
     }
-  }, [codeBlocks.length, chatMode]);
+  }, [codeBlocks.length, chatMode, initialMessages.length]);
+
+  // After streaming finishes in build mode, auto-switch to the preview tab so the user
+  // sees the rendered result without having to click the tab manually.
+  useEffect(() => {
+    const justFinished = wasStreaming.current && !isStreaming;
+    wasStreaming.current = isStreaming;
+    if (
+      justFinished &&
+      hasPreviewableCode &&
+      !userHasManuallySelectedPanel.current &&
+      (chatMode === "build" || chatMode === "saas-upgrade")
+    ) {
+      setActivePanel("preview");
+    }
+  }, [isStreaming, hasPreviewableCode, chatMode]);
 
   // Parse streaming content for workflow tasks in real-time
   const parseWorkflowTasks = useCallback((content: string) => {
