@@ -116,7 +116,7 @@ export const tools: ChatCompletionTool[] = [
     function: {
       name: "save_artifact",
       description:
-        "Save generated code files as a persistent artifact using the proper folder structure. Always call this after generating a project. Files are stored and available across sessions. Use folder paths matching the project structure (e.g. 'index.html', 'src/css/styles.css', 'src/js/components.js', 'src/js/api.js', 'src/js/app.js').",
+        "Save generated code files as a persistent artifact using the proper 8-file folder structure. Always call this after generating a project — pass ALL files with their full folder paths. Files are stored and available across sessions.",
       parameters: {
         type: "object",
         properties: {
@@ -126,13 +126,13 @@ export const tools: ChatCompletionTool[] = [
           },
           files: {
             type: "array",
-            description: "Array of files to save. Use proper folder paths: 'index.html', 'src/css/styles.css', 'src/js/components.js', 'src/js/api.js', 'src/js/app.js'",
+            description: "Array of ALL generated files to save. Use proper folder paths matching the 8-file structure: 'index.html', 'src/css/styles.css', 'src/css/components.css', 'src/js/config.js', 'src/js/state.js', 'src/js/router.js', 'src/js/components.js', 'src/js/app.js'",
             items: {
               type: "object",
               properties: {
                 path: {
                   type: "string",
-                  description: "File path with folder structure. Examples: 'index.html', 'src/css/styles.css', 'src/js/app.js', 'src/js/components.js', 'src/js/api.js'",
+                  description: "File path with folder structure. Examples: 'index.html', 'src/css/styles.css', 'src/css/components.css', 'src/js/config.js', 'src/js/state.js', 'src/js/router.js', 'src/js/components.js', 'src/js/app.js'",
                 },
                 content: {
                   type: "string",
