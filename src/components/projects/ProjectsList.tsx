@@ -588,7 +588,8 @@ export default function ProjectsList() {
                 className="border-border/50 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group overflow-hidden cursor-pointer"
                 onClick={() => { if (editingId !== project.id) router.push(`/projects/${project.id}`); }}
               >
-                {/* Clickable project thumbnail - navigates to project workspace */}
+                {/* Thumbnail Link kept for accessibility/right-click; stopPropagation prevents
+                    double-navigation with the card-level onClick below */}
                 <Link href={`/projects/${project.id}`} className="block cursor-pointer" onClick={(e) => e.stopPropagation()}>
                   <ProjectThumbnail project={project} />
                 </Link>

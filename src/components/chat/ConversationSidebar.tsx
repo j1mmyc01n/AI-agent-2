@@ -139,18 +139,21 @@ export default function ConversationSidebar({
 
   const handleClearAll = async () => {
     const projectIds = new Set(projects.map(p => p.id));
+    // Treat conversations as unlinked if they have no projectId, or if the project
+    // they reference no longer exists (orphaned). Both are safe to bulk-delete.
     const unlinkedConvs = conversations.filter(c => !c.projectId || !projectIds.has(c.projectId));
     if (unlinkedConvs.length === 0) return;
     setClearingAll(true);
 
     try {
-      // Delete only unlinked conversations (not project chats)
+      // Delete only unlinked/orphaned conversations (not project chats)
       const deletePromises = unlinkedConvs.map((conv) =>
         fetch(`/api/conversations/${conv.id}`, { method: "DELETE" }).catch(
           () => null
         )
       );
       await Promise.all(deletePromises);
+      // Keep only conversations that are actively linked to a known project
       setConversations((prev) => prev.filter(c => c.projectId && projectIds.has(c.projectId)));
       if (currentConversationId && unlinkedConvs.some(c => c.id === currentConversationId)) {
         router.push("/chat");
