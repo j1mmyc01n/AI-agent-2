@@ -408,6 +408,8 @@ tailwind.config = {
 7. ✅ No React, TypeScript, React Native, or any framework code
 8. After generating ALL 8 files, call \`save_artifact\` with all 8 folder paths to persist them
 9. After generating, call \`create_project_record\` with type="saas"
+
+**⚠️ COMPLETION RULE: You MUST generate every one of the 8 files before stopping. If you are running low on output space, make each remaining file shorter and more concise — but ALWAYS output a complete, closed code block for every file. NEVER end your response in the middle of generating a file. NEVER skip a file. The system will automatically prompt you to continue if files are missing, but it is better to complete everything in one pass with leaner implementations.**
 `;
 
 const SAAS_UPGRADE_INSTRUCTIONS = `
