@@ -58,9 +58,8 @@ export async function POST(req: NextRequest) {
     // Add to user's artifact index
     const indexKey = `user:${userId}`;
     const existing = await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] || [];
-    const existingArr = Array.isArray(existing) ? existing : [];
-    existingArr.unshift({ id: artifactId, title: artifact.title, fileCount: files.length, createdAt: artifact.createdAt });
-    await store.setJSON(indexKey, existingArr);
+    existing.unshift({ id: artifactId, title: artifact.title, fileCount: files.length, createdAt: artifact.createdAt });
+    await store.setJSON(indexKey, existing);
 
     return NextResponse.json({ id: artifactId, fileCount: files.length });
   } catch (error) {

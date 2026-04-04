@@ -127,10 +127,10 @@ function sortJsBlocks(blocks: CodeBlock[]): CodeBlock[] {
   const priority = (b: CodeBlock): number => {
     const name = (b.filename || "").toLowerCase().replace(/\s*\(generating\.\.\.\)\s*/i, "");
     if (/\b(config|constant|setting|type)/.test(name)) return JS_PRIORITY_CONFIG;
-    if (/\b(state|store|model)/.test(name)) return JS_PRIORITY_STATE;
+    if (/\b(state|store)/.test(name)) return JS_PRIORITY_STATE;
     if (/\b(router|route|navigation)/.test(name)) return JS_PRIORITY_ROUTER;
     if (/\b(component|widget|element|ui)/.test(name)) return JS_PRIORITY_COMPONENTS;
-    if (/\b(api|service|data|util|helper)/.test(name)) return JS_PRIORITY_API;
+    if (/\b(api|service|data|model|util|helper)/.test(name)) return JS_PRIORITY_API;
     if (/\b(app|main|index|init)/.test(name)) return JS_PRIORITY_APP;
     return JS_PRIORITY_DEFAULT;
   };

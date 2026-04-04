@@ -987,6 +987,7 @@ export default function ChatInterface({
 
         // Same auto-save fallback for streams that close without a "done" event
         autoSaveProjectIfNeeded(shouldBuild, projectId, activeToolCalls, streamingContentRef.current, content);
+        autoSaveArtifactIfNeeded(shouldBuild, activeToolCalls, streamingContentRef.current, content, projectId);
 
         // Refresh sidebar in case the agent created/modified projects before the stream ended
         window.dispatchEvent(new Event("dobetter-projects-updated"));
