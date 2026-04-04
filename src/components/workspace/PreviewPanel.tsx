@@ -110,23 +110,27 @@ try {
 }
 
 /** Priority values for JS block ordering in the preview assembler. */
-const JS_PRIORITY_UTILS = 0;       // utilities, helpers, config, constants
-const JS_PRIORITY_COMPONENTS = 1;  // components, widgets, UI elements
-const JS_PRIORITY_API = 2;         // api, service, data, store, model
-const JS_PRIORITY_DEFAULT = 3;     // unclassified / misc
-const JS_PRIORITY_APP = 4;         // app, main, index, init — always last
+const JS_PRIORITY_CONFIG = 0;      // config, constants, settings — must load first
+const JS_PRIORITY_STATE = 1;       // state, store — after config
+const JS_PRIORITY_ROUTER = 2;      // router, route, navigation — after state
+const JS_PRIORITY_COMPONENTS = 3;  // components, widgets, UI elements — after router
+const JS_PRIORITY_API = 4;         // api, service, data, model — data layer
+const JS_PRIORITY_DEFAULT = 3;     // unclassified / misc (same level as components)
+const JS_PRIORITY_APP = 5;         // app, main, index, init — always last
 
 /**
- * Sort JS blocks so utility/component files come before the main app file.
- * This ensures that when all JS is concatenated into one <script>, functions
- * defined in components.js / api.js are available when app.js runs.
+ * Sort JS blocks so files load in dependency order for the 8-file architecture:
+ * config → state → router → components → api/data → app (last)
+ * This ensures all dependencies are defined before the bootstrap runs.
  */
 function sortJsBlocks(blocks: CodeBlock[]): CodeBlock[] {
   const priority = (b: CodeBlock): number => {
     const name = (b.filename || "").toLowerCase().replace(/\s*\(generating\.\.\.\)\s*/i, "");
-    if (/\b(util|helper|constant|config|type)/.test(name)) return JS_PRIORITY_UTILS;
+    if (/\b(config|constant|setting|type)/.test(name)) return JS_PRIORITY_CONFIG;
+    if (/\b(state|store)/.test(name)) return JS_PRIORITY_STATE;
+    if (/\b(router|route|navigation)/.test(name)) return JS_PRIORITY_ROUTER;
     if (/\b(component|widget|element|ui)/.test(name)) return JS_PRIORITY_COMPONENTS;
-    if (/\b(api|service|data|store|model)/.test(name)) return JS_PRIORITY_API;
+    if (/\b(api|service|data|model|util|helper)/.test(name)) return JS_PRIORITY_API;
     if (/\b(app|main|index|init)/.test(name)) return JS_PRIORITY_APP;
     return JS_PRIORITY_DEFAULT;
   };

@@ -552,7 +552,7 @@ export default function ChatInterface({
   }, []);
 
   // Generate activity-based tasks from agent status changes
-  const updateAgentTasks = useCallback((status: AgentStatus, toolName?: string, content?: string) => {
+  const updateAgentTasks = useCallback((status: AgentStatus, toolName?: string, content?: string, toolCalls?: ToolCallData[]) => {
     setAgentTodos(prev => {
       const tasks = [...prev];
 
@@ -631,8 +631,23 @@ export default function ChatInterface({
       }
 
       if (status === "idle") {
-        // Complete all tasks
-        return tasks.map(t => ({ ...t, status: "done" as const }));
+        const hasSaveArtifact = toolCalls?.some(tc => tc.name === "save_artifact");
+        const hasCode = content ? CODE_FENCE_RE.test(content) : false;
+        return tasks.map(t => {
+          // If no code was generated, only mark early planning tasks done; leave the rest unchanged
+          if (!hasCode) {
+            if (t.title.includes("Researching") || t.title.includes("Planning")) {
+              return { ...t, status: "done" as const };
+            }
+            return t;
+          }
+          // Code was generated — mark saving task based on whether save_artifact was called
+          if (t.title.includes("Saving")) {
+            const savingStatus: "done" | "in-progress" = hasSaveArtifact ? "done" : "in-progress";
+            return { ...t, status: savingStatus };
+          }
+          return { ...t, status: "done" as const };
+        });
       }
 
       // When we detect code blocks in streaming content, update code task
@@ -685,6 +700,47 @@ export default function ChatInterface({
     })
       .then(() => window.dispatchEvent(new Event("dobetter-projects-updated")))
       .catch(() => {/* fire-and-forget; sidebar refreshes on next visit */});
+  }
+
+  // Fire-and-forget: save the generated code files as an artifact when the AI built code
+  // but never called save_artifact (e.g. token limit reached). Extracts named code blocks
+  // from the streaming content and POSTs them to /api/artifacts.
+  function autoSaveArtifactIfNeeded(
+    shouldBuild: boolean,
+    toolCalls: ToolCallData[],
+    streamContent: string,
+    userMessage: string,
+    currentProjectId: string | undefined
+  ) {
+    if (!shouldBuild) return;
+    const artifactAlreadySaved = toolCalls.some((tc) => tc.name === "save_artifact");
+    if (artifactAlreadySaved) return;
+
+    // Extract named code blocks from the stream content
+    const codeRegex = /```(\w+)?:([^\n]+)\n([\s\S]*?)```/g;
+    const files: { path: string; content: string }[] = [];
+    let match: RegExpExecArray | null;
+    const seen = new Set<string>();
+    while ((match = codeRegex.exec(streamContent)) !== null) {
+      const filePath = match[2].trim().replace(/\s*\(generating\.\.\.\)\s*/i, "").trim();
+      if (filePath && !seen.has(filePath)) {
+        seen.add(filePath);
+        files.push({ path: filePath, content: match[3].trim() });
+      }
+    }
+
+    if (files.length === 0) return;
+
+    const rawName = userMessage.trim().replace(/[.!?]+$/, "");
+    const title = rawName.length > MAX_PROJECT_NAME_LENGTH
+      ? rawName.slice(0, MAX_PROJECT_NAME_LENGTH).trim() + "…"
+      : rawName || "My Project";
+
+    fetch("/api/artifacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, files, projectId: currentProjectId }),
+    }).catch(() => {/* fire-and-forget */});
   }
 
   const sendMessageToAgent = useCallback(
@@ -835,7 +891,7 @@ export default function ChatInterface({
                 setAgentStatus("idle");
 
                 if (shouldBuild) {
-                  updateAgentTasks("idle");
+                  updateAgentTasks("idle", undefined, streamingContentRef.current, activeToolCalls);
                 }
 
                 setMessages((prev) =>
@@ -887,6 +943,19 @@ export default function ChatInterface({
                 // create_project_record (e.g. token-limit was hit, or chat-mode build).
                 autoSaveProjectIfNeeded(shouldBuild, projectId, activeToolCalls, streamingContentRef.current, content);
 
+                // Auto-save artifact files when the AI built code but didn't call save_artifact.
+                autoSaveArtifactIfNeeded(shouldBuild, activeToolCalls, streamingContentRef.current, content, projectId);
+
+                // Mark saving task done now that auto-save has been triggered
+                if (shouldBuild) {
+                  const hasSaveArtifact = activeToolCalls.some(tc => tc.name === "save_artifact");
+                  if (!hasSaveArtifact && CODE_FENCE_RE.test(streamingContentRef.current)) {
+                    setAgentTodos(prev => prev.map(t =>
+                      t.title.includes("Saving") ? { ...t, status: "done" as const } : t
+                    ));
+                  }
+                }
+
                 window.dispatchEvent(new Event("dobetter-projects-updated"));
                 window.dispatchEvent(new Event("dobetter-conversations-updated"));
 
@@ -918,6 +987,7 @@ export default function ChatInterface({
 
         // Same auto-save fallback for streams that close without a "done" event
         autoSaveProjectIfNeeded(shouldBuild, projectId, activeToolCalls, streamingContentRef.current, content);
+        autoSaveArtifactIfNeeded(shouldBuild, activeToolCalls, streamingContentRef.current, content, projectId);
 
         // Refresh sidebar in case the agent created/modified projects before the stream ended
         window.dispatchEvent(new Event("dobetter-projects-updated"));
