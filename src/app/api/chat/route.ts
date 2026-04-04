@@ -302,13 +302,13 @@ export async function POST(req: NextRequest) {
         // Set a timeout to prevent stalling
         const timeout = setTimeout(() => {
           try {
-            const errorData = JSON.stringify({ type: "error", error: "Request timed out after 60 seconds. Try again or switch to a faster model like Claude Haiku or GPT-4o mini." });
+            const errorData = JSON.stringify({ type: "error", error: "Request timed out after 5 minutes. Try again or switch to a faster model like Claude Haiku or GPT-4o mini." });
             controller.enqueue(encoder.encode(`data: ${errorData}\n\n`));
             controller.close();
           } catch {
             // Controller may already be closed
           }
-        }, 60000); // 60 second timeout (reduced from 2 min)
+        }, 300000); // 5 minute timeout for complex agent tasks
 
         try {
           await runAgent(

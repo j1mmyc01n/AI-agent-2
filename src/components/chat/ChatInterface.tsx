@@ -785,6 +785,9 @@ export default function ChatInterface({
         );
         setAgentStatus("idle");
         setIsLoading(false);
+        // Refresh sidebar in case the agent created/modified projects before the stream ended
+        window.dispatchEvent(new Event("dobetter-projects-updated"));
+        window.dispatchEvent(new Event("dobetter-conversations-updated"));
       } catch (error) {
         abortControllerRef.current = null;
         setIsLoading(false);
@@ -799,6 +802,9 @@ export default function ChatInterface({
                 : m
             )
           );
+          // Still refresh sidebar — agent may have saved a project before the abort
+          window.dispatchEvent(new Event("dobetter-projects-updated"));
+          window.dispatchEvent(new Event("dobetter-conversations-updated"));
           return;
         }
 
@@ -814,6 +820,9 @@ export default function ChatInterface({
           description: errorMsg,
           variant: "destructive",
         });
+        // Refresh sidebar — agent may have saved a project before the error occurred
+        window.dispatchEvent(new Event("dobetter-projects-updated"));
+        window.dispatchEvent(new Event("dobetter-conversations-updated"));
       }
     },
     [isLoading, currentConversationId, initialConversationId, projectId, messages, chatMode, parseWorkflowTasks, updateAgentTasks]
