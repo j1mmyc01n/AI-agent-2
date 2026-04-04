@@ -660,10 +660,15 @@ export default function ChatInterface({
         const hasSaveArtifact = toolCalls?.some(tc => tc.name === "save_artifact");
         const hasCode = content ? CODE_FENCE_RE.test(content) : false;
         return tasks.map(t => {
-          // If no code was generated, only mark early planning tasks done; leave the rest unchanged
+          // If no code was generated, only mark early planning/research tasks done;
+          // mark remaining tasks as skipped so they don't appear stuck as "Pending"
           if (!hasCode) {
             if (t.title.includes("Researching") || t.title.includes("Planning")) {
               return { ...t, status: "done" as const };
+            }
+            // Tasks that need code to complete should be skipped, not stuck at pending
+            if (t.status === "pending") {
+              return { ...t, status: "skipped" as const };
             }
             return t;
           }
@@ -995,14 +1000,14 @@ export default function ChatInterface({
                 // Auto-continue if in build mode and some required files are still missing.
                 // This handles the common case of token-limit truncation where the AI finishes
                 // its response but hasn't yet output all 8 required project files.
-                if (shouldBuild && buildContinuationCountRef.current < 2) {
+                if (shouldBuild && buildContinuationCountRef.current < 3) {
                   const missingFiles = getMissingBuildFiles(streamingContentRef.current);
                   if (missingFiles.length > 0) {
                     buildContinuationCountRef.current += 1;
                     const continuationPrompt =
-                      `Continue building the project. Generate these remaining files completely with full working code:\n` +
+                      `Continue building — output the remaining files right now with NO preamble or explanation. Start immediately with the first missing file's code block:\n` +
                       missingFiles.map(f => `- \`${f}\``).join('\n') +
-                      `\n\nDo not stop until every listed file has a complete, closed code block. Then call save_artifact with all generated files.`;
+                      `\n\nRules: complete, closed code block for every file listed. No "continuing..." text. Just code. After all files, call save_artifact with ALL generated files (including previously generated ones).`;
                     // Small delay lets React flush state updates (isStreaming, conversationId)
                     // before the continuation request is dispatched.
                     const AUTO_CONTINUATION_DELAY_MS = 400;
