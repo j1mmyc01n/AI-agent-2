@@ -848,6 +848,27 @@ export default function ChatInterface({
                 // Reset manual panel tracking for next message
                 userHasManuallySelectedPanel.current = false;
 
+                // Auto-save a project record when the AI built code but didn't call
+                // create_project_record (e.g. token-limit was hit, or chat-mode build).
+                // Only applies when we're NOT already inside a project page.
+                if (shouldBuild && !projectId) {
+                  const projectAlreadySaved = activeToolCalls.some(
+                    (tc) => tc.name === "create_project_record"
+                  );
+                  const hasCodeOutput = streamingContentRef.current.includes("```");
+                  if (!projectAlreadySaved && hasCodeOutput) {
+                    const rawName = content.trim().replace(/[.!?]+$/, "");
+                    const projectName = rawName.length > 60 ? rawName.slice(0, 60).trim() + "…" : rawName || "My Project";
+                    fetch("/api/projects", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ name: projectName, type: "saas" }),
+                    })
+                      .then(() => window.dispatchEvent(new Event("dobetter-projects-updated")))
+                      .catch(() => {/* fire-and-forget; sidebar refreshes on next visit */});
+                  }
+                }
+
                 window.dispatchEvent(new Event("dobetter-projects-updated"));
                 window.dispatchEvent(new Event("dobetter-conversations-updated"));
 
@@ -876,6 +897,26 @@ export default function ChatInterface({
         );
         setAgentStatus("idle");
         setIsLoading(false);
+
+        // Same auto-save fallback for streams that close without a "done" event
+        if (shouldBuild && !projectId) {
+          const projectAlreadySaved = activeToolCalls.some(
+            (tc) => tc.name === "create_project_record"
+          );
+          const hasCodeOutput = streamingContentRef.current.includes("```");
+          if (!projectAlreadySaved && hasCodeOutput) {
+            const rawName = content.trim().replace(/[.!?]+$/, "");
+            const projectName = rawName.length > 60 ? rawName.slice(0, 60).trim() + "…" : rawName || "My Project";
+            fetch("/api/projects", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name: projectName, type: "saas" }),
+            })
+              .then(() => window.dispatchEvent(new Event("dobetter-projects-updated")))
+              .catch(() => {});
+          }
+        }
+
         // Refresh sidebar in case the agent created/modified projects before the stream ended
         window.dispatchEvent(new Event("dobetter-projects-updated"));
         window.dispatchEvent(new Event("dobetter-conversations-updated"));
