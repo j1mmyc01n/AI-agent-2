@@ -8,6 +8,7 @@
 [build.environment]
   NODE_VERSION = "20"
   NPM_FLAGS = "--legacy-peer-deps"
+  BUILDING = "true"
 
 # CRITICAL: Set these environment variables in Netlify UI for runtime
 # (DO NOT set DATABASE_URL here - it would override the runtime value)
