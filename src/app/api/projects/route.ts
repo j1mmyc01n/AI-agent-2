@@ -70,8 +70,18 @@ export async function POST(req: NextRequest) {
   }
   const userId = (session.user as { id: string }).id;
 
-  const body = await req.json();
-  const { name, description, type, githubRepo, vercelUrl } = body;
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const name = typeof body.name === "string" && body.name.trim() ? body.name.trim() : undefined;
+  const description = typeof body.description === "string" ? body.description : undefined;
+  const type = typeof body.type === "string" ? body.type : undefined;
+  const githubRepo = typeof body.githubRepo === "string" ? body.githubRepo : undefined;
+  const vercelUrl = typeof body.vercelUrl === "string" ? body.vercelUrl : undefined;
 
   if (!name) {
     return NextResponse.json({ error: "Project name is required" }, { status: 400 });
