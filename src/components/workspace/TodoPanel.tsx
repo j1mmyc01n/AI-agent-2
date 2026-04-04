@@ -228,9 +228,9 @@ export default function TodoPanel({ todos: initialTodos = [], agentStatus = "idl
 
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className={`text-sm font-medium leading-tight font-mono ${
+                    <p className={`text-sm font-medium leading-tight ${
                       todo.status === "done" ? "line-through text-muted-foreground" : ""
-                    } ${isFileTask ? "text-xs" : ""}`}>
+                    } ${isFileTask ? "text-xs font-mono" : ""}`}>
                       {isFileTask && todo.status !== "done" && (
                         <span className="not-italic font-sans text-muted-foreground mr-1">
                           {isActive ? "✍" : "○"}

@@ -94,6 +94,12 @@ function ProjectThumbnail({ project }: { project: Project }) {
   const hash = project.name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const pattern = hash % 4;
 
+  // Thumbnail iframe scaling: container is h-32 (128px); iframe is rendered at 4× then scaled
+  // down by 0.25, so the visible 128px slot shows the top 512px of the project page at 25% zoom.
+  const PREVIEW_SCALE = 0.25;
+  const PREVIEW_MULTIPLIER = 1 / PREVIEW_SCALE; // 4
+  const CONTAINER_HEIGHT_PX = 128;
+
   return (
     <div className={`relative w-full h-32 rounded-t-lg overflow-hidden ${!previewHtml ? `bg-gradient-to-br ${gradient}` : "bg-background"}`}>
       {previewHtml ? (
@@ -105,9 +111,9 @@ function ProjectThumbnail({ project }: { project: Project }) {
             title={`Preview of ${project.name}`}
             className="absolute top-0 left-0 border-0 pointer-events-none"
             style={{
-              width: "400%",
-              height: "512px",
-              transform: "scale(0.25)",
+              width: `${PREVIEW_MULTIPLIER * 100}%`,
+              height: `${CONTAINER_HEIGHT_PX * PREVIEW_MULTIPLIER}px`,
+              transform: `scale(${PREVIEW_SCALE})`,
               transformOrigin: "top left",
             }}
           />

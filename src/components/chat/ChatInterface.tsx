@@ -603,7 +603,8 @@ export default function ChatInterface({
             );
             // Per-file tasks: all done except the last one in-progress
             const fileTasks: TodoItem[] = fileProgress.map((f, i) => ({
-              id: `file-${f.filename.replace(/[^a-z0-9]/gi, "-")}`,
+              // Normalize to avoid consecutive/leading/trailing hyphens (e.g. src/js/app.js → src-js-app-js)
+              id: `file-${f.filename.replace(/[^a-z0-9]+/gi, "-").replace(/^-+|-+$/g, "")}`,
               title: f.filename,
               status: (f.done || i < fileProgress.length - 1 ? "done" : "in-progress") as "done" | "in-progress",
             }));
@@ -819,7 +820,10 @@ export default function ChatInterface({
                   parseWorkflowTasks(streamingContentRef.current);
                 }
 
-                // Save first complete HTML block as project preview thumbnail
+                // Save first complete HTML block as project preview thumbnail.
+                // Limit to MAX_PREVIEW_HTML_BYTES to stay well within localStorage quota
+                // (browsers typically allow 5-10MB total, we cap at ~60KB per project preview).
+                const MAX_PREVIEW_HTML_BYTES = 60_000;
                 if (shouldBuild && projectId) {
                   try {
                     const htmlMatch = streamingContentRef.current.match(
@@ -828,7 +832,7 @@ export default function ChatInterface({
                     if (htmlMatch) {
                       localStorage.setItem(
                         `project-preview-${projectId}`,
-                        htmlMatch[1].slice(0, 60000)
+                        htmlMatch[1].slice(0, MAX_PREVIEW_HTML_BYTES)
                       );
                       window.dispatchEvent(
                         new CustomEvent("dobetter-project-preview-updated", {
