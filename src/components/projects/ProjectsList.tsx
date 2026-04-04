@@ -583,16 +583,20 @@ export default function ProjectsList() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {projects.map((project) => (
-              <Card key={project.id} className="border-border/50 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group overflow-hidden">
+              <Card
+                key={project.id}
+                className="border-border/50 hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5 transition-all group overflow-hidden cursor-pointer"
+                onClick={() => { if (editingId !== project.id) router.push(`/projects/${project.id}`); }}
+              >
                 {/* Clickable project thumbnail - navigates to project workspace */}
-                <Link href={`/projects/${project.id}`} className="block cursor-pointer">
+                <Link href={`/projects/${project.id}`} className="block cursor-pointer" onClick={(e) => e.stopPropagation()}>
                   <ProjectThumbnail project={project} />
                 </Link>
 
                 <CardHeader className="pb-2 pt-3">
                   <div className="flex items-start justify-between gap-2">
                     {editingId === project.id ? (
-                      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 flex-1 min-w-0" onClick={(e) => e.stopPropagation()}>
                         <input
                           type="text"
                           value={editName}
@@ -612,16 +616,14 @@ export default function ProjectsList() {
                         </Button>
                       </div>
                     ) : (
-                      <Link href={`/projects/${project.id}`} className="flex-1 min-w-0">
-                        <CardTitle className="text-base leading-tight truncate hover:text-primary transition-colors cursor-pointer">
-                          {project.name}
-                        </CardTitle>
-                      </Link>
+                      <CardTitle className="text-base leading-tight truncate flex-1 min-w-0">
+                        {project.name}
+                      </CardTitle>
                     )}
 
                     {/* Action buttons - always visible */}
                     {editingId !== project.id && (
-                      <div className="flex items-center gap-0.5 shrink-0">
+                      <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="icon"
@@ -655,7 +657,7 @@ export default function ProjectsList() {
                   )}
                 </CardHeader>
                 <CardContent className="pt-0 pb-3">
-                  <div className="flex flex-wrap gap-1.5">
+                  <div className="flex flex-wrap gap-1.5" onClick={(e) => e.stopPropagation()}>
                     {project.githubRepo && (
                       <a
                         href={project.githubRepo}

@@ -851,7 +851,7 @@ export default function ChatInterface({
                 window.dispatchEvent(new Event("dobetter-projects-updated"));
                 window.dispatchEvent(new Event("dobetter-conversations-updated"));
 
-                if (!initialConversationId && newConversationId) {
+                if (!initialConversationId && !projectId && newConversationId) {
                   window.history.replaceState(null, "", `/chat/${newConversationId}`);
                 }
               } else if (chunk.type === "error") {

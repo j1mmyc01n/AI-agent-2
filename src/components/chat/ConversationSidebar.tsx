@@ -17,7 +17,6 @@ import {
   MessageSquarePlus,
   Settings,
   Trash2,
-  MoreHorizontal,
   Bot,
   LogOut,
   User,
@@ -139,19 +138,21 @@ export default function ConversationSidebar({
   };
 
   const handleClearAll = async () => {
-    if (conversations.length === 0) return;
+    const projectIds = new Set(projects.map(p => p.id));
+    const unlinkedConvs = conversations.filter(c => !c.projectId || !projectIds.has(c.projectId));
+    if (unlinkedConvs.length === 0) return;
     setClearingAll(true);
 
     try {
-      // Delete all conversations one by one
-      const deletePromises = conversations.map((conv) =>
+      // Delete only unlinked conversations (not project chats)
+      const deletePromises = unlinkedConvs.map((conv) =>
         fetch(`/api/conversations/${conv.id}`, { method: "DELETE" }).catch(
           () => null
         )
       );
       await Promise.all(deletePromises);
-      setConversations([]);
-      if (currentConversationId) {
+      setConversations((prev) => prev.filter(c => c.projectId && projectIds.has(c.projectId)));
+      if (currentConversationId && unlinkedConvs.some(c => c.id === currentConversationId)) {
         router.push("/chat");
       }
     } catch (error) {
@@ -283,42 +284,17 @@ export default function ConversationSidebar({
                           >
                             <FolderOpen className="h-3.5 w-3.5 shrink-0 text-primary/70" />
                             <span className="truncate flex-1 text-xs font-medium">{project.name}</span>
-                            {project.status && (
+                            {projectConvs.length > 0 && (
+                              <span className="h-4 min-w-4 rounded-full bg-primary/15 text-primary text-[10px] flex items-center justify-center px-1 shrink-0">
+                                {projectConvs.length}
+                              </span>
+                            )}
+                            {project.status && projectConvs.length === 0 && (
                               <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${
                                 project.status === "active" ? "bg-green-400" : "bg-muted-foreground/40"
                               }`} />
                             )}
                           </Link>
-                          {/* Conversations belonging to this project - nested */}
-                          {projectConvs.length > 0 && (
-                            <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/30 pl-2">
-                              {projectConvs.map((conv) => (
-                                <div key={conv.id} className="group relative">
-                                  <Link
-                                    href={`/chat/${conv.id}`}
-                                    className={`flex items-center gap-2 px-2 py-1 text-xs rounded-md transition-colors ${
-                                      currentConversationId === conv.id
-                                        ? "bg-primary/10 text-primary"
-                                        : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                                    }`}
-                                  >
-                                    <MessageSquare className="h-3 w-3 shrink-0 opacity-50" />
-                                    <span className="truncate flex-1">{conv.title}</span>
-                                  </Link>
-                                  <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <button
-                                      onClick={(e) => handleDelete(conv.id, e)}
-                                      disabled={deletingId === conv.id}
-                                      className="h-4 w-4 flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-                                      title="Delete conversation"
-                                    >
-                                      <Trash2 className="h-2.5 w-2.5" />
-                                    </button>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       );
                     })}
