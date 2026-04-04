@@ -1003,9 +1003,12 @@ export default function ChatInterface({
                       `Continue building the project. Generate these remaining files completely with full working code:\n` +
                       missingFiles.map(f => `- \`${f}\``).join('\n') +
                       `\n\nDo not stop until every listed file has a complete, closed code block. Then call save_artifact with all generated files.`;
+                    // Small delay lets React flush state updates (isStreaming, conversationId)
+                    // before the continuation request is dispatched.
+                    const AUTO_CONTINUATION_DELAY_MS = 400;
                     setTimeout(() => {
                       sendMessageToAgent(continuationPrompt, model, shouldUpgrade, shouldBuild, true);
-                    }, 400);
+                    }, AUTO_CONTINUATION_DELAY_MS);
                   }
                 }
               } else if (chunk.type === "error") {
