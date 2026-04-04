@@ -171,6 +171,30 @@ const statusLabels: Record<AgentStatus, { label: string; icon: React.ReactNode }
   saving: { label: "Saving project...", icon: <Loader2 className="h-3 w-3 animate-spin" /> },
 };
 
+// Required files for a complete build-mode project
+const REQUIRED_BUILD_FILES = [
+  'index.html',
+  'src/css/styles.css',
+  'src/css/components.css',
+  'src/js/config.js',
+  'src/js/state.js',
+  'src/js/router.js',
+  'src/js/components.js',
+  'src/js/app.js',
+];
+
+// Returns list of required build files that are not yet present as completed code blocks
+function getMissingBuildFiles(streamContent: string): string[] {
+  const generatedFiles = new Set<string>();
+  const completedBlockRe = /```(?:\w+)?:([^\n]+)\n[\s\S]*?```/g;
+  let m: RegExpExecArray | null;
+  while ((m = completedBlockRe.exec(streamContent)) !== null) {
+    const filePath = m[1].trim().replace(/\s*\(generating\.\.\.\)\s*/i, '').trim();
+    if (filePath) generatedFiles.add(filePath);
+  }
+  return REQUIRED_BUILD_FILES.filter(f => !generatedFiles.has(f));
+}
+
 // Detect if a message looks like a build/project request
 function isBuildRequest(message: string): boolean {
   const buildKeywords = [
@@ -313,6 +337,8 @@ export default function ChatInterface({
   } | null>(null);
   const streamingContentRef = useRef("");
   const abortControllerRef = useRef<AbortController | null>(null);
+  // Tracks how many auto-continuation messages have been sent for the current build
+  const buildContinuationCountRef = useRef(0);
 
   // Load user's default model preference and configured keys
   useEffect(() => {
@@ -744,7 +770,7 @@ export default function ChatInterface({
   }
 
   const sendMessageToAgent = useCallback(
-    async (content: string, model: AIModel, shouldUpgrade: boolean, shouldBuild: boolean) => {
+    async (content: string, model: AIModel, shouldUpgrade: boolean, shouldBuild: boolean, isAutoContinuation = false) => {
       if (shouldUpgrade) {
         setChatMode("saas-upgrade");
       } else if (shouldBuild && chatMode !== "build" && chatMode !== "saas-upgrade") {
@@ -756,10 +782,13 @@ export default function ChatInterface({
       setIsLoading(true);
       setAgentStatus("thinking");
       streamingContentRef.current = "";
-      // Reset agent todos for new messages in build mode
+      // Reset agent todos and continuation counter for new (non-continuation) build messages
       if (shouldBuild) {
         setAgentTodos([]);
         setWorkflowTodos([]);
+        if (!isAutoContinuation) {
+          buildContinuationCountRef.current = 0;
+        }
       }
 
       try {
@@ -961,6 +990,23 @@ export default function ChatInterface({
 
                 if (!initialConversationId && !projectId && newConversationId) {
                   window.history.replaceState(null, "", `/chat/${newConversationId}`);
+                }
+
+                // Auto-continue if in build mode and some required files are still missing.
+                // This handles the common case of token-limit truncation where the AI finishes
+                // its response but hasn't yet output all 8 required project files.
+                if (shouldBuild && buildContinuationCountRef.current < 2) {
+                  const missingFiles = getMissingBuildFiles(streamingContentRef.current);
+                  if (missingFiles.length > 0) {
+                    buildContinuationCountRef.current += 1;
+                    const continuationPrompt =
+                      `Continue building the project. Generate these remaining files completely with full working code:\n` +
+                      missingFiles.map(f => `- \`${f}\``).join('\n') +
+                      `\n\nDo not stop until every listed file has a complete, closed code block. Then call save_artifact with all generated files.`;
+                    setTimeout(() => {
+                      sendMessageToAgent(continuationPrompt, model, shouldUpgrade, shouldBuild, true);
+                    }, 400);
+                  }
                 }
               } else if (chunk.type === "error") {
                 throw new Error(chunk.error);

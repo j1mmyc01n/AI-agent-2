@@ -120,7 +120,7 @@ async function runOpenAIAgent(
       tools,
       tool_choice: "auto",
       stream: true,
-      ...(isReasoningModel ? {} : { max_tokens: 8192 }),
+      ...(isReasoningModel ? {} : { max_tokens: 16000 }),
     });
 
     let currentContent = "";
@@ -221,7 +221,7 @@ async function runAnthropicAgent(
       system: systemPrompt,
       messages: allMessages,
       tools: anthropicTools,
-      max_tokens: 8192,
+      max_tokens: 16000,
       stream: true,
     });
 
