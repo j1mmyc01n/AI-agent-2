@@ -246,17 +246,27 @@ export default function ConversationSidebar({
             </div>
           ) : (
             <div className="space-y-3">
-              {/* Projects section - prominently listed */}
-              {projects.length > 0 && (
-                <div>
-                  <div className="flex items-center justify-between px-3 mb-1.5">
-                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
-                      Projects ({projects.length})
+              {/* Projects section - always visible */}
+              <div>
+                <div className="flex items-center justify-between px-3 mb-1.5">
+                  <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
+                    Projects {projects.length > 0 ? `(${projects.length})` : ""}
+                  </span>
+                  <Link href="/projects">
+                    <span className="text-[10px] text-primary/60 hover:text-primary transition-colors cursor-pointer">
+                      {projects.length > 0 ? "View all" : "New"}
                     </span>
-                    <Link href="/projects">
-                      <span className="text-[10px] text-primary/60 hover:text-primary transition-colors cursor-pointer">View all</span>
-                    </Link>
-                  </div>
+                  </Link>
+                </div>
+                {projects.length === 0 ? (
+                  <Link href="/projects">
+                    <div className="mx-1 px-3 py-2.5 rounded-lg border border-dashed border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-colors cursor-pointer">
+                      <p className="text-xs text-muted-foreground/60 text-center">
+                        No projects yet — create one
+                      </p>
+                    </div>
+                  </Link>
+                ) : (
                   <div className="space-y-0.5">
                     {projects.map((project) => {
                       const projectConvs = conversations.filter(c => c.projectId === project.id);
@@ -313,8 +323,8 @@ export default function ConversationSidebar({
                       );
                     })}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Unlinked conversations (not attached to a project) */}
               {(() => {
