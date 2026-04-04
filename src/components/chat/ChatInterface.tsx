@@ -394,10 +394,11 @@ export default function ChatInterface({
       "- Clean navigation and responsive layout",
   };
 
-  // Required file structure hint for the init prompt (matches BUILD_MODE folder layout)
+  // Required file structure hint for the init prompt (8-file architecture)
   const BUILD_FILE_STRUCTURE =
-    "```html:index.html\n```css:src/css/styles.css\n" +
-    "```javascript:src/js/components.js\n```javascript:src/js/api.js\n```javascript:src/js/app.js";
+    "```html:index.html\n```css:src/css/styles.css\n```css:src/css/components.css\n" +
+    "```javascript:src/js/config.js\n```javascript:src/js/state.js\n```javascript:src/js/router.js\n" +
+    "```javascript:src/js/components.js\n```javascript:src/js/app.js";
 
   // Build the initialization prompt for a new project — type-aware, aligned with BUILD_MODE_INSTRUCTIONS
   function buildProjectInitPrompt(name: string, type?: string, description?: string): string {
@@ -406,12 +407,50 @@ export default function ChatInterface({
     const features = PROJECT_TYPE_FEATURES[type ?? "other"] ?? PROJECT_TYPE_FEATURES.other;
 
     return (
-      `Build my ${typeLabel} project "${name}" as a complete, premium web application.${descPart}\n\n` +
-      `Generate ALL 5 files in the required multi-file folder structure:\n${BUILD_FILE_STRUCTURE}\n\n` +
+      `Build my ${typeLabel} project "${name}" as a complete, production-quality web application.${descPart}\n\n` +
+      `Generate ALL 8 files in the required multi-file folder structure:\n${BUILD_FILE_STRUCTURE}\n\n` +
+      `File responsibilities:\n` +
+      `- index.html: Full HTML shell with semantic structure, meta tags, and all script/link tags\n` +
+      `- src/css/styles.css: CSS custom properties (--color-*, --radius, --shadow), resets, typography, layout utilities, animations\n` +
+      `- src/css/components.css: Component-specific styles (cards, modals, buttons, forms, sidebar, navbar, toast)\n` +
+      `- src/js/config.js: APP_CONFIG object with theme colors, feature flags, API endpoints, and localStorage keys\n` +
+      `- src/js/state.js: Centralized state store with subscribe/dispatch pattern, localStorage persistence, and typed actions\n` +
+      `- src/js/router.js: Hash-based SPA router with route guards, transitions, and breadcrumb support\n` +
+      `- src/js/components.js: Reusable UI component factory functions (Modal, Toast, Dropdown, DataTable, Chart, etc.)\n` +
+      `- src/js/app.js: App bootstrap — imports modules, wires event listeners, initializes router, renders initial view\n\n` +
       `Required features for this ${typeLabel}:\n${features}\n\n` +
-      `Use the dark premium color system (surface/accent tokens), Tailwind CDN, and function declarations throughout. ` +
+      `Architecture requirements:\n` +
+      `- All state changes go through state.js dispatch; no direct DOM mutation for data\n` +
+      `- Router handles all view transitions; each route renders a complete view\n` +
+      `- Components are pure factory functions that return DOM elements\n` +
+      `- Full localStorage persistence for user preferences and session data\n` +
+      `- Proper error boundaries with user-friendly error states\n` +
+      `- Loading skeletons for async operations\n` +
+      `- Keyboard navigation (Escape to close modals, arrow keys for lists)\n` +
+      `- Responsive layout with mobile-first breakpoints\n\n` +
+      `Use the dark premium color system (--color-surface, --color-accent tokens), Tailwind CDN for utility classes, ` +
+      `and function declarations throughout. Make it fully functional with working navigation, forms, and interactions. ` +
       `After generating all files, call save_artifact with the full folder paths and create_project_record with type="${type ?? "saas"}".`
     );
+  }
+
+  // Parse file-level progress from streaming content — returns each named code block and whether it is complete
+  function parseFileProgress(content: string): Array<{ filename: string; done: boolean }> {
+    const files: Array<{ filename: string; done: boolean }> = [];
+    const openFenceRe = /```[a-z]+:([^\n`]+)\n/gi;
+    let match: RegExpExecArray | null;
+    while ((match = openFenceRe.exec(content)) !== null) {
+      const raw = match[1].trim().replace(/\s*\(generating\.\.\.\)\s*/i, "").trim();
+      if (!raw) continue;
+      const afterOpen = content.slice(match.index + match[0].length);
+      const closingFence = /^`{3,}\s*$/m;
+      const done = closingFence.test(afterOpen);
+      files.push({ filename: raw, done });
+    }
+    // Deduplicate by filename, keeping last occurrence
+    const seen = new Map<string, { filename: string; done: boolean }>();
+    for (const f of files) seen.set(f.filename, f);
+    return [...seen.values()];
   }
 
   // Auto-initialize new projects: when autoInit=true and no messages, kick off a build
@@ -546,6 +585,32 @@ export default function ChatInterface({
       }
 
       if (status === "coding") {
+        // Parse file-level progress from streaming content
+        if (content) {
+          const fileProgress = parseFileProgress(content);
+          if (fileProgress.length > 0) {
+            // Build pre-tasks (research/planning/search) marked done
+            const preTasks = tasks
+              .filter(t =>
+                t.title.includes("Researching") ||
+                t.title.includes("Planning") ||
+                t.title.includes("Searching")
+              )
+              .map(t => ({ ...t, status: "done" as const }));
+            // Post-tasks (polish/saving) stay pending
+            const postTasks = tasks.filter(
+              t => t.title.includes("Adding polish") || t.title.includes("Saving")
+            );
+            // Per-file tasks: all done except the last one in-progress
+            const fileTasks: TodoItem[] = fileProgress.map((f, i) => ({
+              id: `file-${f.filename.replace(/[^a-z0-9]/gi, "-")}`,
+              title: f.filename,
+              status: (f.done || i < fileProgress.length - 1 ? "done" : "in-progress") as "done" | "in-progress",
+            }));
+            return [...preTasks, ...fileTasks, ...postTasks];
+          }
+        }
+        // Fall back to generic coding behavior (no filenames parsed yet)
         return tasks.map(t => {
           if (t.title.includes("Searching")) return { ...t, status: "done" as const };
           if (t.title.includes("Researching")) return { ...t, status: "done" as const };
@@ -752,6 +817,28 @@ export default function ChatInterface({
 
                 if (shouldBuild) {
                   parseWorkflowTasks(streamingContentRef.current);
+                }
+
+                // Save first complete HTML block as project preview thumbnail
+                if (shouldBuild && projectId) {
+                  try {
+                    const htmlMatch = streamingContentRef.current.match(
+                      /```html(?::[^\n]*)?\n([\s\S]*?)\n```/
+                    );
+                    if (htmlMatch) {
+                      localStorage.setItem(
+                        `project-preview-${projectId}`,
+                        htmlMatch[1].slice(0, 60000)
+                      );
+                      window.dispatchEvent(
+                        new CustomEvent("dobetter-project-preview-updated", {
+                          detail: { projectId },
+                        })
+                      );
+                    }
+                  } catch {
+                    // localStorage not available — ignore
+                  }
                 }
 
                 // Reset manual panel tracking for next message

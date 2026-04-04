@@ -64,54 +64,101 @@ const projectTypes = [
 function ProjectThumbnail({ project }: { project: Project }) {
   const gradient = typeGradients[project.type] || typeGradients.other;
   const icon = typeIcons[project.type] || typeIcons.other;
+  const [previewHtml, setPreviewHtml] = useState<string | null>(null);
 
-  // Generate a unique pattern based on project name for visual diversity
+  // Load stored HTML preview from localStorage (set when a project is built)
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`project-preview-${project.id}`);
+      if (stored) setPreviewHtml(stored);
+    } catch {
+      // localStorage not available
+    }
+
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ projectId: string }>).detail;
+      if (detail?.projectId === project.id) {
+        try {
+          const stored = localStorage.getItem(`project-preview-${project.id}`);
+          if (stored) setPreviewHtml(stored);
+        } catch {
+          // ignore
+        }
+      }
+    };
+    window.addEventListener("dobetter-project-preview-updated", handler);
+    return () => window.removeEventListener("dobetter-project-preview-updated", handler);
+  }, [project.id]);
+
+  // Generate a unique pattern based on project name for visual diversity (fallback)
   const hash = project.name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const pattern = hash % 4;
 
   return (
-    <div className={`relative w-full h-32 rounded-t-lg bg-gradient-to-br ${gradient} overflow-hidden`}>
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-30">
-        {pattern === 0 && (
-          <div className="absolute inset-0" style={{
-            backgroundImage: "radial-gradient(circle at 25% 25%, currentColor 1px, transparent 1px), radial-gradient(circle at 75% 75%, currentColor 1px, transparent 1px)",
-            backgroundSize: "20px 20px",
-          }} />
-        )}
-        {pattern === 1 && (
-          <div className="absolute inset-0" style={{
-            backgroundImage: "linear-gradient(45deg, currentColor 25%, transparent 25%), linear-gradient(-45deg, currentColor 25%, transparent 25%)",
-            backgroundSize: "30px 30px",
-            backgroundPosition: "0 0, 15px 0",
-            opacity: 0.15,
-          }} />
-        )}
-        {pattern === 2 && (
-          <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <pattern id={`grid-${project.id}`} width="24" height="24" patternUnits="userSpaceOnUse">
-                <path d="M 24 0 L 0 0 0 24" fill="none" stroke="currentColor" strokeWidth="0.5" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill={`url(#grid-${project.id})`} />
-          </svg>
-        )}
-        {pattern === 3 && (
-          <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-20">
-            {Array.from({ length: 5 }).map((_, i) => (
-              <div key={i} className="w-1 rounded-full bg-current" style={{ height: `${30 + (hash * (i + 1)) % 60}%` }} />
-            ))}
+    <div className={`relative w-full h-32 rounded-t-lg overflow-hidden ${!previewHtml ? `bg-gradient-to-br ${gradient}` : "bg-background"}`}>
+      {previewHtml ? (
+        /* Scaled-down live HTML preview */
+        <>
+          <iframe
+            srcDoc={previewHtml}
+            sandbox="allow-scripts"
+            title={`Preview of ${project.name}`}
+            className="absolute top-0 left-0 border-0 pointer-events-none"
+            style={{
+              width: "400%",
+              height: "512px",
+              transform: "scale(0.25)",
+              transformOrigin: "top left",
+            }}
+          />
+          {/* Subtle overlay to prevent iframe from looking clickable */}
+          <div className="absolute inset-0 bg-background/10" />
+        </>
+      ) : (
+        <>
+          {/* Background pattern */}
+          <div className="absolute inset-0 opacity-30">
+            {pattern === 0 && (
+              <div className="absolute inset-0" style={{
+                backgroundImage: "radial-gradient(circle at 25% 25%, currentColor 1px, transparent 1px), radial-gradient(circle at 75% 75%, currentColor 1px, transparent 1px)",
+                backgroundSize: "20px 20px",
+              }} />
+            )}
+            {pattern === 1 && (
+              <div className="absolute inset-0" style={{
+                backgroundImage: "linear-gradient(45deg, currentColor 25%, transparent 25%), linear-gradient(-45deg, currentColor 25%, transparent 25%)",
+                backgroundSize: "30px 30px",
+                backgroundPosition: "0 0, 15px 0",
+                opacity: 0.15,
+              }} />
+            )}
+            {pattern === 2 && (
+              <svg className="absolute inset-0 w-full h-full opacity-20" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id={`grid-${project.id}`} width="24" height="24" patternUnits="userSpaceOnUse">
+                    <path d="M 24 0 L 0 0 0 24" fill="none" stroke="currentColor" strokeWidth="0.5" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill={`url(#grid-${project.id})`} />
+              </svg>
+            )}
+            {pattern === 3 && (
+              <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-20">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="w-1 rounded-full bg-current" style={{ height: `${30 + (hash * (i + 1)) % 60}%` }} />
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* Centered icon */}
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="p-4 rounded-2xl bg-background/60 backdrop-blur-sm border border-white/10 shadow-lg">
-          <div className="text-foreground/70">{icon}</div>
-        </div>
-      </div>
+          {/* Centered icon */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="p-4 rounded-2xl bg-background/60 backdrop-blur-sm border border-white/10 shadow-lg">
+              <div className="text-foreground/70">{icon}</div>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Status badge overlay */}
       <div className="absolute top-2 right-2">
