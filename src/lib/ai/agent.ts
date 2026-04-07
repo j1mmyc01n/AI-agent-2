@@ -192,7 +192,7 @@ async function runOpenAIAgent(
         }
 
         // Mark that files have been successfully saved so create_project_record is now allowed.
-        if (toolName === "save_artifact" && !toolResult.startsWith("ERROR:")) {
+        if (toolName === "save_artifact" && (toolResult.startsWith("Saved ") || toolResult.startsWith("Updated "))) {
           artifactSaved = true;
         }
 
