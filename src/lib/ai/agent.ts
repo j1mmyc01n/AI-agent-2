@@ -436,8 +436,7 @@ async function executeToolCall(
               };
               await store.setJSON(existingArtifactId, updated);
               // Update file count in index
-              const index = await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] || [];
-              const indexArr = Array.isArray(index) ? index : [];
+              const indexArr = (await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] | null) || [];
               const entry = indexArr.find(e => e.id === existingArtifactId);
               if (entry) entry.fileCount = files.length;
               await store.setJSON(indexKey, indexArr);
