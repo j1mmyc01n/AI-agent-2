@@ -885,14 +885,16 @@ export default function ChatInterface({
       setIsLoading(true);
       setAgentStatus("thinking");
       streamingContentRef.current = "";
-      // Reset agent todos and continuation counter for new (non-continuation) build messages
-      if (shouldBuild) {
+      // Reset agent todos and continuation counter only for new (non-continuation) build messages.
+      // Nudge and auto-continuations must NOT wipe existing task progress.
+      if (shouldBuild && !isAutoContinuation) {
         setAgentTodos([]);
         setWorkflowTodos([]);
-        if (!isAutoContinuation) {
-          buildContinuationCountRef.current = 0;
-        }
+        buildContinuationCountRef.current = 0;
       }
+      // Track whether auto-saves have fired for this message to prevent double-firing
+      // (once in the "done" SSE event handler and once when the stream naturally closes).
+      let autoSavesTriggered = false;
 
       try {
         const abortController = new AbortController();
@@ -1078,6 +1080,9 @@ export default function ChatInterface({
                 // Auto-save artifact files when the AI built code but didn't call save_artifact.
                 autoSaveArtifactIfNeeded(shouldBuild, activeToolCalls, streamingContentRef.current, content, projectId);
 
+                // Mark that auto-saves have now fired so the stream-close handler skips them.
+                autoSavesTriggered = true;
+
                 // Mark saving task done now that auto-save has been triggered
                 if (shouldBuild) {
                   const hasSaveArtifact = activeToolCalls.some(tc => tc.name === "save_artifact");
@@ -1092,7 +1097,11 @@ export default function ChatInterface({
                 window.dispatchEvent(new Event("dobetter-conversations-updated"));
 
                 if (!initialConversationId && !projectId && newConversationId) {
-                  window.history.replaceState(null, "", `/chat/${newConversationId}`);
+                  try {
+                    window.history.replaceState(null, "", `/chat/${newConversationId}`);
+                  } catch {
+                    // history state update is non-critical (can fail in some mobile browsers)
+                  }
                 }
 
                 // Auto-continue if in build mode and some required files are still missing.
@@ -1137,9 +1146,12 @@ export default function ChatInterface({
         setAgentStatus("idle");
         setIsLoading(false);
 
-        // Same auto-save fallback for streams that close without a "done" event
-        autoSaveProjectIfNeeded(shouldBuild, projectId, activeToolCalls, streamingContentRef.current, content);
-        autoSaveArtifactIfNeeded(shouldBuild, activeToolCalls, streamingContentRef.current, content, projectId);
+        // Same auto-save fallback for streams that close without a "done" event.
+        // Skip if auto-saves already fired in the "done" handler above.
+        if (!autoSavesTriggered) {
+          autoSaveProjectIfNeeded(shouldBuild, projectId, activeToolCalls, streamingContentRef.current, content);
+          autoSaveArtifactIfNeeded(shouldBuild, activeToolCalls, streamingContentRef.current, content, projectId);
+        }
 
         // Refresh sidebar in case the agent created/modified projects before the stream ended
         window.dispatchEvent(new Event("dobetter-projects-updated"));
@@ -1206,7 +1218,7 @@ export default function ChatInterface({
   }, [chatMode, updateAgentTasks]);
 
   const sendMessage = useCallback(
-    async (content: string, model: AIModel) => {
+    async (content: string, model: AIModel, isAutoContinuation = false) => {
       if (isLoading) return;
 
       // Detect if this should trigger build mode or saas upgrade
@@ -1262,15 +1274,18 @@ export default function ChatInterface({
         return sendMessageToAgent(enhancedPrompt, model, shouldUpgrade, true);
       }
 
-      return sendMessageToAgent(content, model, shouldUpgrade, shouldBuild);
+      return sendMessageToAgent(content, model, shouldUpgrade, shouldBuild, isAutoContinuation);
     },
     [isLoading, chatMode, messages.length, clarifyingFlow, sendMessageToAgent]
   );
 
   const handleQuickPrompt = useCallback((prompt: string) => {
     if (isLoading) return;
-    sendMessage(prompt, selectedModel);
-  }, [isLoading, sendMessage, selectedModel]);
+    // Treat quick prompts (including Nudge) in build/saas-upgrade mode as continuations
+    // so the task list and continuation counter are NOT reset.
+    const isContinuation = chatMode === "build" || chatMode === "saas-upgrade";
+    sendMessage(prompt, selectedModel, isContinuation);
+  }, [isLoading, chatMode, sendMessage, selectedModel]);
 
   const panelTabs = [
     { id: "chat" as PanelView, label: "Chat", icon: MessageSquare, count: messages.filter(m => m.role !== "system").length },

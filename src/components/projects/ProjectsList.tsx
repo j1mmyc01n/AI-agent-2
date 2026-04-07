@@ -91,7 +91,7 @@ function ProjectThumbnail({ project }: { project: Project }) {
   }, [project.id]);
 
   // Generate a unique pattern based on project name for visual diversity (fallback)
-  const hash = project.name.split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
+  const hash = (project.name || "").split("").reduce((acc, c) => acc + c.charCodeAt(0), 0);
   const pattern = hash % 4;
 
   // Thumbnail iframe scaling: container is h-32 (128px); iframe is rendered at 4× then scaled
