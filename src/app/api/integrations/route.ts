@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { db, getDatabaseUrl } from "@/lib/db";
 import { getStore } from "@netlify/blobs";
+import { detectNetlifyEnv, detectNeonEnv } from "@/lib/env-detection";
 
 const ALL_KEYS = [
   "openaiKey",
@@ -60,10 +61,10 @@ function buildResponse(userKeys: Record<string, string | null>) {
     result[STATUS_KEY_MAP[key]] = !!userVal;
   }
   // Auto-detect Netlify and Neon from environment (these are platform-level, not user keys)
-  if (!result.hasNetlifyToken && (process.env.NETLIFY || process.env.NETLIFY_SITE_ID)) {
+  if (!result.hasNetlifyToken && detectNetlifyEnv()) {
     result.isNetlifyEnv = true;
   }
-  if (!result.hasNeonKey && (process.env.NETLIFY_DATABASE_URL?.includes("neon") || process.env.DATABASE_URL?.includes("neon") || process.env.NEON_DATABASE_URL)) {
+  if (!result.hasNeonKey && detectNeonEnv()) {
     result.isNeonEnv = true;
   }
   // Include user preferences

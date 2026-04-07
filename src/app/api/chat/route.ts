@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth";
 import { db, getDatabaseUrl } from "@/lib/db";
 import { runAgent, type AIProvider } from "@/lib/ai/agent";
 import { getStore } from "@netlify/blobs";
+import { detectNetlifyEnv, detectNeonEnv } from "@/lib/env-detection";
 
 /**
  * Generate a 2-3 word descriptive title from a user message.
@@ -194,8 +195,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Auto-detect Netlify and Neon environments
-    const isNetlifyEnv = !!(process.env.NETLIFY || process.env.NETLIFY_SITE_ID);
-    const isNeonEnv = !!(process.env.NETLIFY_DATABASE_URL?.includes("neon") || process.env.DATABASE_URL?.includes("neon") || process.env.NEON_DATABASE_URL);
+    const isNetlifyEnv = detectNetlifyEnv();
+    const isNeonEnv = detectNeonEnv();
 
     // Get or create conversation
     let conversation: { id: string; title: string; messages: { role: string; content: string }[] };

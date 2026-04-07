@@ -367,25 +367,28 @@ export async function runAgent(
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error(`Failed with requested provider ${requestedProvider}:`, errMsg);
 
-    // If the requested provider failed, try another available provider as fallback
-    const fallbackProvider = requestedProvider === "openai" ? "anthropic" : "openai";
-    try {
-      if (fallbackProvider === "anthropic" && config.anthropicKey) {
-        const fallbackConfig = { ...config, model: "claude-haiku-4-5", provider: "anthropic" as AIProvider };
-        return await runAnthropicAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.anthropicKey, process.env.ANTHROPIC_BASE_URL);
-      } else if (config.openaiKey) {
-        const fallbackConfig = { ...config, model: "gpt-4o-mini", provider: "openai" as AIProvider };
-        return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.openaiKey, process.env.OPENAI_BASE_URL);
-      } else if (config.grokKey) {
-        const fallbackConfig = { ...config, provider: "grok" as AIProvider };
-        return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
+    // If the requested provider failed, try other available providers in preference order
+    const fallbackOrder: AIProvider[] = ["anthropic", "openai", "grok"].filter(p => p !== requestedProvider) as AIProvider[];
+    let lastFallbackError: unknown = error;
+    for (const fallbackProvider of fallbackOrder) {
+      try {
+        if (fallbackProvider === "anthropic" && config.anthropicKey) {
+          const fallbackConfig = { ...config, model: "claude-haiku-4-5", provider: "anthropic" as AIProvider };
+          return await runAnthropicAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.anthropicKey, process.env.ANTHROPIC_BASE_URL);
+        } else if (fallbackProvider === "openai" && config.openaiKey) {
+          const fallbackConfig = { ...config, model: "gpt-4o-mini", provider: "openai" as AIProvider };
+          return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.openaiKey, process.env.OPENAI_BASE_URL);
+        } else if (fallbackProvider === "grok" && config.grokKey) {
+          const fallbackConfig = { ...config, provider: "grok" as AIProvider };
+          return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
+        }
+      } catch (fallbackError) {
+        console.error(`Fallback provider ${fallbackProvider} also failed:`, fallbackError);
+        lastFallbackError = fallbackError;
       }
-    } catch (fallbackError) {
-      console.error(`Fallback provider ${fallbackProvider} also failed:`, fallbackError);
-      throw error;
     }
 
-    throw error;
+    throw lastFallbackError;
   }
 
   // If no key for the requested provider, auto-detect from available keys
