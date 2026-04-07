@@ -414,6 +414,7 @@ async function executeToolCall(
       const title = args.title as string || "Untitled";
       const files = args.files as { path: string; content: string }[];
       const artifactProjectId = args.projectId as string | undefined;
+      const existingArtifactId = args.artifact_id as string | undefined;
 
       if (!files || files.length === 0) {
         return "No files provided to save.";
@@ -421,6 +422,34 @@ async function executeToolCall(
 
       try {
         const store = getStore("artifacts");
+        const indexKey = `user:${config.userId}`;
+
+        if (existingArtifactId) {
+          // Upsert: update existing artifact with new file list (save-as-you-go)
+          try {
+            const existing = await store.get(existingArtifactId, { type: "json" }) as Record<string, unknown> | null;
+            if (existing) {
+              const updated = {
+                ...existing,
+                files,
+                updatedAt: new Date().toISOString(),
+              };
+              await store.setJSON(existingArtifactId, updated);
+              // Update file count in index
+              const index = await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] || [];
+              const indexArr = Array.isArray(index) ? index : [];
+              const entry = indexArr.find(e => e.id === existingArtifactId);
+              if (entry) entry.fileCount = files.length;
+              await store.setJSON(indexKey, indexArr);
+              const fileList = files.map(f => `  - ${f.path}`).join("\n");
+              return `Updated artifact "${title}" (ID: ${existingArtifactId}) with ${files.length} file(s):\n${fileList}\n\nKeep using artifact_id: ${existingArtifactId} for subsequent saves.`;
+            }
+          } catch {
+            // Fall through to create new artifact if update fails
+          }
+        }
+
+        // Create new artifact
         const artifactId = `art_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
         const artifact = {
           id: artifactId,
@@ -437,14 +466,13 @@ async function executeToolCall(
         await store.setJSON(artifactId, artifact);
 
         // Add to user's artifact index
-        const indexKey = `user:${config.userId}`;
         const existing = await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] || [];
         const existingArr = Array.isArray(existing) ? existing : [];
         existingArr.unshift({ id: artifactId, title, fileCount: files.length, createdAt: artifact.createdAt });
         await store.setJSON(indexKey, existingArr);
 
         const fileList = files.map(f => `  - ${f.path}`).join("\n");
-        return `Saved ${files.length} file(s) as "${title}" (ID: ${artifactId}):\n${fileList}\n\nThese files are now stored and available in the Code panel.`;
+        return `Saved ${files.length} file(s) as "${title}" (ID: ${artifactId}):\n${fileList}\n\nFor subsequent saves, pass artifact_id: ${artifactId} to update this artifact instead of creating a new one.`;
       } catch (error) {
         console.error("Failed to save artifact:", error);
         return `Generated ${files.length} file(s) for "${title}" — displayed in the Code panel. (Storage unavailable, but code is visible in the conversation.)`;

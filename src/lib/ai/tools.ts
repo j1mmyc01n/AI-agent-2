@@ -116,7 +116,7 @@ export const tools: ChatCompletionTool[] = [
     function: {
       name: "save_artifact",
       description:
-        "Save generated code files as a persistent artifact using the proper 8-file folder structure. Always call this after generating a project — pass ALL files with their full folder paths. Files are stored and available across sessions.",
+        "Save generated code files as a persistent artifact using the proper 8-file folder structure. Call this after writing EACH file (or group of files) to save progress incrementally. Pass ALL files generated so far each time you call it. If you received an artifact_id from a previous call, pass it as artifact_id to update the existing artifact instead of creating a new one. Files are stored and available across sessions.",
       parameters: {
         type: "object",
         properties: {
@@ -126,7 +126,7 @@ export const tools: ChatCompletionTool[] = [
           },
           files: {
             type: "array",
-            description: "Array of ALL generated files to save. Use proper folder paths matching the 8-file structure: 'index.html', 'src/css/styles.css', 'src/css/components.css', 'src/js/config.js', 'src/js/state.js', 'src/js/router.js', 'src/js/components.js', 'src/js/app.js'",
+            description: "Array of ALL generated files so far. Use proper folder paths matching the 8-file structure: 'index.html', 'src/css/styles.css', 'src/css/components.css', 'src/js/config.js', 'src/js/state.js', 'src/js/router.js', 'src/js/components.js', 'src/js/app.js'",
             items: {
               type: "object",
               properties: {
@@ -145,6 +145,10 @@ export const tools: ChatCompletionTool[] = [
           projectId: {
             type: "string",
             description: "Optional project ID to associate this artifact with",
+          },
+          artifact_id: {
+            type: "string",
+            description: "Optional ID returned from a previous save_artifact call. When provided, updates the existing artifact with the new file list instead of creating a new one. Use this for incremental saves.",
           },
         },
         required: ["title", "files"],

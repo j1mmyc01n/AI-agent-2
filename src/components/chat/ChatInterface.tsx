@@ -119,33 +119,66 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
   });
 }
 
-// Extract todo items from assistant messages
+// Extract todo items from assistant messages.
+// Deduplicates by normalized title — the LAST seen status for a given title wins,
+// so the task list progresses correctly as the agent marks files done across rounds.
 function extractTodos(messages: Message[]): TodoItem[] {
-  const todos: TodoItem[] = [];
+  // Map from normalized title → {title, status, insertOrder}
+  const seenTitles = new Map<string, { title: string; status: TodoItem["status"]; order: number }>();
   let idCounter = 0;
+
+  const normalizeTitle = (t: string) =>
+    t.replace(/^`?([^`]+)`?$/, "$1") // strip backtick wrapping
+     .replace(/\.\.\.\s*$/, "")       // strip trailing ellipsis
+     .toLowerCase()
+     .trim();
 
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
     const lines = msg.content.split("\n");
+    let firstNumberedDone = false;
     for (const line of lines) {
       const pendingMatch = line.match(/^[-*]\s+\[\s\]\s+(.+)$/);
       const doneMatch = line.match(/^[-*]\s+\[x\]\s+(.+)$/i);
       const inProgressMatch = line.match(/^[-*]\s+\[~\]\s+(.+)$/i);
       const numberedMatch = line.match(/^\d+\.\s+(?:\*\*)?(.+?)(?:\*\*)?$/);
 
-      if (pendingMatch) {
-        todos.push({ id: `todo-${idCounter++}`, title: pendingMatch[1].trim(), status: "pending" });
-      } else if (doneMatch) {
-        todos.push({ id: `todo-${idCounter++}`, title: doneMatch[1].trim(), status: "done" });
-      } else if (inProgressMatch) {
-        todos.push({ id: `todo-${idCounter++}`, title: inProgressMatch[1].trim(), status: "in-progress" });
-      } else if (numberedMatch && todos.length === 0) {
-        todos.push({ id: `todo-${idCounter++}`, title: numberedMatch[1].trim(), status: "pending" });
+      let title: string | null = null;
+      let status: TodoItem["status"] | null = null;
+
+      if (pendingMatch) { title = pendingMatch[1].trim(); status = "pending"; }
+      else if (doneMatch) { title = doneMatch[1].trim(); status = "done"; }
+      else if (inProgressMatch) { title = inProgressMatch[1].trim(); status = "in-progress"; }
+      else if (numberedMatch && !firstNumberedDone) {
+        // Only parse numbered lists when no checkbox tasks have been seen yet
+        if (seenTitles.size === 0) {
+          title = numberedMatch[1].trim();
+          status = "pending";
+          firstNumberedDone = true;
+        }
+      }
+
+      if (title && status) {
+        const key = normalizeTitle(title);
+        const existing = seenTitles.get(key);
+        if (existing) {
+          // Update status to the latest seen (later in the stream = more recent)
+          existing.status = status;
+        } else {
+          seenTitles.set(key, { title, status, order: idCounter++ });
+        }
       }
     }
   }
 
-  return todos;
+  // Re-sort by insertion order so the task list preserves its original sequence
+  return [...seenTitles.values()]
+    .sort((a, b) => a.order - b.order)
+    .map((entry) => ({
+      id: `todo-${entry.order}`,
+      title: entry.title,
+      status: entry.status,
+    }));
 }
 
 function getAgentStatusFromToolCalls(streamingToolCalls: { name: string; args: Record<string, unknown> }[] | undefined): AgentStatus {
