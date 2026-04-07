@@ -412,12 +412,16 @@ async function executeToolCall(
 
     case "save_artifact": {
       const title = args.title as string || "Untitled";
-      const files = args.files as { path: string; content: string }[];
+      const rawFiles = args.files as { path: string; content: string }[];
+      // Filter out empty placeholder/scaffold files (.gitkeep, .keep) that should never be stored
+      const files = (rawFiles || []).filter(
+        f => !f.path.endsWith(".gitkeep") && !f.path.endsWith(".keep")
+      );
       const artifactProjectId = args.projectId as string | undefined;
       const existingArtifactId = args.artifact_id as string | undefined;
 
       if (!files || files.length === 0) {
-        return "No files provided to save.";
+        return "No real code files provided to save (empty/placeholder files were skipped).";
       }
 
       try {

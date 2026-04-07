@@ -11,7 +11,7 @@ import TodoPanel, { type TodoItem } from "@/components/workspace/TodoPanel";
 import PreviewPanel from "@/components/workspace/PreviewPanel";
 import { Button } from "@/components/ui/button";
 import AgentMonitor from "@/components/workspace/AgentMonitor";
-import { Code2, ListTodo, Eye, MessageSquare, Brain, Loader2, Sparkles, Hammer, MessageCircle } from "lucide-react";
+import { Code2, ListTodo, Eye, MessageSquare, Brain, Loader2, Sparkles, Hammer, MessageCircle, FolderOpen, Plus } from "lucide-react";
 
 interface ToolCallData {
   name: string;
@@ -115,7 +115,10 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
   }
   return blocks.filter((block, i) => {
     if (!block.filename) return true; // keep unnamed blocks as-is
-    return namedLastIdx.get(normalizeFilename(block.filename)) === i;
+    // Strip empty placeholder/scaffold files that the AI should never generate
+    const cleanName = normalizeFilename(block.filename);
+    if (cleanName.endsWith(".gitkeep") || cleanName.endsWith(".keep")) return false;
+    return namedLastIdx.get(cleanName) === i;
   });
 }
 
@@ -811,7 +814,9 @@ export default function ChatInterface({
     const seen = new Set<string>();
     while ((match = codeRegex.exec(streamContent)) !== null) {
       const filePath = match[2].trim().replace(/\s*\(generating\.\.\.\)\s*/i, "").trim();
-      if (filePath && !seen.has(filePath)) {
+      // Skip empty placeholder scaffold files
+      if (!filePath || filePath.endsWith(".gitkeep") || filePath.endsWith(".keep")) continue;
+      if (!seen.has(filePath)) {
         seen.add(filePath);
         files.push({ path: filePath, content: match[3].trim() });
       }
@@ -1240,6 +1245,29 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      {/* Project context header — shown when inside a project */}
+      {projectName && (
+        <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 border-b border-border/40 bg-card/30 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-5 w-5 rounded flex items-center justify-center bg-primary/10 shrink-0">
+              <FolderOpen className="h-3 w-3 text-primary" />
+            </div>
+            <span className="text-xs font-semibold text-foreground truncate">{projectName}</span>
+            {codeBlocks.length > 0 && (
+              <span className="text-[10px] text-muted-foreground/70 bg-muted/60 rounded px-1.5 py-0.5 shrink-0">
+                {codeBlocks.length} {codeBlocks.length === 1 ? "file" : "files"}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setChatMode("build")}
+            className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+            title="Switch to Build mode"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       {/* Agent status bar + panel tabs */}
       <div className="flex items-center justify-between px-2 sm:px-4 py-1.5 border-b bg-card/50 shrink-0">
         {/* Panel tabs */}
