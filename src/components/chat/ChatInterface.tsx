@@ -133,6 +133,18 @@ const BLOCKED_TASK_PATTERNS = [
   /\bfiles?\s+to\s+(claude|gpt|openai|ai|anthropic)\b/i,
   /\b(claude|openai|anthropic)\s+(api|sonnet|haiku|opus|gpt)\b.*\bfiles?\b/i,
   /\bfiles?\b.*\b(claude|openai|anthropic)\s+(api|sonnet|haiku|opus|gpt)\b/i,
+  // Block any task about sending/passing files to an AI
+  /\bsend\w*\s+files?\s+(to|via|through)\b/i,
+  /\bpass\w*\s+files?\s+(to|via)\b/i,
+  // Block "using Claude/GPT to generate/write"
+  /\busing\s+(claude|gpt|openai|anthropic|ai)\s+(api\s+)?(to\s+)?(generate|write|create|code|build)\b/i,
+  // Block "calling Claude/GPT API"
+  /\bcall\w*\s+(claude|gpt|openai|anthropic)\s+(api|sonnet|haiku|opus)\b/i,
+  // Block scaffold/boilerplate setup tasks that should never appear
+  /\bscaffold\w*\s+(project|structure|boilerplate)\b/i,
+  /\b(creating|building|generating)\s+scaffold\b/i,
+  /\bproject\s+scaffold\b/i,
+  /\bboilerplate\b/i,
 ];
 
 function isBlockedTaskTitle(title: string): boolean {

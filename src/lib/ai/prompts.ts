@@ -7,6 +7,11 @@ export function buildSystemPrompt(context?: {
   userName?: string;
   hasGithub?: boolean;
   hasVercel?: boolean;
+  hasTavily?: boolean;
+  hasDatabase?: boolean;
+  hasAnthropicKey?: boolean;
+  hasOpenaiKey?: boolean;
+  isNetlifyGateway?: boolean;
   mode?: "chat" | "build" | "saas-upgrade";
 }): string {
   let prompt = SYSTEM_PROMPT;
@@ -25,13 +30,50 @@ export function buildSystemPrompt(context?: {
   // Add integration availability context
   const hasGithub = context?.hasGithub ?? false;
   const hasVercel = context?.hasVercel ?? false;
+  const hasTavily = context?.hasTavily ?? false;
+  const hasDatabase = context?.hasDatabase ?? false;
+  const hasAnthropicKey = context?.hasAnthropicKey ?? false;
+  const hasOpenaiKey = context?.hasOpenaiKey ?? false;
+  const isNetlifyGateway = context?.isNetlifyGateway ?? false;
 
-  prompt += "\n\n## Integration Availability\n";
+  prompt += "\n\n## Platform Integration Status\n";
+  prompt += "The following integrations are currently connected on this platform:\n";
+
+  // AI providers
+  if (hasAnthropicKey) {
+    prompt += isNetlifyGateway
+      ? "\n- **Anthropic (Claude)**: ✅ Connected via Netlify AI Gateway (auto-provided, no user key needed)"
+      : "\n- **Anthropic (Claude)**: ✅ Connected (user API key)";
+  } else {
+    prompt += "\n- **Anthropic (Claude)**: ❌ Not connected — no API key set";
+  }
+  if (hasOpenaiKey) {
+    prompt += "\n- **OpenAI (GPT)**: ✅ Connected";
+  } else {
+    prompt += "\n- **OpenAI (GPT)**: ❌ Not connected — no API key set";
+  }
+
+  // Database
+  if (hasDatabase) {
+    prompt += "\n- **Database (PostgreSQL/Neon)**: ✅ Connected — conversations, projects, and user data are persisted";
+  } else {
+    prompt += "\n- **Database**: ❌ Not connected — using local Netlify Blobs storage as fallback; data persists but DB features are limited";
+  }
+
+  // Tavily
+  if (hasTavily) {
+    prompt += "\n- **Tavily Web Search**: ✅ Connected — use web_search tool when users need current info";
+  } else {
+    prompt += "\n- **Tavily Web Search**: ❌ Not connected — web_search tool unavailable; do not attempt web searches";
+  }
+
+  // GitHub / Vercel
   if (!hasGithub && !hasVercel) {
     prompt += `
-**IMPORTANT: GitHub and Vercel are NOT connected.** Do NOT attempt to use create_github_repo, push_code_to_github, or create_vercel_project tools. They will fail.
+- **GitHub**: ❌ Not connected — do NOT attempt create_github_repo or push_code_to_github tools
+- **Vercel**: ❌ Not connected — do NOT attempt create_vercel_project tools
 
-Instead, focus on:
+Since GitHub and Vercel are not connected, focus on:
 1. Generating complete code in code blocks so it appears in the Code tab
 2. Generating HTML/CSS/JS for live preview in the Preview tab
 3. Using save_artifact to persist generated files across sessions
@@ -40,10 +82,10 @@ Instead, focus on:
 
 When building projects, output the full code in markdown code blocks. The Code tab and Preview tab will display it automatically. After generating, use save_artifact to save all files. Do NOT mention GitHub or deployment unless the user specifically asks about it.`;
   } else {
-    if (hasGithub) prompt += "\n- GitHub is connected and available for repo creation and code pushing.";
-    else prompt += "\n- GitHub is NOT connected. Do not use GitHub tools.";
-    if (hasVercel) prompt += "\n- Vercel is connected and available for deployment.";
-    else prompt += "\n- Vercel is NOT connected. Do not use Vercel deployment tools.";
+    if (hasGithub) prompt += "\n- **GitHub**: ✅ Connected — repo creation and code pushing available";
+    else prompt += "\n- **GitHub**: ❌ Not connected — do not use GitHub tools";
+    if (hasVercel) prompt += "\n- **Vercel**: ✅ Connected — deployment available";
+    else prompt += "\n- **Vercel**: ❌ Not connected — do not use Vercel deployment tools";
   }
 
   if (context) {

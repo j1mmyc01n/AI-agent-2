@@ -47,6 +47,8 @@ interface IntegrationStatus {
   netlifyToken: string | null;
   defaultModel: string | null;
   defaultProvider: string | null;
+  gatewayAnthropic?: boolean;
+  gatewayOpenai?: boolean;
 }
 
 type StatusKey = keyof Pick<
@@ -358,6 +360,19 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
 
   return (
     <div className="space-y-6">
+      {/* Netlify AI Gateway notice */}
+      {(status?.gatewayAnthropic || status?.gatewayOpenai) && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2.5">
+          <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
+          <p className="text-xs text-blue-300">
+            <span className="font-semibold">Netlify AI Gateway detected.</span>{" "}
+            {status?.gatewayAnthropic && "Anthropic (Claude) "}
+            {status?.gatewayAnthropic && status?.gatewayOpenai && "and "}
+            {status?.gatewayOpenai && "OpenAI "}
+            {(status?.gatewayAnthropic || status?.gatewayOpenai) && "are available automatically — no API key needed."}
+          </p>
+        </div>
+      )}
       {/* Summary */}
       <div className="flex items-center gap-3">
         <div className="text-sm text-muted-foreground">
@@ -376,6 +391,9 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
         {filteredIntegrations.map((integration) => {
           const isConnected = status?.[integration.statusKey] || false;
           const isDefault = status?.defaultProvider === integration.defaultProvider && !!integration.defaultProvider;
+          const isGateway =
+            (integration.id === "anthropicKey" && status?.gatewayAnthropic) ||
+            (integration.id === "openaiKey" && status?.gatewayOpenai);
           return (
             <Card key={integration.id} className={isDefault ? "ring-2 ring-primary/30" : ""}>
               <CardHeader className="pb-3">
@@ -399,12 +417,12 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
                   </div>
                   <Badge
                     variant={isConnected ? "default" : "outline"}
-                    className={isConnected ? "bg-green-500" : ""}
+                    className={isConnected ? (isGateway ? "bg-blue-500" : "bg-green-500") : ""}
                   >
                     {isConnected ? (
                       <>
                         <CheckCircle2 className="h-3 w-3 mr-1" />
-                        Connected
+                        {isGateway ? "Via Gateway" : "Connected"}
                       </>
                     ) : (
                       "Not set"
