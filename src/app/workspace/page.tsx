@@ -11,8 +11,6 @@ import {
   LayoutDashboard,
   MessageSquare,
   FolderOpen,
-  Bot,
-  CheckCircle2,
   AlertCircle,
   Plus,
   Database,
