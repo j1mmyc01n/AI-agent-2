@@ -11,7 +11,9 @@ export function buildSystemPrompt(context?: {
   hasDatabase?: boolean;
   hasAnthropicKey?: boolean;
   hasOpenaiKey?: boolean;
-  isNetlifyGateway?: boolean;
+  hasGrokKey?: boolean;
+  hasNeon?: boolean;
+  hasNetlify?: boolean;
   mode?: "chat" | "build" | "saas-upgrade";
 }): string {
   let prompt = SYSTEM_PROMPT;
@@ -34,30 +36,41 @@ export function buildSystemPrompt(context?: {
   const hasDatabase = context?.hasDatabase ?? false;
   const hasAnthropicKey = context?.hasAnthropicKey ?? false;
   const hasOpenaiKey = context?.hasOpenaiKey ?? false;
-  const isNetlifyGateway = context?.isNetlifyGateway ?? false;
+  const hasGrokKey = context?.hasGrokKey ?? false;
+  const hasNeon = context?.hasNeon ?? false;
+  const hasNetlify = context?.hasNetlify ?? false;
 
   prompt += "\n\n## Platform Integration Status\n";
   prompt += "The following integrations are currently connected on this platform:\n";
 
   // AI providers
   if (hasAnthropicKey) {
-    prompt += isNetlifyGateway
-      ? "\n- **Anthropic (Claude)**: ✅ Connected via Netlify AI Gateway (auto-provided, no user key needed)"
-      : "\n- **Anthropic (Claude)**: ✅ Connected (user API key)";
+    prompt += "\n- **Anthropic (Claude)**: ✅ Connected (user API key)";
   } else {
-    prompt += "\n- **Anthropic (Claude)**: ❌ Not connected — no API key set";
+    prompt += "\n- **Anthropic (Claude)**: ❌ Not connected — user must add API key in Settings → AI Models";
   }
   if (hasOpenaiKey) {
-    prompt += "\n- **OpenAI (GPT)**: ✅ Connected";
+    prompt += "\n- **OpenAI (GPT)**: ✅ Connected (user API key)";
   } else {
-    prompt += "\n- **OpenAI (GPT)**: ❌ Not connected — no API key set";
+    prompt += "\n- **OpenAI (GPT)**: ❌ Not connected — user must add API key in Settings → AI Models";
+  }
+  if (hasGrokKey) {
+    prompt += "\n- **xAI (Grok)**: ✅ Connected (user API key)";
+  } else {
+    prompt += "\n- **xAI (Grok)**: ❌ Not connected";
   }
 
-  // Database
+  // Infrastructure
   if (hasDatabase) {
     prompt += "\n- **Database (PostgreSQL/Neon)**: ✅ Connected — conversations, projects, and user data are persisted";
   } else {
     prompt += "\n- **Database**: ❌ Not connected — using local Netlify Blobs storage as fallback; data persists but DB features are limited";
+  }
+  if (hasNeon) {
+    prompt += "\n- **Neon**: ✅ Detected (serverless PostgreSQL available)";
+  }
+  if (hasNetlify) {
+    prompt += "\n- **Netlify**: ✅ Detected (hosting environment active)";
   }
 
   // Tavily

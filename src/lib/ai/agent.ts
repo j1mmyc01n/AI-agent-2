@@ -13,7 +13,7 @@ import { createProject as createVercelProject } from "@/lib/integrations/vercel"
 import { db, getDatabaseUrl } from "@/lib/db";
 import { getStore } from "@netlify/blobs";
 
-export type AIProvider = "openai" | "anthropic";
+export type AIProvider = "openai" | "anthropic" | "grok";
 
 interface ProjectContext {
   projects?: { id: string; name: string; description?: string | null; type: string; status: string; githubRepo?: string | null; vercelUrl?: string | null }[];
@@ -24,12 +24,20 @@ interface ProjectContext {
   userName?: string;
   hasGithub?: boolean;
   hasVercel?: boolean;
+  hasTavily?: boolean;
+  hasDatabase?: boolean;
+  hasAnthropicKey?: boolean;
+  hasOpenaiKey?: boolean;
+  hasGrokKey?: boolean;
+  hasNeon?: boolean;
+  hasNetlify?: boolean;
   mode?: "chat" | "build" | "saas-upgrade";
 }
 
 interface AgentConfig {
   openaiKey?: string;
   anthropicKey?: string;
+  grokKey?: string;
   githubToken?: string;
   vercelToken?: string;
   tavilyKey?: string;
@@ -61,21 +69,22 @@ function toAnthropicTools(): Anthropic.Tool[] {
 }
 
 /**
- * Detect available AI provider based on environment variables.
- * Netlify AI Gateway auto-injects ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL
- * and OPENAI_API_KEY/OPENAI_BASE_URL — no user API keys required.
+ * Detect available AI provider based on user-configured keys only.
  */
 function detectAvailableProvider(config: AgentConfig): { provider: AIProvider; apiKey?: string; baseURL?: string } | null {
-  // Check Anthropic (preferred - available via Netlify AI Gateway)
-  const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    return { provider: "anthropic", apiKey: anthropicKey, baseURL: process.env.ANTHROPIC_BASE_URL };
+  // Check Anthropic first (preferred)
+  if (config.anthropicKey) {
+    return { provider: "anthropic", apiKey: config.anthropicKey, baseURL: process.env.ANTHROPIC_BASE_URL };
   }
 
-  // Check OpenAI (also available via Netlify AI Gateway)
-  const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
-  if (openaiKey) {
-    return { provider: "openai", apiKey: openaiKey, baseURL: process.env.OPENAI_BASE_URL };
+  // Check OpenAI
+  if (config.openaiKey) {
+    return { provider: "openai", apiKey: config.openaiKey, baseURL: process.env.OPENAI_BASE_URL };
+  }
+
+  // Check Grok (uses OpenAI-compatible API)
+  if (config.grokKey) {
+    return { provider: "grok", apiKey: config.grokKey, baseURL: "https://api.x.ai/v1" };
   }
 
   return null;
@@ -90,15 +99,8 @@ async function runOpenAIAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use user's own API key directly when provided (bypasses Netlify AI Gateway = cheaper).
-  // Fall back to zero-config gateway constructor when only env vars are present.
-  const envKey = process.env.OPENAI_API_KEY;
-  const envBase = process.env.OPENAI_BASE_URL;
-  const hasUserKey = !!config.openaiKey && config.openaiKey !== envKey;
-  const useGateway = !hasUserKey && !!(envKey && envBase);
-  const openai = useGateway
-    ? new OpenAI()
-    : new OpenAI({ apiKey: hasUserKey ? config.openaiKey : apiKey, ...(hasUserKey ? {} : baseURL ? { baseURL } : {}) });
+  // Use the user's API key directly
+  const openai = new OpenAI({ apiKey: apiKey, ...(baseURL ? { baseURL } : {}) });
 
   const model = config.model || "gpt-4o-mini";
 
@@ -113,6 +115,7 @@ async function runOpenAIAgent(
   let finalResponse = "";
   let continueLoop = true;
   let artifactSaved = false; // tracks whether save_artifact was successfully called before create_project_record
+  let projectRecordCreated = false; // prevents duplicate project records
 
   while (continueLoop) {
     const stream = await openai.chat.completions.create({
@@ -187,6 +190,14 @@ async function runOpenAIAgent(
           continue;
         }
 
+        // Prevent duplicate project records in the same session
+        if (toolName === "create_project_record" && projectRecordCreated) {
+          toolResult = "Project record already created in this session — skipping duplicate.";
+          onToolResult(toolName, toolResult);
+          allMessages.push({ role: "tool", content: toolResult, tool_call_id: toolCall.id });
+          continue;
+        }
+
         try { toolResult = await executeToolCall(toolName, args, config); } catch (error) {
           toolResult = `Error executing ${toolName}: ${error instanceof Error ? error.message : "Unknown error"}`;
         }
@@ -194,6 +205,9 @@ async function runOpenAIAgent(
         // Mark that files have been successfully saved so create_project_record is now allowed.
         if (toolName === "save_artifact" && (toolResult.startsWith("Saved ") || toolResult.startsWith("Updated "))) {
           artifactSaved = true;
+        }
+        if (toolName === "create_project_record" && !toolResult.startsWith("Error") && !toolResult.startsWith("Project record already")) {
+          projectRecordCreated = true;
         }
 
         onToolResult(toolName, toolResult);
@@ -214,15 +228,8 @@ async function runAnthropicAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use user's own API key directly when provided (bypasses Netlify AI Gateway = cheaper).
-  // Fall back to zero-config gateway constructor when only env vars are present.
-  const envKey = process.env.ANTHROPIC_API_KEY;
-  const envBase = process.env.ANTHROPIC_BASE_URL;
-  const hasUserKey = !!config.anthropicKey && config.anthropicKey !== envKey;
-  const useGateway = !hasUserKey && !!(envKey && envBase);
-  const anthropic = useGateway
-    ? new Anthropic()
-    : new Anthropic({ apiKey: hasUserKey ? config.anthropicKey : apiKey, ...(hasUserKey ? {} : baseURL ? { baseURL } : {}) });
+  // Use the user's API key directly
+  const anthropic = new Anthropic({ apiKey: apiKey, ...(baseURL ? { baseURL } : {}) });
 
   const model = config.model || "claude-haiku-4-5";
   const anthropicTools = toAnthropicTools();
@@ -237,6 +244,7 @@ async function runAnthropicAgent(
   let finalResponse = "";
   let continueLoop = true;
   let artifactSaved = false; // tracks whether save_artifact was successfully called before create_project_record
+  let projectRecordCreated = false; // prevents duplicate project records
 
   while (continueLoop) {
     const stream = await anthropic.messages.create({
@@ -303,6 +311,14 @@ async function runAnthropicAgent(
           continue;
         }
 
+        // Prevent duplicate project records in the same session
+        if (tu.name === "create_project_record" && projectRecordCreated) {
+          result = "Project record already created in this session — skipping duplicate.";
+          onToolResult(tu.name, result);
+          toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: result });
+          continue;
+        }
+
         try { result = await executeToolCall(tu.name, tu.input, config); } catch (error) {
           result = `Error executing ${tu.name}: ${error instanceof Error ? error.message : "Unknown error"}`;
         }
@@ -310,6 +326,9 @@ async function runAnthropicAgent(
         // Mark that files have been successfully saved so create_project_record is now allowed.
         if (tu.name === "save_artifact" && !result.startsWith("ERROR:")) {
           artifactSaved = true;
+        }
+        if (tu.name === "create_project_record" && !result.startsWith("Error") && !result.startsWith("Project record already")) {
+          projectRecordCreated = true;
         }
 
         onToolResult(tu.name, result);
@@ -333,51 +352,43 @@ export async function runAgent(
 
   // Try the requested provider first
   try {
-    if (requestedProvider === "anthropic") {
-      const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
-      if (anthropicKey) {
-        return await runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, anthropicKey, process.env.ANTHROPIC_BASE_URL);
-      }
+    if (requestedProvider === "anthropic" && config.anthropicKey) {
+      return await runAnthropicAgent(messages, config, onChunk, onToolCall, onToolResult, config.anthropicKey, process.env.ANTHROPIC_BASE_URL);
     }
 
-    if (requestedProvider === "openai") {
-      const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
-      if (openaiKey) {
-        return await runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, openaiKey, process.env.OPENAI_BASE_URL);
-      }
+    if (requestedProvider === "openai" && config.openaiKey) {
+      return await runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.openaiKey, process.env.OPENAI_BASE_URL);
+    }
+
+    if (requestedProvider === "grok" && config.grokKey) {
+      return await runOpenAIAgent(messages, config, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
     }
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : String(error);
     console.error(`Failed with requested provider ${requestedProvider}:`, errMsg);
 
-    // If the requested provider failed, try the OTHER provider as fallback
+    // If the requested provider failed, try another available provider as fallback
     const fallbackProvider = requestedProvider === "openai" ? "anthropic" : "openai";
     try {
-      if (fallbackProvider === "anthropic") {
-        const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
-        if (anthropicKey) {
-          // Override the model to a valid Anthropic model when falling back
-          const fallbackConfig = { ...config, model: "claude-haiku-4-5", provider: "anthropic" as AIProvider };
-          return await runAnthropicAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, anthropicKey, process.env.ANTHROPIC_BASE_URL);
-        }
-      } else {
-        const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
-        if (openaiKey) {
-          const fallbackConfig = { ...config, model: "gpt-4o-mini", provider: "openai" as AIProvider };
-          return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, openaiKey, process.env.OPENAI_BASE_URL);
-        }
+      if (fallbackProvider === "anthropic" && config.anthropicKey) {
+        const fallbackConfig = { ...config, model: "claude-haiku-4-5", provider: "anthropic" as AIProvider };
+        return await runAnthropicAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.anthropicKey, process.env.ANTHROPIC_BASE_URL);
+      } else if (config.openaiKey) {
+        const fallbackConfig = { ...config, model: "gpt-4o-mini", provider: "openai" as AIProvider };
+        return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.openaiKey, process.env.OPENAI_BASE_URL);
+      } else if (config.grokKey) {
+        const fallbackConfig = { ...config, provider: "grok" as AIProvider };
+        return await runOpenAIAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, config.grokKey, "https://api.x.ai/v1");
       }
     } catch (fallbackError) {
       console.error(`Fallback provider ${fallbackProvider} also failed:`, fallbackError);
-      // Throw the original error for better diagnostics
       throw error;
     }
 
-    // If we got here, fallback provider had no key available
     throw error;
   }
 
-  // If no key for the requested provider, auto-detect
+  // If no key for the requested provider, auto-detect from available keys
   const detected = detectAvailableProvider(config);
   if (detected) {
     try {
@@ -392,8 +403,7 @@ export async function runAgent(
   }
 
   throw new Error(
-    "No AI provider available. Netlify AI Gateway provides Claude and GPT automatically — no API keys needed. " +
-    "If this error persists, the site may need a production deploy to activate AI Gateway."
+    "No AI provider configured. Please add an API key in Settings → AI Models (OpenAI, Anthropic, or Grok)."
   );
 }
 

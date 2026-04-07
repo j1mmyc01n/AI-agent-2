@@ -76,9 +76,12 @@ export async function POST(req: NextRequest) {
       name?: string | null;
       openaiKey?: string | null;
       anthropicKey?: string | null;
+      grokKey?: string | null;
       githubToken?: string | null;
       vercelToken?: string | null;
       tavilyKey?: string | null;
+      neonKey?: string | null;
+      netlifyToken?: string | null;
     } | null = null;
 
     let userProjects: {
@@ -101,9 +104,12 @@ export async function POST(req: NextRequest) {
             name: true,
             openaiKey: true,
             anthropicKey: true,
+            grokKey: true,
             githubToken: true,
             vercelToken: true,
             tavilyKey: true,
+            neonKey: true,
+            netlifyToken: true,
           },
         });
 
@@ -140,9 +146,12 @@ export async function POST(req: NextRequest) {
           user = {
             openaiKey: blobKeys.openaiKey || null,
             anthropicKey: blobKeys.anthropicKey || null,
+            grokKey: blobKeys.grokKey || null,
             githubToken: blobKeys.githubToken || null,
             vercelToken: blobKeys.vercelToken || null,
             tavilyKey: blobKeys.tavilyKey || null,
+            neonKey: blobKeys.neonKey || null,
+            netlifyToken: blobKeys.netlifyToken || null,
           };
         }
       } catch {
@@ -161,25 +170,32 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve API keys - Netlify AI Gateway auto-injects these env vars, no user keys needed
-    const openaiKey = user?.openaiKey || process.env.OPENAI_API_KEY;
-    const anthropicKey = user?.anthropicKey || process.env.ANTHROPIC_API_KEY;
+    // Resolve API keys — only use keys the user has configured in Settings
+    const openaiKey = user?.openaiKey || null;
+    const anthropicKey = user?.anthropicKey || null;
+    const grokKey = user?.grokKey || null;
 
     // Auto-detect best available provider: prefer requested, then fallback
     let activeProvider: AIProvider = provider || "anthropic";
     if (activeProvider === "openai" && !openaiKey) {
-      activeProvider = anthropicKey ? "anthropic" : "openai";
+      activeProvider = anthropicKey ? "anthropic" : grokKey ? "grok" : "openai";
     } else if (activeProvider === "anthropic" && !anthropicKey) {
-      activeProvider = openaiKey ? "openai" : "anthropic";
+      activeProvider = openaiKey ? "openai" : grokKey ? "grok" : "anthropic";
+    } else if (activeProvider === "grok" && !grokKey) {
+      activeProvider = anthropicKey ? "anthropic" : openaiKey ? "openai" : "grok";
     }
 
-    // Netlify AI Gateway provides keys automatically - only error if truly nothing available
-    if (!openaiKey && !anthropicKey) {
+    // Require user to have at least one API key configured
+    if (!openaiKey && !anthropicKey && !grokKey) {
       return NextResponse.json(
-        { error: "No AI provider available. Netlify AI Gateway should provide Claude and GPT automatically. If this persists, the site may need a production deploy to activate AI Gateway." },
+        { error: "No AI provider configured. Please add an API key in Settings → AI Models (OpenAI, Anthropic, or Grok)." },
         { status: 400 }
       );
     }
+
+    // Auto-detect Netlify and Neon environments
+    const isNetlifyEnv = !!(process.env.NETLIFY || process.env.NETLIFY_SITE_ID);
+    const isNeonEnv = !!(process.env.NETLIFY_DATABASE_URL?.includes("neon") || process.env.DATABASE_URL?.includes("neon") || process.env.NEON_DATABASE_URL);
 
     // Get or create conversation
     let conversation: { id: string; title: string; messages: { role: string; content: string }[] };
@@ -298,8 +314,9 @@ export async function POST(req: NextRequest) {
       hasDatabase: hasDb,
       hasAnthropicKey: !!anthropicKey,
       hasOpenaiKey: !!openaiKey,
-      // Netlify AI Gateway auto-injects env keys — flag if gateway is providing the key (not the user)
-      isNetlifyGateway: !user?.anthropicKey && !!process.env.ANTHROPIC_API_KEY,
+      hasGrokKey: !!grokKey,
+      hasNeon: !!(user?.neonKey) || isNeonEnv,
+      hasNetlify: !!(user?.netlifyToken) || isNetlifyEnv,
       mode: mode || "chat",
     };
 
@@ -322,6 +339,7 @@ export async function POST(req: NextRequest) {
             {
               openaiKey: openaiKey || undefined,
               anthropicKey: anthropicKey || undefined,
+              grokKey: grokKey || undefined,
               githubToken: user?.githubToken || undefined,
               vercelToken: user?.vercelToken || undefined,
               tavilyKey: user?.tavilyKey || undefined,

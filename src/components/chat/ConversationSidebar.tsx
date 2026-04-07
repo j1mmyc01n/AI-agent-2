@@ -26,7 +26,6 @@ import {
   Globe,
   History,
   MessageSquare,
-  Eraser,
 } from "lucide-react";
 
 interface Conversation {
@@ -59,7 +58,6 @@ export default function ConversationSidebar({
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [clearingAll, setClearingAll] = useState(false);
 
   const fetchConversations = useCallback(async () => {
     try {
@@ -134,34 +132,6 @@ export default function ConversationSidebar({
       console.error("Failed to delete conversation:", error);
     } finally {
       setDeletingId(null);
-    }
-  };
-
-  const handleClearAll = async () => {
-    const projectIds = new Set(projects.map(p => p.id));
-    // Treat conversations as unlinked if they have no projectId, or if the project
-    // they reference no longer exists (orphaned). Both are safe to bulk-delete.
-    const unlinkedConvs = conversations.filter(c => !c.projectId || !projectIds.has(c.projectId));
-    if (unlinkedConvs.length === 0) return;
-    setClearingAll(true);
-
-    try {
-      // Delete only unlinked/orphaned conversations (not project chats)
-      const deletePromises = unlinkedConvs.map((conv) =>
-        fetch(`/api/conversations/${conv.id}`, { method: "DELETE" }).catch(
-          () => null
-        )
-      );
-      await Promise.all(deletePromises);
-      // Keep only conversations that are actively linked to a known project
-      setConversations((prev) => prev.filter(c => c.projectId && projectIds.has(c.projectId)));
-      if (currentConversationId && unlinkedConvs.some(c => c.id === currentConversationId)) {
-        router.push("/chat");
-      }
-    } catch (error) {
-      console.error("Failed to clear conversations:", error);
-    } finally {
-      setClearingAll(false);
     }
   };
 
@@ -249,8 +219,8 @@ export default function ConversationSidebar({
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
-              {/* Projects section - always visible */}
+            <div className="space-y-1">
+              {/* Projects section */}
               <div>
                 <div className="flex items-center justify-between px-3 mb-1.5">
                   <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
@@ -258,7 +228,7 @@ export default function ConversationSidebar({
                   </span>
                   <Link href="/projects">
                     <span className="text-[10px] text-primary/60 hover:text-primary transition-colors cursor-pointer">
-                      {projects.length > 0 ? "View all" : "New"}
+                      {projects.length > 0 ? "Manage" : "New"}
                     </span>
                   </Link>
                 </div>
@@ -277,6 +247,7 @@ export default function ConversationSidebar({
                       const isOnProjectPage = pathname === `/projects/${project.id}`;
                       return (
                         <div key={project.id}>
+                          {/* Project row */}
                           <Link
                             href={`/projects/${project.id}`}
                             className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg mx-1 transition-colors ${
@@ -298,50 +269,18 @@ export default function ConversationSidebar({
                               }`} />
                             )}
                           </Link>
+                          {/* Project conversations (nested) */}
+                          {projectConvs.length > 0 && (
+                            <div className="ml-4 mt-0.5 space-y-0.5 border-l border-border/30 pl-2">
+                              {projectConvs.map(renderConversation)}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 )}
               </div>
-
-              {/* Unlinked conversations (not attached to a project) */}
-              {(() => {
-                const projectIds = new Set(projects.map(p => p.id));
-                const unlinkedConvs = conversations.filter(c => !c.projectId || !projectIds.has(c.projectId));
-                if (unlinkedConvs.length === 0 && projects.length > 0) return null;
-                return (
-                  <div>
-                    <div className="flex items-center justify-between px-3 mb-1">
-                      <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
-                        Chats ({unlinkedConvs.length})
-                      </span>
-                      {unlinkedConvs.length > 0 && (
-                        <button
-                          onClick={handleClearAll}
-                          disabled={clearingAll}
-                          className="flex items-center gap-1 text-[10px] text-muted-foreground/60 hover:text-destructive transition-colors"
-                          title="Clear all conversations"
-                        >
-                          <Eraser className="h-3 w-3" />
-                          <span>{clearingAll ? "Clearing..." : "Clear all"}</span>
-                        </button>
-                      )}
-                    </div>
-                    {unlinkedConvs.length === 0 ? (
-                      <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                        <MessageSquare className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                        <p className="text-xs">No conversations yet</p>
-                        <p className="text-xs opacity-60 mt-0.5">Start a new chat!</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-0.5">
-                        {unlinkedConvs.map(renderConversation)}
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
             </div>
           )}
         </ScrollArea>

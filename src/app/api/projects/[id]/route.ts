@@ -124,8 +124,11 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
   if (getDatabaseUrl()) {
     try {
-      await db.project.deleteMany({ where: { id, userId } });
-      return NextResponse.json({ success: true });
+      const result = await db.project.deleteMany({ where: { id, userId } });
+      if (result.count > 0) {
+        return NextResponse.json({ success: true });
+      }
+      // count=0 means not in DB — fall through to try Blobs
     } catch (error) {
       console.error("DB error in DELETE /api/projects/[id]:", error);
     }

@@ -59,14 +59,12 @@ function buildResponse(userKeys: Record<string, string | null>) {
     result[key] = maskSecret(userVal);
     result[STATUS_KEY_MAP[key]] = !!userVal;
   }
-  // Also check env vars (Netlify AI Gateway auto-injects these)
-  if (!result.hasAnthropicKey && process.env.ANTHROPIC_API_KEY) {
-    result.hasAnthropicKey = true;
-    result.gatewayAnthropic = true;
+  // Auto-detect Netlify and Neon from environment (these are platform-level, not user keys)
+  if (!result.hasNetlifyToken && (process.env.NETLIFY || process.env.NETLIFY_SITE_ID)) {
+    result.isNetlifyEnv = true;
   }
-  if (!result.hasOpenaiKey && process.env.OPENAI_API_KEY) {
-    result.hasOpenaiKey = true;
-    result.gatewayOpenai = true;
+  if (!result.hasNeonKey && (process.env.NETLIFY_DATABASE_URL?.includes("neon") || process.env.DATABASE_URL?.includes("neon") || process.env.NEON_DATABASE_URL)) {
+    result.isNeonEnv = true;
   }
   // Include user preferences
   result.defaultModel = userKeys.defaultModel || null;
