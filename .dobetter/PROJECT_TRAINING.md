@@ -213,9 +213,11 @@ Does it need AI features?
         └── api.ts                    ← API request/response types
 ```
 
-### 3B. Pure HTML/CSS/JS App (Single File or Multi-File)
+### 3B. Pure HTML/CSS/JS App (DoBetter Viber Default — 8-File Structure)
 
-Single-file (for tools, portfolios, landing pages):
+**This is the DEFAULT structure for ALL user projects built by DoBetter Viber.**
+
+Single-file (for tools, portfolios, landing pages — simple requests):
 ```
 {project-name}/
 ├── index.html       ← Everything lives here: HTML + <style> + <script>
@@ -223,98 +225,72 @@ Single-file (for tools, portfolios, landing pages):
 └── .gitignore
 ```
 
-Multi-file (for larger static sites):
+**Multi-file (standard — always use this for anything non-trivial):**
 ```
 {project-name}/
-├── index.html
-├── css/
-│   ├── reset.css
-│   ├── variables.css    ← Design tokens
-│   ├── layout.css
-│   ├── components.css
-│   └── animations.css
-├── js/
-│   ├── main.js          ← Entry point
-│   ├── api.js           ← All fetch calls
-│   ├── state.js         ← App state object
-│   ├── render.js        ← DOM rendering functions
-│   └── utils.js         ← Helpers
-├── assets/
-│   ├── images/
-│   └── fonts/
-└── README.md
+├── index.html                ← Full HTML shell with <link> and <script> tags
+├── src/
+│   ├── css/
+│   │   ├── styles.css        ← Design tokens, resets, typography, layout, animations
+│   │   └── components.css    ← Component-specific styles
+│   └── js/
+│       ├── config.js         ← APP_CONFIG object
+│       ├── state.js          ← Centralized state store
+│       ├── router.js         ← Hash-based SPA router
+│       ├── components.js     ← Reusable UI component factories
+│       └── app.js            ← Bootstrap: init router, wire events, render
 ```
+
+**REQUIRED paths (use exactly these — no others):**
+- `index.html`
+- `src/css/styles.css`
+- `src/css/components.css`
+- `src/js/config.js`
+- `src/js/state.js`
+- `src/js/router.js`
+- `src/js/components.js`
+- `src/js/app.js`
+
+**FORBIDDEN paths:**
+- ❌ `src/lib/` (any file) — use `src/js/` instead
+- ❌ `src/pages/` — use `Router.register()` in `src/js/router.js`
+- ❌ `src/styles/` — use `src/css/`
+- ❌ `public/` — no public directory in HTML/CSS/JS projects
+- ❌ `src/components/` (as a folder) — use `src/js/components.js`
+- ❌ `.gitkeep`, `.keep`, or any empty placeholder files
 
 ### 3C. E-Commerce App Structure
 
 ```
-{store-name}/
-└── src/
-    ├── app/
-    │   ├── page.tsx                  ← Storefront home
-    │   ├── products/
-    │   │   ├── page.tsx              ← Product listing
-    │   │   └── [slug]/page.tsx       ← Product detail
-    │   ├── cart/page.tsx
-    │   ├── checkout/page.tsx
-    │   ├── orders/
-    │   │   ├── page.tsx              ← Order history
-    │   │   └── [id]/page.tsx         ← Order detail
-    │   └── api/
-    │       ├── products/route.ts
-    │       ├── cart/route.ts
-    │       ├── checkout/route.ts
-    │       └── webhooks/stripe/route.ts
-    │
-    ├── components/
-    │   ├── ui/                       ← Same base UI system
-    │   ├── store/
-    │   │   ├── ProductCard.tsx
-    │   │   ├── ProductGrid.tsx
-    │   │   ├── ProductImages.tsx
-    │   │   └── ProductBadge.tsx
-    │   ├── cart/
-    │   │   ├── CartDrawer.tsx        ← Slide-out cart
-    │   │   ├── CartItem.tsx
-    │   │   ├── CartSummary.tsx
-    │   │   └── CartButton.tsx        ← Floating cart icon + count
-    │   └── checkout/
-    │       ├── CheckoutForm.tsx
-    │       ├── OrderSummary.tsx
-    │       └── PaymentSection.tsx
-    │
-    └── ...same hooks/lib/types structure
+{store-name}/src/app/
+├── page.tsx                  ← Storefront home
+├── products/
+│   ├── page.tsx              ← Product listing
+│   └── [slug]/page.tsx       ← Product detail
+├── cart/page.tsx
+├── checkout/page.tsx
+├── orders/
+│   ├── page.tsx              ← Order history
+│   └── [id]/page.tsx
+└── api/
+    ├── products/route.ts
+    ├── cart/route.ts
+    ├── checkout/route.ts
+    └── webhooks/stripe/route.ts
 ```
 
 ### 3D. AI Tool App Structure
 
 ```
-{ai-tool-name}/
-└── src/
-    ├── app/
-    │   ├── page.tsx                  ← Tool landing / entry
-    │   ├── (tool)/
-    │   │   ├── layout.tsx
-    │   │   └── generate/page.tsx     ← Main generation UI
-    │   ├── history/page.tsx          ← Past generations
-    │   └── api/
-    │       ├── generate/route.ts     ← Streams AI response
-    │       └── history/route.ts
-    │
-    ├── components/
-    │   ├── ui/
-    │   ├── tool/
-    │   │   ├── PromptInput.tsx       ← User input area
-    │   │   ├── OutputDisplay.tsx     ← Streaming output renderer
-    │   │   ├── StreamingText.tsx     ← Animated streaming text
-    │   │   ├── CopyButton.tsx
-    │   │   ├── RegenerateButton.tsx
-    │   │   └── ModelSelector.tsx     ← Pick Claude/GPT/Grok
-    │   └── history/
-    │       ├── HistoryList.tsx
-    │       └── HistoryItem.tsx
-    │
-    └── ...same hooks/lib/types structure
+{ai-tool-name}/src/app/
+├── page.tsx                  ← Tool landing / entry
+├── (tool)/
+│   ├── layout.tsx
+│   └── generate/page.tsx     ← Main generation UI
+├── history/page.tsx          ← Past generations
+└── api/
+    ├── generate/route.ts     ← Streams AI response
+    └── history/route.ts
 ```
 
 ---
@@ -325,17 +301,17 @@ Multi-file (for larger static sites):
 
 When you create a file, write 100% of it. These patterns are non-negotiable:
 
-### 4A. globals.css — Always Start Here
+### 4A. globals.css / styles.css — Always Start Here
 
 ```css
-/* globals.css — Generated by DoBetter Viber */
+/* styles.css — Generated by DoBetter Viber */
 @import url('https://fonts.googleapis.com/css2?family={DisplayFont}:wght@400;600;700&family={BodyFont}:wght@300;400;500;600&display=swap');
 
 :root {
   /* Brand Colors */
   --primary: #[hex];
   --primary-hover: #[hex];
-  --primary-subtle: #[hex];       /* 10% opacity version */
+  --primary-subtle: #[hex]; /* 10% opacity version */
   --secondary: #[hex];
   --accent: #[hex];
 
@@ -537,8 +513,8 @@ export function useFetch<T>(url: string | null): FetchState<T> {
         if (!res.ok) throw new Error(`Error ${res.status}: ${res.statusText}`);
         const json = await res.json();
         if (!cancelled) setData(json);
-      } catch (err: any) {
-        if (!cancelled && err.name !== 'AbortError') {
+      } catch (err: unknown) {
+        if (!cancelled && err instanceof Error && err.name !== 'AbortError') {
           setError(err.message || 'Something went wrong');
         }
       } finally {
@@ -569,25 +545,23 @@ const CreateSchema = z.object({
   description: z.string().optional(),
 });
 
-// GET /api/{resource} — list all for current user
-export async function GET(req: NextRequest) {
+export async function GET() {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    const { rows } = await db.query(
-      'SELECT * FROM {resources} WHERE user_id = $1 ORDER BY created_at DESC',
-      [session.user.id]
-    );
-    return NextResponse.json({ data: rows });
+    const items = await db.resource.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: 'desc' },
+    });
+    return NextResponse.json({ data: items });
   } catch (error) {
-    console.error('[GET /{resource}]', error);
+    console.error('[GET /resource]', error);
     return NextResponse.json({ error: 'Failed to fetch' }, { status: 500 });
   }
 }
 
-// POST /api/{resource} — create new
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
@@ -596,18 +570,15 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const validated = CreateSchema.parse(body);
-    const { rows } = await db.query(
-      `INSERT INTO {resources} (user_id, name, description)
-       VALUES ($1, $2, $3)
-       RETURNING *`,
-      [session.user.id, validated.name, validated.description]
-    );
-    return NextResponse.json({ data: rows[0] }, { status: 201 });
-  } catch (error: any) {
-    if (error.name === 'ZodError') {
+    const item = await db.resource.create({
+      data: { ...validated, userId: session.user.id },
+    });
+    return NextResponse.json({ data: item }, { status: 201 });
+  } catch (error: unknown) {
+    if (error instanceof z.ZodError) {
       return NextResponse.json({ error: 'Invalid input', details: error.errors }, { status: 400 });
     }
-    console.error('[POST /{resource}]', error);
+    console.error('[POST /resource]', error);
     return NextResponse.json({ error: 'Failed to create' }, { status: 500 });
   }
 }
@@ -623,54 +594,46 @@ This is the most important section. Features only work when they are correctly l
 
 ```
 ┌─────────────────────────────────────────┐
-│  LAYER 4: COMPONENT (what user sees)    │
+│  LAYER 4: COMPONENT  (what user sees)   │
 │  ProjectList.tsx, ProjectCard.tsx       │
 │  Uses → useProjects() hook              │
 ├─────────────────────────────────────────┤
-│  LAYER 3: HOOK (data bridge)            │
+│  LAYER 3: HOOK  (data bridge)           │
 │  useProjects.ts                         │
 │  Uses → fetch('/api/projects')          │
 ├─────────────────────────────────────────┤
-│  LAYER 2: API ROUTE (server logic)      │
+│  LAYER 2: API ROUTE  (server logic)     │
 │  /api/projects/route.ts                 │
-│  Uses → db.query('SELECT * FROM...')    │
+│  Uses → db.project.findMany()           │
 ├─────────────────────────────────────────┤
-│  LAYER 1: DATABASE (source of truth)    │
-│  Neon PostgreSQL table: projects        │
+│  LAYER 1: DATABASE  (source of truth)   │
+│  Neon PostgreSQL / Prisma model         │
 └─────────────────────────────────────────┘
 ```
 
-### Complete Feature Example: Projects Feature
+### Complete Feature Example: Projects
 
-**Layer 1 — Database Table:**
-
-```sql
-CREATE TABLE projects (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  name TEXT NOT NULL,
-  description TEXT,
-  status TEXT DEFAULT 'active',
-  created_at TIMESTAMPTZ DEFAULT NOW(),
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_projects_user_id ON projects(user_id);
+**Layer 1 — Prisma Schema:**
+```prisma
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
 ```
 
+**Layer 2 — API Route (`/api/projects/route.ts`):**
+- GET → fetch all projects for current user
+- POST → create new project
+(See template in Part 4D above)
+
 **Layer 3 — Custom Hook (`hooks/useProjects.ts`):**
-
 ```ts
-import { useState, useEffect } from 'react';
-
-export interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  status: string;
-  created_at: string;
-}
-
 export function useProjects() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -683,8 +646,8 @@ export function useProjects() {
       if (!res.ok) throw new Error('Failed to load projects');
       const { data } = await res.json();
       setProjects(data);
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {
       setLoading(false);
     }
@@ -704,26 +667,14 @@ export function useProjects() {
     return data;
   }
 
-  async function deleteProject(id: string) {
-    await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-    setProjects(prev => prev.filter(p => p.id !== id));
-  }
-
-  return { projects, loading, error, createProject, deleteProject, refetch: load };
+  return { projects, loading, error, createProject, refetch: load };
 }
 ```
 
 **Layer 4 — Component (`components/projects/ProjectList.tsx`):**
-
 ```tsx
-import { useProjects } from '@/hooks/useProjects';
-import { ProjectCard } from './ProjectCard';
-import { Button, EmptyState, ErrorState, Spinner } from '@/components/ui';
-import { useState } from 'react';
-
 export function ProjectList() {
   const { projects, loading, error, createProject } = useProjects();
-  const [creating, setCreating] = useState(false);
 
   if (loading) return <div className="flex justify-center p-12"><Spinner /></div>;
   if (error) return <ErrorState message={error} />;
@@ -731,7 +682,7 @@ export function ProjectList() {
     <EmptyState
       title="No projects yet"
       description="Create your first project to get started."
-      action={<Button onClick={() => setCreating(true)}>New Project</Button>}
+      action={<Button onClick={() => createProject('My Project')}>New Project</Button>}
     />
   );
 
@@ -745,27 +696,11 @@ export function ProjectList() {
 }
 ```
 
-**How it's wired into the page (`app/(dashboard)/projects/page.tsx`):**
-
-```tsx
-import { ProjectList } from '@/components/projects/ProjectList';
-import { PageHeader } from '@/components/layout/PageHeader';
-
-export default function ProjectsPage() {
-  return (
-    <div>
-      <PageHeader title="Projects" subtitle="Manage your projects" />
-      <ProjectList />
-    </div>
-  );
-}
-```
-
 ---
 
 ## PART 6: NAVIGATION & ROUTING — FULLY WIRED
 
-### Sidebar Navigation (Sidebar.tsx) — Must Match Actual Routes
+### Sidebar Navigation — Must Match Actual Routes
 
 ```tsx
 // components/layout/Sidebar.tsx
@@ -775,9 +710,9 @@ import { usePathname } from 'next/navigation';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', href: '/dashboard', icon: '⊞' },
-  { label: 'Projects',  href: '/projects',  icon: '◫' },
-  { label: 'Settings',  href: '/settings',  icon: '⚙' },
-  { label: 'Billing',   href: '/billing',   icon: '💳' },
+  { label: 'Projects', href: '/projects', icon: '◫' },
+  { label: 'Settings', href: '/settings', icon: '⚙' },
+  { label: 'Billing', href: '/billing', icon: '💳' },
 ];
 
 export function Sidebar() {
@@ -799,13 +734,13 @@ export function Sidebar() {
 }
 ```
 
-**Rule:** Every item in the sidebar must have a corresponding `page.tsx` file. No dead links ever.
+**Rule: Every item in the sidebar must have a corresponding `page.tsx` file. No dead links ever.**
 
 ---
 
 ## PART 7: DATABASE PATTERNS — NEON POSTGRESQL
 
-### Connection Setup (lib/db.ts)
+### Connection Setup (`lib/db.ts`)
 
 ```ts
 import { Pool } from 'pg';
@@ -826,10 +761,10 @@ if (process.env.NODE_ENV !== 'production') globalForDb.pool = db;
 ### Schema Pattern — Every Table Gets These Columns
 
 ```sql
-id          UUID PRIMARY KEY DEFAULT gen_random_uuid()
-user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE
-created_at  TIMESTAMPTZ DEFAULT NOW()
-updated_at  TIMESTAMPTZ DEFAULT NOW()
+id         UUID PRIMARY KEY DEFAULT gen_random_uuid()
+user_id    UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE
+created_at TIMESTAMPTZ DEFAULT NOW()
+updated_at TIMESTAMPTZ DEFAULT NOW()
 ```
 
 ### Common Schema Patterns by App Type
@@ -862,7 +797,7 @@ posts → comments
 
 ## PART 8: AUTH WIRING (NEXTAUTH)
 
-### lib/auth.ts — Full Config
+### `lib/auth.ts` — Full Config
 
 ```ts
 import NextAuth, { NextAuthOptions } from 'next-auth';
@@ -885,12 +820,9 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials.password) return null;
-        const { rows } = await db.query(
-          'SELECT * FROM users WHERE email = $1', [credentials.email]
-        );
-        const user = rows[0];
+        const user = await db.user.findUnique({ where: { email: credentials.email } });
         if (!user) return null;
-        const valid = await bcrypt.compare(credentials.password, user.hashed_password);
+        const valid = await bcrypt.compare(credentials.password, user.hashedPassword);
         if (!valid) return null;
         return { id: user.id, email: user.email, name: user.name };
       }
@@ -902,7 +834,7 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) session.user.id = token.id as string;
+      if (session.user) (session.user as { id: string }).id = token.id as string;
       return session;
     }
   },
@@ -945,6 +877,7 @@ export async function POST(req: NextRequest) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { priceId } = await req.json();
+
   const checkout = await stripe.checkout.sessions.create({
     mode: 'subscription',
     customer_email: session.user.email!,
@@ -958,16 +891,14 @@ export async function POST(req: NextRequest) {
 }
 ```
 
-### Step 2 — Webhook (Stripe → Your DB)
+### Step 2 — Webhook (Stripe → DB)
 
 ```ts
 // app/api/webhooks/stripe/route.ts
-import { stripe } from '@/lib/stripe';
-import { db } from '@/lib/db';
-
 export async function POST(req: NextRequest) {
   const body = await req.text();
   const sig = req.headers.get('stripe-signature')!;
+
   let event;
   try {
     event = stripe.webhooks.constructEvent(body, sig, process.env.STRIPE_WEBHOOK_SECRET!);
@@ -976,19 +907,19 @@ export async function POST(req: NextRequest) {
   }
 
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object as any;
-    await db.query(
-      'UPDATE users SET plan = $1, stripe_customer_id = $2 WHERE id = $3',
-      ['pro', session.customer, session.metadata.userId]
-    );
+    const session = event.data.object as Stripe.Checkout.Session;
+    await db.user.update({
+      where: { id: session.metadata!.userId },
+      data: { plan: 'pro', stripeCustomerId: session.customer as string },
+    });
   }
 
   if (event.type === 'customer.subscription.deleted') {
-    const sub = event.data.object as any;
-    await db.query(
-      'UPDATE users SET plan = $1 WHERE stripe_customer_id = $2',
-      ['free', sub.customer]
-    );
+    const sub = event.data.object as Stripe.Subscription;
+    await db.user.update({
+      where: { stripeCustomerId: sub.customer as string },
+      data: { plan: 'free' },
+    });
   }
 
   return NextResponse.json({ received: true });
@@ -1011,7 +942,7 @@ export async function POST(req: NextRequest) {
   const { prompt, systemPrompt } = await req.json();
 
   const stream = await client.messages.stream({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-5',
     max_tokens: 4096,
     system: systemPrompt || 'You are a helpful assistant.',
     messages: [{ role: 'user', content: prompt }],
@@ -1029,7 +960,10 @@ export async function POST(req: NextRequest) {
   });
 
   return new Response(readable, {
-    headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Transfer-Encoding': 'chunked' }
+    headers: {
+      'Content-Type': 'text/plain; charset=utf-8',
+      'Transfer-Encoding': 'chunked'
+    }
   });
 }
 ```
@@ -1048,6 +982,7 @@ export function StreamingOutput() {
   async function generate(prompt: string) {
     setLoading(true);
     setOutput('');
+
     const res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1056,11 +991,13 @@ export function StreamingOutput() {
 
     const reader = res.body!.getReader();
     const decoder = new TextDecoder();
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       setOutput(prev => prev + decoder.decode(value));
     }
+
     setLoading(false);
   }
 
@@ -1084,13 +1021,7 @@ Every project needs a toast system. Wire it once, use everywhere.
 import { create } from 'zustand';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info';
-
-interface Toast {
-  id: string;
-  type: ToastType;
-  message: string;
-}
-
+interface Toast { id: string; type: ToastType; message: string; }
 interface UIStore {
   toasts: Toast[];
   addToast: (type: ToastType, message: string) => void;
@@ -1107,7 +1038,6 @@ export const useUIStore = create<UIStore>((set) => ({
   removeToast: (id) => set(s => ({ toasts: s.toasts.filter(t => t.id !== id) })),
 }));
 
-// Convenience hook
 export const useToast = () => {
   const { addToast } = useUIStore();
   return {
@@ -1119,7 +1049,7 @@ export const useToast = () => {
 };
 ```
 
-**Using toasts anywhere in the app:**
+### Usage anywhere in the app:
 
 ```ts
 const toast = useToast();
@@ -1142,48 +1072,46 @@ Before delivering any project, verify every item:
 
 ### STRUCTURE
 - [ ] Folder structure matches the correct template for this app type
-- [ ] Every page in the nav has a corresponding `page.tsx` file
-- [ ] All imports use `@/` aliases (not relative `../../`)
-- [ ] Barrel exports (`index.ts`) exist in `ui/` and each feature folder
-- [ ] `package.json` lists every imported package
-- [ ] `.env.example` has every env variable used in the code
+- [ ] Every page in the nav has a corresponding page file
+- [ ] All imports resolve correctly (no missing files)
+- [ ] package.json lists every imported package
+- [ ] .env.example has every env variable used in the code
 
 ### DATABASE
-- [ ] Schema created with UUID PKs, timestamps, cascade deletes
+- [ ] Schema created with proper PKs and timestamps
 - [ ] Indexes on all foreign key columns
-- [ ] `lib/db.ts` connection pool configured
-- [ ] All queries use parameterized values (no string interpolation)
+- [ ] DB connection pool configured
+- [ ] All queries use parameterized values (no string interpolation for user data)
 
 ### API ROUTES
 - [ ] Every route checks auth before doing anything
 - [ ] Every route has try/catch with proper status codes
-- [ ] POST routes validate input with Zod before DB write
-- [ ] All routes return `{ data }` on success, `{ error }` on failure
+- [ ] POST routes validate input before DB write
+- [ ] All routes return consistent response shape on success and failure
 
 ### COMPONENTS
 - [ ] Every component handles: loading state, error state, empty state, data state
-- [ ] All buttons have loading prop used during async actions
+- [ ] All buttons have loading state during async actions
 - [ ] Forms have validation before submit
 - [ ] No hardcoded colors or sizes (all use CSS variables)
 
 ### FEATURE LINKING
-- [ ] Every DB table has a matching API route
-- [ ] Every API route has a matching custom hook
+- [ ] Every DB table/model has a matching API route
+- [ ] Every API route has a matching hook or fetch call
 - [ ] Every hook is used in a component
 - [ ] Every component is imported into a page
 - [ ] Every page is reachable via navigation
 
 ### UI/UX
-- [ ] `globals.css` defines all CSS variables
+- [ ] CSS defines all design tokens (colors, spacing, radius)
 - [ ] Responsive at 375px (mobile), 768px (tablet), 1024px (desktop)
 - [ ] Touch targets minimum 44px height on mobile
-- [ ] Fonts loaded from Google Fonts in `layout.tsx` `<head>`
+- [ ] Fonts loaded from CDN in HTML `<head>`
 
 ### FINAL
-- [ ] `README.md` has: description, setup steps, env vars table, run command
-- [ ] App starts with: `npm install && npm run dev`
+- [ ] README.md has: description, setup steps, env vars table, run command
 - [ ] No `console.log` statements left in production code
-- [ ] No "TODO", "FIXME", or "implement later" in any file
+- [ ] No `TODO`, `FIXME`, or "implement later" in any file
 
 ---
 
@@ -1193,31 +1121,22 @@ If the platform gets stuck at any point, follow this decision tree:
 
 **STUCK? Ask yourself:**
 
-- **Is the file partially written?**
-  → Finish it completely before moving on. Partial files break everything downstream.
+| Situation | Action |
+|---|---|
+| Is the file partially written? | Finish it completely before moving on. Partial files break everything downstream. |
+| Is an import missing? | Create the missing file immediately. Trace what it needs first, then come back. |
+| Is a feature unclear? | Pick the simplest reasonable interpretation. Build that. Add a comment: `// Simplified version — extend as needed`. Move on. |
+| Is a library unfamiliar? | Use the most popular option for that use case. Import it. Use basic API. Move on. |
+| Is the task too large? | Split into: schema → API → hook → component → page. Do one layer at a time. Complete each layer fully. |
+| Is something broken? | Fix it before writing new files. Broken imports + new files = cascading failures. |
 
-- **Is an import missing?**
-  → Create the missing file immediately. Trace: what does this file need? Create those first. Then come back and create this file.
-
-- **Is a feature unclear?**
-  → Pick the simplest reasonable interpretation. Build that. Add a comment: `// Simplified version — extend as needed`. Move on.
-
-- **Is a library unfamiliar?**
-  → Use the most popular option for that use case. Add to `package.json`. Import it. Use basic API. Move on.
-
-- **Is the task too large?**
-  → Split into: schema → API → hook → component → page. Do one layer at a time. Complete each layer fully.
-
-- **Is something broken?**
-  → Fix it before writing new files. Broken imports + new files = cascading failures.
-
-**NEVER:**
+### NEVER:
 - Leave a component without a complete return statement
 - Leave an async function without try/catch
 - Leave a page without importing its components
 - Leave a navigation item pointing to a non-existent route
-- Generate placeholder JSX like `<div>TODO</div>`
+- Generate placeholder markup like `<div>TODO</div>`
 
 ---
 
-*This is the complete training document for the DoBetter Viber AI coding engine. Every project the platform generates must follow these standards exactly.*
+*This is the complete training document for the DoBetter Viber AI coding engine. Embedded in every agent system prompt via `buildSystemPrompt()` in `src/lib/ai/prompts.ts`. Every project the platform generates must follow these standards exactly.*
