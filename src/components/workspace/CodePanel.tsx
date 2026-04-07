@@ -132,7 +132,7 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
     <div className="flex h-full">
       {/* File tree sidebar */}
       <div className={`border-r border-border/50 bg-card/30 flex flex-col shrink-0 transition-all duration-200 ${
-        sidebarCollapsed ? "w-10" : "w-52"
+        sidebarCollapsed ? "w-10" : "w-44 sm:w-52"
       }`}>
         {/* Sidebar header */}
         <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/30">

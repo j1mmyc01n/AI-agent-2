@@ -119,6 +119,23 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
   });
 }
 
+// Task titles matching any of these patterns are suppressed from the Tasks panel.
+// They describe AI meta-behavior (scope docs, file delegation) that should never
+// surface as user-visible tasks — the agent should generate files directly.
+const BLOCKED_TASK_PATTERNS = [
+  /\bscope\s+of\s+work\b/i,
+  /\bbuild\w*\s+scope\b/i,
+  /\bdelegate\b/i,
+  /\bdelegat\w+\s+files?\b/i,
+  /\bfiles?\s+to\s+(claude|gpt|openai|ai|anthropic)\b/i,
+  /\b(claude|openai|anthropic)\s+(api|sonnet|haiku|opus|gpt)\b.*\bfiles?\b/i,
+  /\bfiles?\b.*\b(claude|openai|anthropic)\s+(api|sonnet|haiku|opus|gpt)\b/i,
+];
+
+function isBlockedTaskTitle(title: string): boolean {
+  return BLOCKED_TASK_PATTERNS.some((p) => p.test(title));
+}
+
 // Extract todo items from assistant messages.
 // Deduplicates by normalized title — the LAST seen status for a given title wins,
 // so the task list progresses correctly as the agent marks files done across rounds.
@@ -128,7 +145,7 @@ function extractTodos(messages: Message[]): TodoItem[] {
   let idCounter = 0;
 
   const normalizeTitle = (t: string) =>
-    t.replace(/^`?([^`]+)`?$/, "$1") // strip backtick wrapping
+    t.replace(/^`([^`]+)`$/, "$1") // strip backtick wrapping (only when both present)
      .replace(/\.\.\.\s*$/, "")       // strip trailing ellipsis
      .toLowerCase()
      .trim();
@@ -151,7 +168,7 @@ function extractTodos(messages: Message[]): TodoItem[] {
       else if (inProgressMatch) { title = inProgressMatch[1].trim(); status = "in-progress"; }
       else if (numberedMatch) { title = numberedMatch[1].trim(); status = "pending"; }
 
-      if (title && status) {
+      if (title && status && !isBlockedTaskTitle(title)) {
         const key = normalizeTitle(title);
         const existing = seenTitles.get(key);
         if (existing) {
@@ -589,12 +606,14 @@ export default function ChatInterface({
       const doneMatch = line.match(/^[-*]\s+\[x\]\s+(.+)$/i);
       const inProgressMatch = line.match(/^[-*]\s+\[~\]\s+(.+)$/i);
 
-      if (pendingMatch) {
-        newTodos.push({ id: `wf-${idCounter++}`, title: pendingMatch[1].trim(), status: "pending" });
-      } else if (doneMatch) {
-        newTodos.push({ id: `wf-${idCounter++}`, title: doneMatch[1].trim(), status: "done" });
-      } else if (inProgressMatch) {
-        newTodos.push({ id: `wf-${idCounter++}`, title: inProgressMatch[1].trim(), status: "in-progress" });
+      let title: string | null = null;
+      let status: TodoItem["status"] | null = null;
+      if (pendingMatch) { title = pendingMatch[1].trim(); status = "pending"; }
+      else if (doneMatch) { title = doneMatch[1].trim(); status = "done"; }
+      else if (inProgressMatch) { title = inProgressMatch[1].trim(); status = "in-progress"; }
+
+      if (title && status && !isBlockedTaskTitle(title)) {
+        newTodos.push({ id: `wf-${idCounter++}`, title, status });
       }
     }
 
@@ -685,6 +704,9 @@ export default function ChatInterface({
       if (status === "idle") {
         const hasSaveArtifact = toolCalls?.some(tc => tc.name === "save_artifact");
         const hasCode = content ? CODE_FENCE_RE.test(content) : false;
+        // Compute which required files are still missing so we don't prematurely
+        // mark file tasks as done when the AI stopped before completing all of them.
+        const missingFiles = content ? new Set(getMissingBuildFiles(content)) : new Set<string>();
         return tasks.map(t => {
           // If no code was generated, only mark early planning/research tasks done;
           // mark remaining tasks as skipped so they don't appear stuck as "Pending"
@@ -702,6 +724,10 @@ export default function ChatInterface({
           if (t.title.includes("Saving")) {
             const savingStatus: "done" | "in-progress" = hasSaveArtifact ? "done" : "in-progress";
             return { ...t, status: savingStatus };
+          }
+          // File tasks: only mark done if the file was actually generated (not in missing set)
+          if (t.id.startsWith("file-") && missingFiles.has(t.title)) {
+            return { ...t, status: "pending" as const };
           }
           return { ...t, status: "done" as const };
         });
@@ -1333,7 +1359,9 @@ export default function ChatInterface({
         )}
         {activePanel === "code" && (
           <div className="flex flex-col h-full min-h-0">
-            <CodePanel codeBlocks={codeBlocks} isGenerating={isStreaming && agentStatus === "coding"} />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <CodePanel codeBlocks={codeBlocks} isGenerating={isStreaming && agentStatus === "coding"} />
+            </div>
             <MessageInput
               onSend={sendMessage}
               isLoading={isLoading}
