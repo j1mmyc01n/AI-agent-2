@@ -11,7 +11,7 @@ import TodoPanel, { type TodoItem } from "@/components/workspace/TodoPanel";
 import PreviewPanel from "@/components/workspace/PreviewPanel";
 import { Button } from "@/components/ui/button";
 import AgentMonitor from "@/components/workspace/AgentMonitor";
-import { Code2, ListTodo, Eye, MessageSquare, Brain, Loader2, Sparkles, Hammer, MessageCircle } from "lucide-react";
+import { Code2, ListTodo, Eye, MessageSquare, Brain, Loader2, Sparkles, Hammer, MessageCircle, FolderOpen, Plus } from "lucide-react";
 
 interface ToolCallData {
   name: string;
@@ -48,6 +48,21 @@ type AgentStatus = "idle" | "thinking" | "coding" | "searching" | "deploying" | 
 type ChatMode = "chat" | "build" | "saas-upgrade";
 
 // Extract code blocks from assistant messages (including streaming/incomplete blocks)
+// The 8 canonical file paths the AI must use for build-mode projects.
+// Any named code block whose path is NOT in this set and contains a path separator
+// is considered a wrong-path file and is stripped from the UI display — keeping the
+// file count in sync with what save_artifact accepts server-side.
+const CANONICAL_BUILD_PATHS = new Set([
+  "index.html",
+  "src/css/styles.css",
+  "src/css/components.css",
+  "src/js/config.js",
+  "src/js/state.js",
+  "src/js/router.js",
+  "src/js/components.js",
+  "src/js/app.js",
+]);
+
 function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlock[] {
   const blocks: CodeBlock[] = [];
   const codeRegex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g;
@@ -114,15 +129,65 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
     }
   }
   return blocks.filter((block, i) => {
-    if (!block.filename) return true; // keep unnamed blocks as-is
-    return namedLastIdx.get(normalizeFilename(block.filename)) === i;
+    if (!block.filename) return true; // keep unnamed snippet blocks
+    const cleanName = normalizeFilename(block.filename);
+    // Strip empty placeholder/scaffold files
+    if (cleanName.endsWith(".gitkeep") || cleanName.endsWith(".keep")) return false;
+    // Strip wrong-path files: any named file that contains a "/" (i.e. has a directory
+    // component) but is NOT one of the 8 canonical build paths is rejected so the UI
+    // count stays in sync with what save_artifact accepts server-side.
+    if (cleanName.includes("/") && !CANONICAL_BUILD_PATHS.has(cleanName)) return false;
+    return namedLastIdx.get(cleanName) === i;
   });
 }
 
-// Extract todo items from assistant messages
+// Task titles matching any of these patterns are suppressed from the Tasks panel.
+// They describe AI meta-behavior (scope docs, file delegation) that should never
+// surface as user-visible tasks — the agent should generate files directly.
+const BLOCKED_TASK_PATTERNS = [
+  /\bscope\s+of\s+work\b/i,
+  /\bbuild\w*\s+scope\b/i,
+  /\bdelegate\b/i,
+  /\bdelegat\w+\s+files?\b/i,
+  /\bfiles?\s+to\s+(claude|gpt|openai|ai|anthropic)\b/i,
+  /\b(claude|openai|anthropic)\s+(api|sonnet|haiku|opus|gpt)\b.*\bfiles?\b/i,
+  /\bfiles?\b.*\b(claude|openai|anthropic)\s+(api|sonnet|haiku|opus|gpt)\b/i,
+  // Block any task about sending/passing files to an AI
+  /\bsend\w*\s+files?\s+(to|via|through)\b/i,
+  /\bpass\w*\s+files?\s+(to|via)\b/i,
+  // Block "using Claude/GPT to generate/write"
+  /\busing\s+(claude|gpt|openai|anthropic|ai)\s+(api\s+)?(to\s+)?(generate|write|create|code|build)\b/i,
+  // Block "calling Claude/GPT API"
+  /\bcall\w*\s+(claude|gpt|openai|anthropic)\s+(api|sonnet|haiku|opus)\b/i,
+  // Block scaffold/boilerplate setup tasks that should never appear
+  /\bscaffold\w*\s+(project|structure|boilerplate)\b/i,
+  /\b(creating|building|generating)\s+scaffold\b/i,
+  /\bproject\s+scaffold\b/i,
+  /\bboilerplate\b/i,
+  // Block "folder scaffold" and "project record & folder scaffold" style tasks
+  /\bfolder\s+scaffold\b/i,
+  /\bscaffold\b.*\bfolder\b/i,
+  // Block "creating/initializing folder structure" tasks
+  /\b(creating|initializ\w+|setting\s+up)\s+(folder|directory|project)\s+(structure|scaffold|skeleton)\b/i,
+];
+
+function isBlockedTaskTitle(title: string): boolean {
+  return BLOCKED_TASK_PATTERNS.some((p) => p.test(title));
+}
+
+// Extract todo items from assistant messages.
+// Deduplicates by normalized title — the LAST seen status for a given title wins,
+// so the task list progresses correctly as the agent marks files done across rounds.
 function extractTodos(messages: Message[]): TodoItem[] {
-  const todos: TodoItem[] = [];
+  // Map from normalized title → {title, status, insertOrder}
+  const seenTitles = new Map<string, { title: string; status: TodoItem["status"]; order: number }>();
   let idCounter = 0;
+
+  const normalizeTitle = (t: string) =>
+    t.replace(/^`+|`+$/g, "")         // strip leading/trailing backticks
+     .replace(/\.\.\.\s*$/, "")       // strip trailing ellipsis
+     .toLowerCase()
+     .trim();
 
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
@@ -131,21 +196,38 @@ function extractTodos(messages: Message[]): TodoItem[] {
       const pendingMatch = line.match(/^[-*]\s+\[\s\]\s+(.+)$/);
       const doneMatch = line.match(/^[-*]\s+\[x\]\s+(.+)$/i);
       const inProgressMatch = line.match(/^[-*]\s+\[~\]\s+(.+)$/i);
-      const numberedMatch = line.match(/^\d+\.\s+(?:\*\*)?(.+?)(?:\*\*)?$/);
+      // Only parse numbered lists when no checkbox tasks have been accumulated yet
+      const numberedMatch = seenTitles.size === 0 ? line.match(/^\d+\.\s+(?:\*\*)?(.+?)(?:\*\*)?$/) : null;
 
-      if (pendingMatch) {
-        todos.push({ id: `todo-${idCounter++}`, title: pendingMatch[1].trim(), status: "pending" });
-      } else if (doneMatch) {
-        todos.push({ id: `todo-${idCounter++}`, title: doneMatch[1].trim(), status: "done" });
-      } else if (inProgressMatch) {
-        todos.push({ id: `todo-${idCounter++}`, title: inProgressMatch[1].trim(), status: "in-progress" });
-      } else if (numberedMatch && todos.length === 0) {
-        todos.push({ id: `todo-${idCounter++}`, title: numberedMatch[1].trim(), status: "pending" });
+      let title: string | null = null;
+      let status: TodoItem["status"] | null = null;
+
+      if (pendingMatch) { title = pendingMatch[1].trim(); status = "pending"; }
+      else if (doneMatch) { title = doneMatch[1].trim(); status = "done"; }
+      else if (inProgressMatch) { title = inProgressMatch[1].trim(); status = "in-progress"; }
+      else if (numberedMatch) { title = numberedMatch[1].trim(); status = "pending"; }
+
+      if (title && status && !isBlockedTaskTitle(title)) {
+        const key = normalizeTitle(title);
+        const existing = seenTitles.get(key);
+        if (existing) {
+          // Update status to the latest seen (later in the stream = more recent)
+          existing.status = status;
+        } else {
+          seenTitles.set(key, { title, status, order: idCounter++ });
+        }
       }
     }
   }
 
-  return todos;
+  // Re-sort by insertion order so the task list preserves its original sequence
+  return [...seenTitles.values()]
+    .sort((a, b) => a.order - b.order)
+    .map((entry) => ({
+      id: `todo-${entry.order}`,
+      title: entry.title,
+      status: entry.status,
+    }));
 }
 
 function getAgentStatusFromToolCalls(streamingToolCalls: { name: string; args: Record<string, unknown> }[] | undefined): AgentStatus {
@@ -563,12 +645,14 @@ export default function ChatInterface({
       const doneMatch = line.match(/^[-*]\s+\[x\]\s+(.+)$/i);
       const inProgressMatch = line.match(/^[-*]\s+\[~\]\s+(.+)$/i);
 
-      if (pendingMatch) {
-        newTodos.push({ id: `wf-${idCounter++}`, title: pendingMatch[1].trim(), status: "pending" });
-      } else if (doneMatch) {
-        newTodos.push({ id: `wf-${idCounter++}`, title: doneMatch[1].trim(), status: "done" });
-      } else if (inProgressMatch) {
-        newTodos.push({ id: `wf-${idCounter++}`, title: inProgressMatch[1].trim(), status: "in-progress" });
+      let title: string | null = null;
+      let status: TodoItem["status"] | null = null;
+      if (pendingMatch) { title = pendingMatch[1].trim(); status = "pending"; }
+      else if (doneMatch) { title = doneMatch[1].trim(); status = "done"; }
+      else if (inProgressMatch) { title = inProgressMatch[1].trim(); status = "in-progress"; }
+
+      if (title && status && !isBlockedTaskTitle(title)) {
+        newTodos.push({ id: `wf-${idCounter++}`, title, status });
       }
     }
 
@@ -659,6 +743,9 @@ export default function ChatInterface({
       if (status === "idle") {
         const hasSaveArtifact = toolCalls?.some(tc => tc.name === "save_artifact");
         const hasCode = content ? CODE_FENCE_RE.test(content) : false;
+        // Compute which required files are still missing so we don't prematurely
+        // mark file tasks as done when the AI stopped before completing all of them.
+        const missingFiles = content ? new Set(getMissingBuildFiles(content)) : new Set<string>();
         return tasks.map(t => {
           // If no code was generated, only mark early planning/research tasks done;
           // mark remaining tasks as skipped so they don't appear stuck as "Pending"
@@ -676,6 +763,15 @@ export default function ChatInterface({
           if (t.title.includes("Saving")) {
             const savingStatus: "done" | "in-progress" = hasSaveArtifact ? "done" : "in-progress";
             return { ...t, status: savingStatus };
+          }
+          // File tasks: only mark done if the file was actually generated (not in missing set).
+          // Normalize the task title (strip backticks/spaces) so it can be matched against the
+          // plain file paths returned by getMissingBuildFiles (e.g. 'src/js/app.js').
+          if (t.id.startsWith("file-")) {
+            const normalizedTitle = t.title.replace(/^`+|`+$/g, "").trim();
+            if (missingFiles.has(normalizedTitle) || missingFiles.has(t.title)) {
+              return { ...t, status: "pending" as const };
+            }
           }
           return { ...t, status: "done" as const };
         });
@@ -754,7 +850,9 @@ export default function ChatInterface({
     const seen = new Set<string>();
     while ((match = codeRegex.exec(streamContent)) !== null) {
       const filePath = match[2].trim().replace(/\s*\(generating\.\.\.\)\s*/i, "").trim();
-      if (filePath && !seen.has(filePath)) {
+      // Skip empty placeholder scaffold files
+      if (!filePath || filePath.endsWith(".gitkeep") || filePath.endsWith(".keep")) continue;
+      if (!seen.has(filePath)) {
         seen.add(filePath);
         files.push({ path: filePath, content: match[3].trim() });
       }
@@ -1183,6 +1281,29 @@ export default function ChatInterface({
 
   return (
     <div className="flex flex-col h-full min-h-0 overflow-hidden">
+      {/* Project context header — shown when inside a project */}
+      {projectName && (
+        <div className="flex items-center justify-between px-3 sm:px-4 py-1.5 border-b border-border/40 bg-card/30 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="h-5 w-5 rounded flex items-center justify-center bg-primary/10 shrink-0">
+              <FolderOpen className="h-3 w-3 text-primary" />
+            </div>
+            <span className="text-xs font-semibold text-foreground truncate">{projectName}</span>
+            {codeBlocks.length > 0 && (
+              <span className="text-[10px] text-muted-foreground/70 bg-muted/60 rounded px-1.5 py-0.5 shrink-0">
+                {codeBlocks.length} {codeBlocks.length === 1 ? "file" : "files"}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setChatMode("build")}
+            className="h-6 w-6 rounded flex items-center justify-center text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors shrink-0"
+            title="Switch to Build mode"
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
       {/* Agent status bar + panel tabs */}
       <div className="flex items-center justify-between px-2 sm:px-4 py-1.5 border-b bg-card/50 shrink-0">
         {/* Panel tabs */}
@@ -1307,7 +1428,9 @@ export default function ChatInterface({
         )}
         {activePanel === "code" && (
           <div className="flex flex-col h-full min-h-0">
-            <CodePanel codeBlocks={codeBlocks} isGenerating={isStreaming && agentStatus === "coding"} />
+            <div className="flex-1 min-h-0 overflow-hidden">
+              <CodePanel codeBlocks={codeBlocks} isGenerating={isStreaming && agentStatus === "coding"} />
+            </div>
             <MessageInput
               onSend={sendMessage}
               isLoading={isLoading}

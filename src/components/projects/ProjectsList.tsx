@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check, Link2, Code2, Layout, Server, Wrench, Box, Globe, Rocket } from "lucide-react";
+import { ExternalLink, Github, Zap, Plus, FolderOpen, MessageSquare, X, Loader2, Pencil, Trash2, Check, Link2, Code2, Layout, Server, Wrench, Box, Globe, Rocket, AlertTriangle, RefreshCw } from "lucide-react";
 
 interface Project {
   id: string;
@@ -215,9 +215,14 @@ export default function ProjectsList() {
       if (res.ok) {
         const data = await res.json();
         setProjects(data);
+        setError(null);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || `Failed to load projects (${res.status})`);
       }
     } catch (err) {
       console.error("Failed to fetch projects:", err);
+      setError("Could not connect to the server. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -556,6 +561,18 @@ export default function ProjectsList() {
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          </div>
+        ) : error && projects.length === 0 ? (
+          <div className="text-center py-16">
+            <div className="h-16 w-16 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="h-8 w-8 text-destructive opacity-70" />
+            </div>
+            <h2 className="text-xl font-semibold mb-2">Could not load projects</h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm">{error}</p>
+            <Button onClick={() => { setLoading(true); fetchProjects(); }} className="gap-2">
+              <RefreshCw className="h-4 w-4" />
+              Retry
+            </Button>
           </div>
         ) : projects.length === 0 ? (
           <div className="text-center py-16">

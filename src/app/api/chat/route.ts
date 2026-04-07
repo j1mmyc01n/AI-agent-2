@@ -294,6 +294,12 @@ export async function POST(req: NextRequest) {
       userName: user?.name || undefined,
       hasGithub: !!(user?.githubToken),
       hasVercel: !!(user?.vercelToken),
+      hasTavily: !!(user?.tavilyKey || process.env.TAVILY_API_KEY),
+      hasDatabase: hasDb,
+      hasAnthropicKey: !!anthropicKey,
+      hasOpenaiKey: !!openaiKey,
+      // Netlify AI Gateway auto-injects env keys — flag if gateway is providing the key (not the user)
+      isNetlifyGateway: !user?.anthropicKey && !!process.env.ANTHROPIC_API_KEY,
       mode: mode || "chat",
     };
 
