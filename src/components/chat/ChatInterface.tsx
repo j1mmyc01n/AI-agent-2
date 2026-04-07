@@ -145,6 +145,11 @@ const BLOCKED_TASK_PATTERNS = [
   /\b(creating|building|generating)\s+scaffold\b/i,
   /\bproject\s+scaffold\b/i,
   /\bboilerplate\b/i,
+  // Block "folder scaffold" and "project record & folder scaffold" style tasks
+  /\bfolder\s+scaffold\b/i,
+  /\bscaffold\b.*\bfolder\b/i,
+  // Block "creating/initializing folder structure" tasks
+  /\b(creating|initializ\w+|setting\s+up)\s+(folder|directory|project)\s+(structure|scaffold|skeleton)\b/i,
 ];
 
 function isBlockedTaskTitle(title: string): boolean {
