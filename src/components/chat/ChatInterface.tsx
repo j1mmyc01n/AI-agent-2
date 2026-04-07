@@ -48,6 +48,21 @@ type AgentStatus = "idle" | "thinking" | "coding" | "searching" | "deploying" | 
 type ChatMode = "chat" | "build" | "saas-upgrade";
 
 // Extract code blocks from assistant messages (including streaming/incomplete blocks)
+// The 8 canonical file paths the AI must use for build-mode projects.
+// Any named code block whose path is NOT in this set and contains a path separator
+// is considered a wrong-path file and is stripped from the UI display — keeping the
+// file count in sync with what save_artifact accepts server-side.
+const CANONICAL_BUILD_PATHS = new Set([
+  "index.html",
+  "src/css/styles.css",
+  "src/css/components.css",
+  "src/js/config.js",
+  "src/js/state.js",
+  "src/js/router.js",
+  "src/js/components.js",
+  "src/js/app.js",
+]);
+
 function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlock[] {
   const blocks: CodeBlock[] = [];
   const codeRegex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g;
@@ -114,10 +129,14 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
     }
   }
   return blocks.filter((block, i) => {
-    if (!block.filename) return true; // keep unnamed blocks as-is
-    // Strip empty placeholder/scaffold files that the AI should never generate
+    if (!block.filename) return true; // keep unnamed snippet blocks
     const cleanName = normalizeFilename(block.filename);
+    // Strip empty placeholder/scaffold files
     if (cleanName.endsWith(".gitkeep") || cleanName.endsWith(".keep")) return false;
+    // Strip wrong-path files: any named file that contains a "/" (i.e. has a directory
+    // component) but is NOT one of the 8 canonical build paths is rejected so the UI
+    // count stays in sync with what save_artifact accepts server-side.
+    if (cleanName.includes("/") && !CANONICAL_BUILD_PATHS.has(cleanName)) return false;
     return namedLastIdx.get(cleanName) === i;
   });
 }

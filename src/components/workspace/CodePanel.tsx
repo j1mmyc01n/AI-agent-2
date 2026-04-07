@@ -129,16 +129,16 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
     : 0;
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full overflow-hidden">
       {/* File tree sidebar */}
-      <div className={`border-r border-border/50 bg-card/30 flex flex-col shrink-0 transition-all duration-200 ${
-        sidebarCollapsed ? "w-10" : "w-44 sm:w-52"
+      <div className={`border-r border-border/50 bg-card/30 flex flex-col min-h-0 shrink-0 transition-all duration-200 ${
+        sidebarCollapsed ? "w-10" : "w-52 sm:w-64"
       }`}>
         {/* Sidebar header */}
-        <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/30">
+        <div className="flex items-center justify-between px-2 py-1.5 border-b border-border/30 shrink-0">
           {!sidebarCollapsed && (
             <span className="text-[10px] uppercase tracking-wider text-muted-foreground/60 font-medium">
-              Files ({codeBlocks.length})
+              {codeBlocks.length} / 8 files
             </span>
           )}
           <Button
@@ -158,7 +158,7 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
 
         {/* File list */}
         {!sidebarCollapsed && (
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="py-1">
               {/* Show All Files option */}
               <button
@@ -183,22 +183,22 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
                   <button
                     key={idx}
                     onClick={() => setSelectedFileIdx(idx)}
-                    className={`w-full flex items-center gap-2 px-2.5 py-1.5 text-left text-xs transition-colors ${
+                    className={`w-full flex items-center gap-1.5 px-2.5 py-1.5 text-left text-xs transition-colors ${
                       selectedFileIdx === idx
                         ? "bg-primary/10 text-primary border-l-2 border-primary"
                         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground border-l-2 border-transparent"
                     }`}
                     title={filename}
                   >
-                    {getFileIcon(block.language)}
-                    <span className="truncate flex-1 min-w-0">
+                    <span className="shrink-0">{getFileIcon(block.language)}</span>
+                    <span className="flex flex-col min-w-0 leading-tight">
                       {dirPrefix && (
-                        <span className="opacity-50 text-[11px]">{dirPrefix}</span>
+                        <span className="opacity-50 text-[10px] truncate">{dirPrefix}</span>
                       )}
-                      <span>{basename}</span>
+                      <span className="truncate font-medium">{basename}</span>
                     </span>
                     {isGeneratingFile && (
-                      <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0" />
+                      <Loader2 className="h-3 w-3 animate-spin text-primary shrink-0 ml-auto" />
                     )}
                   </button>
                 );
@@ -209,7 +209,7 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
 
         {/* Collapsed: show just icons */}
         {sidebarCollapsed && (
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="py-1 flex flex-col items-center gap-0.5">
               {codeBlocks.map((block, idx) => (
                 <button
