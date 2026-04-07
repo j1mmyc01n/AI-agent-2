@@ -145,7 +145,7 @@ function extractTodos(messages: Message[]): TodoItem[] {
   let idCounter = 0;
 
   const normalizeTitle = (t: string) =>
-    t.replace(/^`([^`]+)`$/, "$1") // strip backtick wrapping (only when both present)
+    t.replace(/^`+|`+$/g, "")         // strip leading/trailing backticks
      .replace(/\.\.\.\s*$/, "")       // strip trailing ellipsis
      .toLowerCase()
      .trim();
@@ -725,9 +725,14 @@ export default function ChatInterface({
             const savingStatus: "done" | "in-progress" = hasSaveArtifact ? "done" : "in-progress";
             return { ...t, status: savingStatus };
           }
-          // File tasks: only mark done if the file was actually generated (not in missing set)
-          if (t.id.startsWith("file-") && missingFiles.has(t.title)) {
-            return { ...t, status: "pending" as const };
+          // File tasks: only mark done if the file was actually generated (not in missing set).
+          // Normalize the task title (strip backticks/spaces) so it can be matched against the
+          // plain file paths returned by getMissingBuildFiles (e.g. 'src/js/app.js').
+          if (t.id.startsWith("file-")) {
+            const normalizedTitle = t.title.replace(/^`+|`+$/g, "").trim();
+            if (missingFiles.has(normalizedTitle) || missingFiles.has(t.title)) {
+              return { ...t, status: "pending" as const };
+            }
           }
           return { ...t, status: "done" as const };
         });
