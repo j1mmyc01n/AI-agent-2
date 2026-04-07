@@ -104,7 +104,7 @@ export default async function SettingsPage() {
                         <p className="text-xs text-muted-foreground mt-0.5">
                           {hasDb
                             ? "All data persisted to your PostgreSQL database."
-                            : "Data stored in your browser using IndexedDB. Set DATABASE_URL to enable cloud sync."}
+                            : "Data stored in Netlify Blobs (server-side). Connect a database via the Netlify Neon integration or set DATABASE_URL for cloud sync."}
                         </p>
                       </div>
                       <Badge variant={hasDb ? "default" : "secondary"} className="ml-auto shrink-0">
@@ -125,8 +125,8 @@ export default async function SettingsPage() {
                   <CardContent className="space-y-3">
                     {[
                       {
-                        title: "Local-First (Browser)",
-                        desc: "Default mode. Uses IndexedDB for persistence. Data stays in your browser.",
+                        title: "Local-First (Netlify Blobs)",
+                        desc: "Default mode. Uses Netlify Blobs for server-side persistence. No database setup required.",
                         active: !hasDb,
                       },
                       {

@@ -227,7 +227,7 @@ export default async function Home() {
               </p>
               <div className="space-y-4">
                 {[
-                  { icon: Zap, title: "Local-first", desc: "Works instantly with IndexedDB. No setup required." },
+                  { icon: Zap, title: "Local-first", desc: "Works instantly with Netlify Blobs. No database setup required." },
                   { icon: Database, title: "Cloud sync", desc: "Connect PostgreSQL for persistent, multi-device storage." },
                   { icon: Shield, title: "Your keys, your data", desc: "API keys stored securely. Bring your own AI providers." },
                 ].map(({ icon: Icon, title, desc }) => (
