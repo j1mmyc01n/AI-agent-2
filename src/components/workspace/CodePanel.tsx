@@ -82,12 +82,6 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
     }
   }, [isGenerating, codeBlocks]);
 
-  // Auto-select newest file when new blocks appear
-  useEffect(() => {
-    if (codeBlocks.length > 0 && selectedFileIdx === null) {
-      setSelectedFileIdx(0);
-    }
-  }, [codeBlocks.length, selectedFileIdx]);
 
   if (codeBlocks.length === 0 && !isGenerating) {
     return (
