@@ -136,12 +136,12 @@ function extractTodos(messages: Message[]): TodoItem[] {
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
     const lines = msg.content.split("\n");
-    let firstNumberedDone = false;
     for (const line of lines) {
       const pendingMatch = line.match(/^[-*]\s+\[\s\]\s+(.+)$/);
       const doneMatch = line.match(/^[-*]\s+\[x\]\s+(.+)$/i);
       const inProgressMatch = line.match(/^[-*]\s+\[~\]\s+(.+)$/i);
-      const numberedMatch = line.match(/^\d+\.\s+(?:\*\*)?(.+?)(?:\*\*)?$/);
+      // Only parse numbered lists when no checkbox tasks have been accumulated yet
+      const numberedMatch = seenTitles.size === 0 ? line.match(/^\d+\.\s+(?:\*\*)?(.+?)(?:\*\*)?$/) : null;
 
       let title: string | null = null;
       let status: TodoItem["status"] | null = null;
@@ -149,14 +149,7 @@ function extractTodos(messages: Message[]): TodoItem[] {
       if (pendingMatch) { title = pendingMatch[1].trim(); status = "pending"; }
       else if (doneMatch) { title = doneMatch[1].trim(); status = "done"; }
       else if (inProgressMatch) { title = inProgressMatch[1].trim(); status = "in-progress"; }
-      else if (numberedMatch && !firstNumberedDone) {
-        // Only parse numbered lists when no checkbox tasks have been seen yet
-        if (seenTitles.size === 0) {
-          title = numberedMatch[1].trim();
-          status = "pending";
-          firstNumberedDone = true;
-        }
-      }
+      else if (numberedMatch) { title = numberedMatch[1].trim(); status = "pending"; }
 
       if (title && status) {
         const key = normalizeTitle(title);

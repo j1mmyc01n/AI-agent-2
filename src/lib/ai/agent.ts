@@ -444,7 +444,8 @@ async function executeToolCall(
               const fileList = files.map(f => `  - ${f.path}`).join("\n");
               return `Updated artifact "${title}" (ID: ${existingArtifactId}) with ${files.length} file(s):\n${fileList}\n\nKeep using artifact_id: ${existingArtifactId} for subsequent saves.`;
             }
-          } catch {
+          } catch (upsertErr) {
+            console.error("Failed to update existing artifact, will create new one:", upsertErr);
             // Fall through to create new artifact if update fails
           }
         }
