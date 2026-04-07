@@ -1099,8 +1099,10 @@ export default function ChatInterface({
                 if (!initialConversationId && !projectId && newConversationId) {
                   try {
                     window.history.replaceState(null, "", `/chat/${newConversationId}`);
-                  } catch {
-                    // history state update is non-critical (can fail in some mobile browsers)
+                  } catch (e) {
+                    // history state update is non-critical (can fail in some mobile browsers
+                    // with "The string did not match the expected pattern" DOMException)
+                    console.debug("history.replaceState failed:", e);
                   }
                 }
 
