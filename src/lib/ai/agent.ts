@@ -113,8 +113,11 @@ async function runOpenAIAgent(
   let finalResponse = "";
   let continueLoop = true;
   let artifactSaved = false; // tracks whether save_artifact was successfully called before create_project_record
+  let loopCount = 0;
+  const MAX_TOOL_LOOPS = 25;
 
-  while (continueLoop) {
+  while (continueLoop && loopCount < MAX_TOOL_LOOPS) {
+    loopCount++;
     const stream = await openai.chat.completions.create({
       model,
       messages: allMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -202,6 +205,11 @@ async function runOpenAIAgent(
     }
   }
 
+  if (loopCount >= MAX_TOOL_LOOPS) {
+    console.warn(`Agent reached max tool loops (${MAX_TOOL_LOOPS}) — stopping.`);
+    finalResponse += "\n\n⚠️ Agent reached maximum iterations. Check the Code and Tasks panels for what was generated so far.";
+  }
+
   return finalResponse;
 }
 
@@ -224,7 +232,7 @@ async function runAnthropicAgent(
     ? new Anthropic()
     : new Anthropic({ apiKey: hasUserKey ? config.anthropicKey : apiKey, ...(hasUserKey ? {} : baseURL ? { baseURL } : {}) });
 
-  const model = config.model || "claude-haiku-4-5";
+  const model = config.model || "claude-haiku-4-5-20251001";
   const anthropicTools = toAnthropicTools();
 
   const systemPrompt = buildSystemPrompt(config.projectContext);
@@ -237,8 +245,11 @@ async function runAnthropicAgent(
   let finalResponse = "";
   let continueLoop = true;
   let artifactSaved = false; // tracks whether save_artifact was successfully called before create_project_record
+  let loopCount = 0;
+  const MAX_TOOL_LOOPS = 25;
 
-  while (continueLoop) {
+  while (continueLoop && loopCount < MAX_TOOL_LOOPS) {
+    loopCount++;
     const stream = await anthropic.messages.create({
       model,
       system: systemPrompt,
@@ -319,6 +330,11 @@ async function runAnthropicAgent(
     }
   }
 
+  if (loopCount >= MAX_TOOL_LOOPS) {
+    console.warn(`Agent reached max tool loops (${MAX_TOOL_LOOPS}) — stopping.`);
+    finalResponse += "\n\n⚠️ Agent reached maximum iterations. Check the Code and Tasks panels for what was generated so far.";
+  }
+
   return finalResponse;
 }
 
@@ -357,7 +373,7 @@ export async function runAgent(
         const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
         if (anthropicKey) {
           // Override the model to a valid Anthropic model when falling back
-          const fallbackConfig = { ...config, model: "claude-haiku-4-5", provider: "anthropic" as AIProvider };
+          const fallbackConfig = { ...config, model: "claude-haiku-4-5-20251001", provider: "anthropic" as AIProvider };
           return await runAnthropicAgent(messages, fallbackConfig, onChunk, onToolCall, onToolResult, anthropicKey, process.env.ANTHROPIC_BASE_URL);
         }
       } else {

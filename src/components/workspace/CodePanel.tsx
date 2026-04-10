@@ -2,9 +2,11 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { Code2, Copy, Check, Loader2, FileCode, FileText, FileType, PanelLeftClose, PanelLeft } from "lucide-react";
+import { Code2, Copy, Check, Loader2, FileCode, FileText, FileType, PanelLeftClose, PanelLeft, Download } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 interface CodeBlock {
   language: string;
@@ -72,6 +74,20 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
     setTimeout(() => setCopied(null), 2000);
   };
 
+  const handleDownloadZip = async () => {
+    if (!codeBlocks || codeBlocks.length === 0) return;
+    const zip = new JSZip();
+    for (const block of codeBlocks) {
+      const filename = block.filename ? getCleanFilename(block) : `snippet.${block.language}`;
+      if (filename && block.content) {
+        zip.file(filename, block.content);
+      }
+    }
+    const blob = await zip.generateAsync({ type: "blob" });
+    const projectName = codeBlocks.find(b => b.filename === "index.html") ? "dobetter-project" : "dobetter-code";
+    saveAs(blob, `${projectName}.zip`);
+  };
+
   // Auto-scroll to bottom when new code is being generated
   useEffect(() => {
     if (isGenerating && scrollRef.current) {
@@ -135,19 +151,34 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
               {codeBlocks.length} / 8 files
             </span>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-6 w-6"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            title={sidebarCollapsed ? "Expand file tree" : "Collapse file tree"}
-          >
-            {sidebarCollapsed ? (
-              <PanelLeft className="h-3.5 w-3.5 text-muted-foreground" />
-            ) : (
-              <PanelLeftClose className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="flex items-center gap-1">
+            {!sidebarCollapsed && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleDownloadZip}
+                disabled={!codeBlocks || codeBlocks.length === 0}
+                title="Download all files as ZIP"
+                className="gap-1.5 text-xs h-6 px-2"
+              >
+                <Download className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">ZIP</span>
+              </Button>
             )}
-          </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              title={sidebarCollapsed ? "Expand file tree" : "Collapse file tree"}
+            >
+              {sidebarCollapsed ? (
+                <PanelLeft className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : (
+                <PanelLeftClose className="h-3.5 w-3.5 text-muted-foreground" />
+              )}
+            </Button>
+          </div>
         </div>
 
         {/* File list */}

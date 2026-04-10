@@ -1429,6 +1429,28 @@ export default function ChatInterface({
         {activePanel === "chat" && (
           <div className="flex flex-col h-full min-h-0">
             <MessageList messages={messages} isLoading={isLoading} agentStatus={agentStatus} onQuickPrompt={handleQuickPrompt} />
+            {!isLoading && !isStreaming && codeBlocks.filter(b => b.filename && !b.filename.includes("generating")).length >= 6 && (
+              <div className="px-3 py-2 border-t border-border/50 flex flex-wrap gap-1.5 items-center">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wide font-medium mr-1">
+                  Upgrade:
+                </span>
+                {[
+                  "Add user authentication",
+                  "Add dark/light mode toggle",
+                  "Add analytics dashboard",
+                  "Add settings page",
+                  "Add mobile navigation",
+                ].map((suggestion) => (
+                  <button
+                    key={suggestion}
+                    onClick={() => sendMessage(suggestion)}
+                    className="text-[11px] px-2 py-0.5 rounded-full border border-border hover:border-accent/60 hover:text-accent hover:bg-accent/5 transition-colors"
+                  >
+                    + {suggestion}
+                  </button>
+                ))}
+              </div>
+            )}
             <MessageInput
               onSend={sendMessage}
               isLoading={isLoading}
