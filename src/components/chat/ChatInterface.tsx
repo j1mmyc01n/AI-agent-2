@@ -1443,7 +1443,7 @@ export default function ChatInterface({
                 ].map((suggestion) => (
                   <button
                     key={suggestion}
-                    onClick={() => sendMessage(suggestion)}
+                    onClick={() => sendMessage(suggestion, selectedModel)}
                     className="text-[11px] px-2 py-0.5 rounded-full border border-border hover:border-accent/60 hover:text-accent hover:bg-accent/5 transition-colors"
                   >
                     + {suggestion}
