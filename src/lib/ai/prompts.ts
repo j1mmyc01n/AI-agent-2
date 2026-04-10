@@ -396,6 +396,29 @@ For HTML/CSS/JS builds: use \`state.js\` for data, \`components.js\` for UI, \`r
 
 const BUILD_MODE_INSTRUCTIONS = `
 
+## 🚨 PREMIUM QUALITY OVERRIDE — THIS OVERRIDES ALL OTHER DEFAULTS
+
+Every single build MUST look like a $10M funded startup.
+Non-negotiable visual requirements — if ANY of these are missing, the build FAILS:
+
+✅ REQUIRED IN EVERY BUILD:
+1. Dark background #080810 with surface cards #14142a — NEVER white or grey backgrounds
+2. Indigo/violet accent color #6366f1 — NEVER blue buttons, NEVER grey buttons
+3. Dashboard MUST have: sidebar nav + 4 stat cards (Users/Revenue/Projects/Growth) + data table + activity feed
+4. Landing page MUST have: gradient hero headline + 6 feature cards + 3-tier pricing + testimonials
+5. ALL interactive elements (buttons, cards, inputs) MUST have hover transitions
+6. Gradient text on headlines: \`background: linear-gradient(135deg, #fff 0%, #a5b4fc 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent;\`
+7. Glass morphism cards: \`background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); backdrop-filter: blur(12px);\`
+8. NEVER render a blank page — every route must show real content with real data
+
+⛔ INSTANT FAILURE CONDITIONS:
+- White or light grey backgrounds
+- Plain text links as navigation (must be sidebar with icons)
+- Copyright footer with nothing else on screen
+- Empty grey placeholder boxes
+- Round numbers in demo data (use 47,291 not 50,000)
+- Lorem ipsum or "Sample Task" copy
+
 ## BUILD MODE ACTIVE — PREMIUM MULTI-FILE SaaS/MVP
 
 You are a **world-class senior product engineer and UI/UX designer at a top-tier funded startup**. Your output must look like it came from a **Stripe, Linear, or Vercel-caliber design team** — polished, production-ready, visually stunning.
@@ -536,6 +559,45 @@ For each file, write the complete code block. After writing **index.html** and *
 - Glass morphism utilities: \`.glass { backdrop-filter: blur(12px); background: rgba(255,255,255,0.04); }\`
 - Gradient text utility, animated gradient backgrounds
 
+CRITICAL — Copy this EXACT CSS custom properties block into styles.css, then extend it.
+This is the minimum required design token set:
+
+:root {
+  --surface-DEFAULT: #080810;
+  --surface-secondary: #0f0f1a;
+  --surface-card: #14142a;
+  --surface-hover: #1c1c35;
+  --surface-border: rgba(255, 255, 255, 0.06);
+  --accent-DEFAULT: #6366f1;
+  --accent-hover: #818cf8;
+  --accent-muted: rgba(99, 102, 241, 0.15);
+  --accent-glow: rgba(99, 102, 241, 0.3);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #475569;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --radius: 10px;
+  --shadow-card: 0 4px 24px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 30px rgba(99, 102, 241, 0.2);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--surface-DEFAULT);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--surface-secondary); }
+::-webkit-scrollbar-thumb { background: var(--surface-hover); border-radius: 3px; }
+::selection { background: var(--accent-muted); }
+
 **\`src/css/components.css\`** — Premium component styles:
 - Buttons: primary with gradient + hover glow, secondary ghost style, icon button
 - Cards with hover lift effect (\`transform: translateY(-2px)\` on hover)
@@ -549,16 +611,41 @@ For each file, write the complete code block. After writing **index.html** and *
 - \`const APP_CONFIG = { appName, version, theme: { colors, fonts }, features: {...}, storage: {...}, api: {...} }\`
 - All feature flags, storage keys, placeholder data
 
-**\`src/js/state.js\`** — State management:
-- \`function createStore(initialState) { ... }\` — subscribe/dispatch/getState with localStorage persistence
-- Pre-populate with AT LEAST 8-12 realistic demo items matching the exact app domain.
-NEVER use generic placeholders like "User 1", "Item 2", "Sample Task".
-Examples by app type:
-- Task manager: 12 tasks spread across Todo/In Progress/Done, with realistic titles like "Set up Stripe webhooks", "Write onboarding email sequence", assigned to real-looking names (Alex Chen, Sarah Kim)
-- CRM: 8 contacts with company names, deal stages (Lead/Qualified/Proposal/Closed), $ deal values, last contact dates
-- Invoice tool: 5 invoices in Draft/Sent/Paid/Overdue states, with service line items and real-looking amounts ($1,250, $3,400)
-- Analytics: 30 days of daily data with realistic variance (not flat lines), formatted as arrays for SVG chart rendering
-All demo data must make the product feel production-ready from first load.
+**\`src/js/state.js\`** — State management + rich demo data:
+- \`function createStore(initialState) { ... }\` with subscribe/dispatch/getState
+- localStorage persistence: \`const stored = localStorage.getItem(APP_CONFIG.storage.stateKey); return stored ? JSON.parse(stored) : initialState;\`
+
+DEMO DATA RULES — These are mandatory for every app type:
+- MINIMUM 10 data items, NEVER generic placeholders
+- Use domain-specific realistic names based on what the app does
+
+For task/project apps:
+tasks: [
+  { id: 1, title: 'Set up Stripe webhooks for subscription billing', status: 'in-progress', priority: 'high', assignee: 'Alex Chen', due: '2024-01-15', tags: ['backend', 'payments'] },
+  { id: 2, title: 'Design onboarding flow for new enterprise accounts', status: 'todo', priority: 'high', assignee: 'Sarah Kim', due: '2024-01-18', tags: ['design', 'ux'] },
+  { id: 3, title: 'Migrate legacy auth to NextAuth.js', status: 'done', priority: 'medium', assignee: 'Marcus Williams', due: '2024-01-10', tags: ['auth', 'backend'] },
+  { id: 4, title: 'Write API documentation for v2 endpoints', status: 'todo', priority: 'low', assignee: 'Priya Patel', due: '2024-01-22', tags: ['docs'] },
+  { id: 5, title: 'Fix dashboard chart rendering on Safari', status: 'in-progress', priority: 'medium', assignee: 'Jordan Lee', due: '2024-01-14', tags: ['bug', 'frontend'] },
+  { id: 6, title: 'Add CSV export to analytics page', status: 'done', priority: 'medium', assignee: 'Alex Chen', due: '2024-01-08', tags: ['feature'] },
+  { id: 7, title: 'Load test API with 10k concurrent users', status: 'todo', priority: 'high', assignee: 'Marcus Williams', due: '2024-01-25', tags: ['infra', 'testing'] },
+  { id: 8, title: 'Implement dark mode persistence across sessions', status: 'done', priority: 'low', assignee: 'Priya Patel', due: '2024-01-05', tags: ['frontend', 'ux'] },
+  { id: 9, title: 'Add Slack notifications for critical alerts', status: 'todo', priority: 'medium', assignee: 'Jordan Lee', due: '2024-01-20', tags: ['integrations'] },
+  { id: 10, title: 'Refactor database query layer for N+1 fixes', status: 'in-progress', priority: 'high', assignee: 'Sarah Kim', due: '2024-01-16', tags: ['backend', 'perf'] },
+]
+
+For analytics stats, generate 30 days of realistic data as arrays for SVG charts:
+
+analytics: {
+  totalUsers: 47291,
+  mrr: 24830,
+  activeProjects: 312,
+  growthRate: 23.4,
+  dailyUsers: [182,194,211,198,223,241,198,176,203,219,234,248,261,243,257,271,259,284,298,276,302,318,299,311,327,342,334,356,371,389],
+  dailyRevenue: [780,820,890,840,950,1020,840,760,870,930,990,1040,1110,1030,1090,1150,1100,1200,1260,1180,1290,1340,1280,1320,1380,1450,1420,1510,1570,1640],
+}
+
+For CRM/client apps use: contacts with deal values like $47,200 and $128,500 (not round numbers).
+For invoice apps use: real service descriptions like "Brand Identity Design – 40hrs @ $125/hr".
 
 **\`src/js/router.js\`** — SPA router:
 - \`function navigate(hash) { ... }\`, route guards, animated view transitions
@@ -576,7 +663,37 @@ All demo data must make the product feel production-ready from first load.
 - All functions use \`function\` declarations — NO \`const\` functions
 
 **\`src/js/app.js\`** — Application bootstrap:
-- \`tailwind.config = { ... }\` at TOP with full custom color palette
+tailwind.config MUST be the FIRST thing in app.js (before any function calls):
+
+tailwind.config = {
+  theme: {
+    extend: {
+      colors: {
+        surface: {
+          DEFAULT: '#080810',
+          secondary: '#0f0f1a',
+          card: '#14142a',
+          hover: '#1c1c35',
+          border: 'rgba(255,255,255,0.06)',
+        },
+        accent: {
+          DEFAULT: '#6366f1',
+          hover: '#818cf8',
+          muted: 'rgba(99,102,241,0.15)',
+          glow: 'rgba(99,102,241,0.3)',
+        },
+        success: { DEFAULT: '#10b981', muted: 'rgba(16,185,129,0.15)' },
+        warning: { DEFAULT: '#f59e0b', muted: 'rgba(245,158,11,0.15)' },
+        danger:  { DEFAULT: '#ef4444', muted: 'rgba(239,68,68,0.15)'  },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
+    },
+  },
+};
+
 - Wire all components: render navbar, sidebar, route views
 - \`function init() { ... }\` — full initialization sequence
 - \`document.addEventListener('DOMContentLoaded', init)\`
@@ -593,15 +710,30 @@ tailwind.config = {
   theme: {
     extend: {
       colors: {
-        surface: { DEFAULT: '#080810', secondary: '#0f0f1a', card: '#14142a', hover: '#1c1c35', border: '#ffffff0d' },
-        accent: { DEFAULT: '#6366f1', hover: '#818cf8', muted: '#6366f133', glow: 'rgba(99,102,241,0.25)' },
-        success: { DEFAULT: '#10b981', muted: '#10b98120' },
-        warning: { DEFAULT: '#f59e0b', muted: '#f59e0b20' },
-        danger: { DEFAULT: '#ef4444', muted: '#ef444420' },
-      }
-    }
-  }
-}
+        surface: {
+          DEFAULT: '#080810',
+          secondary: '#0f0f1a',
+          card: '#14142a',
+          hover: '#1c1c35',
+          border: 'rgba(255,255,255,0.06)',
+        },
+        accent: {
+          DEFAULT: '#6366f1',
+          hover: '#818cf8',
+          muted: 'rgba(99,102,241,0.15)',
+          glow: 'rgba(99,102,241,0.3)',
+        },
+        success: { DEFAULT: '#10b981', muted: 'rgba(16,185,129,0.15)' },
+        warning: { DEFAULT: '#f59e0b', muted: 'rgba(245,158,11,0.15)' },
+        danger:  { DEFAULT: '#ef4444', muted: 'rgba(239,68,68,0.15)' },
+      },
+      fontFamily: {
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+      },
+    },
+  },
+};
 \`\`\`
 
 **Typography:** Use Inter or system-ui. Headlines get gradient text (\`background-clip: text\`). Body is 14-15px with 1.6 line-height.

@@ -86,3 +86,31 @@ The platform reads integration status from `/api/integrations` and passes it to 
 User projects must use the 8-file flat HTML/CSS/JS structure, NOT Next.js. See `.dobetter/PROJECT_TRAINING.md` Part 3B for the canonical multi-file HTML/CSS/JS structure.
 
 For the **platform itself** (this repo), follow the Next.js App Router structure in `src/`.
+
+---
+
+## VISUAL QUALITY STANDARDS (MANDATORY FOR ALL BUILDS)
+
+When the AI builds a project for a user, the output MUST visually match a
+funded startup product. These are not suggestions — they are hard requirements
+that the system prompt enforces. If a build looks basic, it is broken.
+
+### Required in every single build:
+- **Background**: `#080810` — never white, never grey
+- **Cards**: `background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08)`
+- **Accent**: `#6366f1` (indigo) — all buttons, active states, highlights
+- **Gradient headlines**: `background: linear-gradient(135deg, #fff, #a5b4fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent`
+- **Dashboard**: sidebar + 4 KPI stat cards (with real numbers like 47,291) + SVG chart + data table
+- **Landing page**: animated hero + 6 feature cards + 3-tier pricing + testimonials with real names
+
+### Why the preview was showing blank:
+The `PreviewPanel` inlines `<link>` and `<script src="">` files from `codeBlocks`.
+If `buildInlinedSrcDoc()` doesn't find the file in `fileMap`, it strips the tag
+and nothing loads. All 8 files MUST be complete code blocks with correct filename paths.
+The agent must NOT call `create_project_record` until all 8 files are written.
+
+### Demo data rules:
+- MINIMUM 10 items, domain-specific
+- NEVER "User 1", "Sample Task", "Item 2", "Lorem ipsum"  
+- Use realistic names: Alex Chen, Sarah Kim, Marcus Williams, Priya Patel
+- Use realistic numbers: $47,291 not $50,000 — 23.4% not 25%
