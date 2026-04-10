@@ -65,26 +65,27 @@ const CANONICAL_BUILD_PATHS = new Set([
 
 function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlock[] {
   const blocks: CodeBlock[] = [];
+  // Match fenced code blocks: ```lang:filename\n...content...```
   const codeRegex = /```(\w+)?(?::([^\n]+))?\n([\s\S]*?)```/g;
 
   for (const msg of messages) {
     if (msg.role !== "assistant") continue;
-    let match;
     const content = msg.content;
+    let match;
     while ((match = codeRegex.exec(content)) !== null) {
-      blocks.push({
-        language: match[1] || "text",
-        filename: match[2] || undefined,
-        content: match[3].trim(),
-      });
+      const language = match[1] || "text";
+      const filename = match[2]?.trim() || undefined;
+      const blockContent = match[3].trim();
+      // Skip empty blocks and placeholder scaffold files
+      if (!blockContent) continue;
+      if (filename?.endsWith(".gitkeep") || filename?.endsWith(".keep")) continue;
+      blocks.push({ language, filename, content: blockContent });
     }
 
-    // For streaming messages, also extract in-progress (unclosed) code blocks
+    // Capture partial (unclosed) code block during streaming
     if (includePartial && msg.isStreaming) {
-      // Only look for unclosed block if the last ``` count is odd (block still open)
       const fenceCount = (content.match(/```/g) || []).length;
       if (fenceCount % 2 === 1) {
-        // Find the LAST opening ``` fence (the unclosed one)
         let lastFenceIdx = -1;
         let searchFrom = 0;
         let fencesSeen = 0;
@@ -92,10 +93,7 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
           const idx = content.indexOf("```", searchFrom);
           if (idx === -1) break;
           fencesSeen++;
-          // Odd-numbered fences are opening, even are closing
-          if (fencesSeen % 2 === 1) {
-            lastFenceIdx = idx;
-          }
+          if (fencesSeen % 2 === 1) lastFenceIdx = idx;
           searchFrom = idx + 3;
         }
         if (lastFenceIdx >= 0) {
@@ -106,7 +104,9 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
             if (partialContent.length > 0) {
               blocks.push({
                 language: langMatch[1] || "text",
-                filename: langMatch[2] ? `${langMatch[2]} (generating...)` : "(generating...)",
+                filename: langMatch[2]
+                  ? `${langMatch[2].trim()} (generating...)`
+                  : "(generating...)",
                 content: partialContent,
               });
             }
@@ -116,28 +116,47 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
     }
   }
 
-  // Deduplicate named files: keep the last occurrence of each filename across all messages.
-  // This prevents files from appearing multiple times when the agent is nudged and re-generates
-  // the same files in a subsequent message.
-  const normalizeFilename = (name: string) =>
+  // ── DEDUPLICATION ──────────────────────────────────────────────────────────
+  // Strategy: for NAMED canonical files, keep only the LAST complete (non-partial)
+  // occurrence across ALL messages. This handles the case where the agent re-emits
+  // the same file in a follow-up message (e.g. after a nudge).
+  // For unnamed snippets and non-canonical files, keep all (they are one-offs).
+
+  const normalize = (name: string) =>
     name.replace(/\s*\(generating\.\.\.\)\s*/i, "").toLowerCase().trim();
 
-  const namedLastIdx = new Map<string, number>();
+  // Pass 1: record the last index for each canonical filename
+  const lastCanonicalIdx = new Map<string, number>();
   for (let i = 0; i < blocks.length; i++) {
-    if (blocks[i].filename) {
-      namedLastIdx.set(normalizeFilename(blocks[i].filename!), i);
+    const block = blocks[i];
+    if (!block.filename) continue;
+    const clean = normalize(block.filename);
+    if (CANONICAL_BUILD_PATHS.has(clean)) {
+      lastCanonicalIdx.set(clean, i);
     }
   }
+
+  // Pass 2: filter
   return blocks.filter((block, i) => {
-    if (!block.filename) return true; // keep unnamed snippet blocks
-    const cleanName = normalizeFilename(block.filename);
-    // Strip empty placeholder/scaffold files
-    if (cleanName.endsWith(".gitkeep") || cleanName.endsWith(".keep")) return false;
-    // Strip wrong-path files: any named file that contains a "/" (i.e. has a directory
-    // component) but is NOT one of the 8 canonical build paths is rejected so the UI
-    // count stays in sync with what save_artifact accepts server-side.
-    if (cleanName.includes("/") && !CANONICAL_BUILD_PATHS.has(cleanName)) return false;
-    return namedLastIdx.get(cleanName) === i;
+    if (!block.filename) return true; // keep unnamed snippets
+
+    const clean = normalize(block.filename);
+
+    // Drop empty placeholder files
+    if (clean.endsWith(".gitkeep") || clean.endsWith(".keep")) return false;
+
+    // Drop wrong-path files (has "/" but not a canonical path)
+    if (clean.includes("/") && !CANONICAL_BUILD_PATHS.has(clean)) return false;
+
+    // Drop "file.txt" entries — these are tool-call log artifacts, not real code files
+    if (clean === "file.txt" || clean.endsWith("/file.txt")) return false;
+
+    // For canonical files: keep only the last occurrence
+    if (CANONICAL_BUILD_PATHS.has(clean)) {
+      return lastCanonicalIdx.get(clean) === i;
+    }
+
+    return true;
   });
 }
 
@@ -169,6 +188,11 @@ const BLOCKED_TASK_PATTERNS = [
   /\bscaffold\b.*\bfolder\b/i,
   // Block "creating/initializing folder structure" tasks
   /\b(creating|initializ\w+|setting\s+up)\s+(folder|directory|project)\s+(structure|scaffold|skeleton)\b/i,
+  // Block tool-call noise from appearing as tasks
+  /\bfile\.txt\b/i,
+  /\bartifact\s+saved\b/i,
+  /\bsave_artifact\b/i,
+  /\bcreate_project_record\b/i,
 ];
 
 function isBlockedTaskTitle(title: string): boolean {

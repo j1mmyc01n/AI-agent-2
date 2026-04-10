@@ -42,27 +42,90 @@ function isAbsoluteUrl(url: string): boolean {
 }
 
 /**
- * Strip local-file <link> and <script src> references that will 404 inside a
- * srcDoc iframe (no base URL).  CDN / absolute URLs are preserved.
- *
- * Note: CDN <script> tags are intentionally kept in the output — they are
- * not user-supplied sanitization targets; this function is a srcDoc
- * transformation, not an XSS sanitizer.
+ * Build a fully self-contained srcDoc by inlining all local CSS and JS files
+ * referenced by index.html. CDN scripts (https://) are preserved as-is.
+ * This is the ONLY correct way to render multi-file projects in a sandboxed iframe.
  */
-function stripLocalExternalRefs(html: string, hasCssReplacement: boolean, hasJsReplacement: boolean): string {
-  if (hasCssReplacement) {
-    // Handle both self-closing (<link ... />) and non-self-closing (<link ...>)
-    html = html.replace(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\/?>/gi, (match, href) =>
-      isAbsoluteUrl(href) ? match : ""
-    );
+function buildInlinedSrcDoc(codeBlocks: CodeBlock[]): string {
+  // Find the HTML entry point
+  const htmlBlock = codeBlocks.find(
+    (b) =>
+      b.filename === "index.html" ||
+      normalizePreviewName(b.filename || "") === "index.html" ||
+      (!b.filename && b.language === "html")
+  );
+
+  if (!htmlBlock) {
+    // No HTML — wrap all CSS + JS in a minimal shell
+    const css = codeBlocks
+      .filter((b) => b.language === "css")
+      .map((b) => b.content)
+      .join("\n");
+    const js = codeBlocks
+      .filter((b) => b.language === "javascript" || b.language === "js")
+      .map((b) => b.content)
+      .join("\n\n");
+    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><script>${js}<\/script></body></html>`;
   }
-  if (hasJsReplacement) {
-    // Only remove script tags whose src is a local file; CDN scripts are kept
-    html = html.replace(/<script\b[^>]*\bsrc=["']([^"']+)["'][^>]*><\/script>/gi, (match, src) =>
-      isAbsoluteUrl(src) ? match : ""
-    );
+
+  // Build filename → content lookup (handles both "src/css/styles.css" and "./src/css/styles.css")
+  const fileMap = new Map<string, string>();
+  for (const block of codeBlocks) {
+    if (block.filename && block.content) {
+      const cleanName = block.filename
+        .replace(/\s*\(generating\.\.\.\)\s*/i, "")
+        .replace(/^\.\//, "")
+        .trim();
+      fileMap.set(cleanName, block.content);
+      // Also index by basename so "styles.css" matches "src/css/styles.css"
+      const basename = cleanName.split("/").pop() || cleanName;
+      if (!fileMap.has(basename)) fileMap.set(basename, block.content);
+    }
   }
+
+  let html = htmlBlock.content;
+
+  // Inline CSS: <link rel="stylesheet" href="src/css/styles.css"> → <style>...</style>
+  html = html.replace(
+    /<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\/?>/gi,
+    (match, href) => {
+      // Keep CDN / absolute URLs as-is
+      if (/^(https?:)?\/\//.test(href)) return match;
+      const cleanHref = href.replace(/^\.\//, "");
+      const content =
+        fileMap.get(cleanHref) ||
+        fileMap.get(cleanHref.split("/").pop() || cleanHref);
+      return content ? `<style>\n/* inlined: ${cleanHref} */\n${content}\n</style>` : "";
+    }
+  );
+
+  // Inline JS: <script src="src/js/app.js" defer></script> → <script>...</script>
+  html = html.replace(
+    /<script\b([^>]*)\bsrc=["']([^"']+)["'][^>]*><\/script>/gi,
+    (match, attrs, src) => {
+      // Keep CDN / absolute URLs as-is
+      if (/^(https?:)?\/\//.test(src)) return match;
+      const cleanSrc = src.replace(/^\.\//, "");
+      const content =
+        fileMap.get(cleanSrc) ||
+        fileMap.get(cleanSrc.split("/").pop() || cleanSrc);
+      // Strip `src` and `defer` from inlined script tag attrs
+      const cleanAttrs = (attrs || "")
+        .replace(/\bsrc=["'][^"']*["']/g, "")
+        .replace(/\bdefer\b/g, "")
+        .trim();
+      return content
+        ? `<script${cleanAttrs ? " " + cleanAttrs : ""}>\n/* inlined: ${cleanSrc} */\n${content}\n<\/script>`
+        : "";
+    }
+  );
+
   return html;
+}
+
+// Helper used by buildInlinedSrcDoc
+function normalizePreviewName(name: string): string {
+  return name.replace(/\s*\(generating\.\.\.\)\s*/i, "").toLowerCase().trim();
 }
 
 /** Build a React/JSX preview wrapper using Babel standalone + React 18 CDN. */
@@ -179,134 +242,24 @@ function hasTailwindCdnScript(html: string): boolean {
 function buildPreviewHtml(codeBlocks: CodeBlock[], selectedPage?: string): string | null {
   if (!codeBlocks || codeBlocks.length === 0) return null;
 
-  // Find all HTML file blocks (for multi-page SaaS)
-  const htmlFileBlocks = codeBlocks.filter(
-    (b) =>
-      b.language === "html" &&
-      (b.content.includes("<!DOCTYPE") ||
-        b.content.includes("<html") ||
-        b.content.includes("<body"))
-  );
-
-  // React/JSX-only: no full HTML file but JSX/TSX blocks present → React preview
-  const jsxBlocks = codeBlocks.filter(
+  // React/JSX projects: use Babel standalone wrapper
+  const reactBlocks = codeBlocks.filter(
     (b) => b.language === "jsx" || b.language === "tsx"
   );
-  if (jsxBlocks.length > 0 && htmlFileBlocks.length === 0) {
-    const cssBlocks = codeBlocks.filter((b) => b.language === "css");
-    return buildReactPreview(jsxBlocks, cssBlocks);
-  }
-
-  // If a specific page is selected, use that; otherwise use the first (or best) HTML block
-  let htmlBlock: CodeBlock | undefined;
-  if (selectedPage && htmlFileBlocks.length > 1) {
-    htmlBlock = htmlFileBlocks.find(
-      (b) => b.filename?.toLowerCase().replace(/\s*\(generating\.\.\.\)\s*/i, "").includes(selectedPage.toLowerCase())
+  if (reactBlocks.length > 0) {
+    return buildReactPreview(
+      reactBlocks,
+      codeBlocks.filter((b) => b.language === "css")
     );
   }
-  if (!htmlBlock) {
-    // Prefer index.html, then dashboard.html, then the first HTML block
-    htmlBlock = htmlFileBlocks.find(b => b.filename?.toLowerCase().includes("index"))
-      || htmlFileBlocks.find(b => b.filename?.toLowerCase().includes("dashboard"))
-      || htmlFileBlocks[0];
-  }
 
-  if (htmlBlock) {
-    let html = htmlBlock.content;
-    const cssBlocks = codeBlocks.filter(
-      (b) => b.language === "css" && b !== htmlBlock
-    );
-    // Sort JS blocks so utility/component files are defined before the main app runs
-    const jsBlocks = sortJsBlocks(codeBlocks.filter(
-      (b) =>
-        (b.language === "javascript" ||
-          b.language === "js" ||
-          b.language === "typescript" ||
-          b.language === "ts" ||
-          b.language === "jsx" ||
-          b.language === "tsx") &&
-        b !== htmlBlock
-    ));
+  // HTML/CSS/JS projects: inline all local file references
+  const result = buildInlinedSrcDoc(codeBlocks);
 
-    // Strip broken local-file references before injecting inline replacements
-    html = stripLocalExternalRefs(html, cssBlocks.length > 0, jsBlocks.length > 0);
+  // If buildInlinedSrcDoc returned a minimal shell but we have no meaningful content, return null
+  if (!result || result.length < 50) return null;
 
-    if (cssBlocks.length > 0) {
-      const cssTag = `<style>\n${cssBlocks.map((b) => b.content).join("\n")}\n</style>`;
-      if (html.includes("</head>")) {
-        html = html.replace("</head>", `${cssTag}\n</head>`);
-      } else if (html.includes("<body")) {
-        html = html.replace("<body", `${cssTag}\n<body`);
-      }
-    }
-
-    if (jsBlocks.length > 0) {
-      const combinedJs = jsBlocks.map((b) => b.content).join("\n\n");
-
-      // Hoist any tailwind.config definition before the Tailwind CDN script tag
-      const twConfig = extractTailwindConfig(combinedJs);
-      if (twConfig && hasTailwindCdnScript(html)) {
-        html = html.replace(
-          /(<script\b[^>]*src=["']https:\/\/cdn\.tailwindcss\.com["'][^>]*><\/script>)/i,
-          `<script>${twConfig}</script>\n$1`
-        );
-      }
-
-      const jsTag = `<script>\n${combinedJs}\n</script>`;
-      if (html.includes("</body>")) {
-        html = html.replace("</body>", `${jsTag}\n</body>`);
-      } else {
-        html += jsTag;
-      }
-    }
-
-    return html;
-  }
-
-  // Build HTML from individual blocks (no full HTML file found)
-  const cssBlocks = codeBlocks.filter((b) => b.language === "css");
-  const jsBlocks = sortJsBlocks(codeBlocks.filter(
-    (b) =>
-      b.language === "javascript" ||
-      b.language === "js" ||
-      b.language === "jsx" ||
-      b.language === "typescript" ||
-      b.language === "ts"
-  ));
-  const htmlSnippets = codeBlocks.filter(
-    (b) =>
-      b.language === "html" &&
-      !b.content.includes("<!DOCTYPE") &&
-      !b.content.includes("<html")
-  );
-
-  if (
-    cssBlocks.length === 0 &&
-    jsBlocks.length === 0 &&
-    htmlSnippets.length === 0
-  )
-    return null;
-
-  const css = cssBlocks.map((b) => b.content).join("\n");
-  const combinedJs = jsBlocks.map((b) => b.content).join("\n\n");
-  const htmlContent = htmlSnippets.map((b) => b.content).join("\n");
-
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; min-height: 100vh; }
-  ${css}
-</style>
-</head>
-<body>
-${htmlContent}
-${combinedJs ? `<script>\n${combinedJs}\n</script>` : ""}
-</body>
-</html>`;
+  return result;
 }
 
 /** Extract page names from HTML file blocks */

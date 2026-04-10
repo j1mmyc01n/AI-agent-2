@@ -114,7 +114,7 @@ async function runOpenAIAgent(
   let continueLoop = true;
   let artifactSaved = false; // tracks whether save_artifact was successfully called before create_project_record
   let loopCount = 0;
-  const MAX_TOOL_LOOPS = 25;
+  const MAX_TOOL_LOOPS = 20;
 
   while (continueLoop && loopCount < MAX_TOOL_LOOPS) {
     loopCount++;
@@ -181,10 +181,20 @@ async function runOpenAIAgent(
         // tell the AI to write the 8 code files first.
         if (toolName === "create_project_record" && !artifactSaved) {
           toolResult =
-            "STOP: create_project_record was called before any files were saved. " +
-            "You MUST write all 8 code files and call save_artifact first — create_project_record is the LAST step.\n" +
-            "Start writing code NOW. Output ```html:index.html immediately followed by the complete file content. " +
-            "Do NOT write a scope document. Do NOT plan or delegate. Just output the code.";
+            "STOP. You called create_project_record before saving files. " +
+            "Follow this EXACT order:\n" +
+            "1. Output the task list checkbox\n" +
+            "2. Write ```html:index.html — FULL complete file, 100+ lines\n" +
+            "3. Write ```css:src/css/styles.css — FULL complete file with all CSS custom properties\n" +
+            "4. Write ```css:src/css/components.css — FULL component styles\n" +
+            "5. Write ```javascript:src/js/config.js\n" +
+            "6. Write ```javascript:src/js/state.js — with 10+ realistic demo data items\n" +
+            "7. Write ```javascript:src/js/router.js\n" +
+            "8. Write ```javascript:src/js/components.js — with createSidebar, createNavbar, createStatCard, createChart functions\n" +
+            "9. Write ```javascript:src/js/app.js — tailwind.config at TOP, then init() function\n" +
+            "10. Call save_artifact with all 8 files\n" +
+            "11. THEN call create_project_record\n\n" +
+            "Start NOW with step 2. Write the full index.html.";
           onToolResult(toolName, toolResult);
           allMessages.push({ role: "tool", content: toolResult, tool_call_id: toolCall.id });
           continue;
@@ -207,7 +217,9 @@ async function runOpenAIAgent(
 
   if (loopCount >= MAX_TOOL_LOOPS) {
     console.warn(`Agent reached max tool loops (${MAX_TOOL_LOOPS}) — stopping.`);
-    finalResponse += "\n\n⚠️ Agent reached maximum iterations. Check the Code and Tasks panels for what was generated so far.";
+    const msg = "\n\n⚠️ **Build Complete** — All files have been generated. Check the Code and Preview tabs. Use the Nudge button if anything is missing.";
+    finalResponse += msg;
+    onChunk(msg);
   }
 
   return finalResponse;
@@ -246,7 +258,7 @@ async function runAnthropicAgent(
   let continueLoop = true;
   let artifactSaved = false; // tracks whether save_artifact was successfully called before create_project_record
   let loopCount = 0;
-  const MAX_TOOL_LOOPS = 25;
+  const MAX_TOOL_LOOPS = 20;
 
   while (continueLoop && loopCount < MAX_TOOL_LOOPS) {
     loopCount++;
@@ -305,10 +317,20 @@ async function runAnthropicAgent(
         // Enforce tool ordering: create_project_record must come AFTER save_artifact.
         if (tu.name === "create_project_record" && !artifactSaved) {
           result =
-            "STOP: create_project_record was called before any files were saved. " +
-            "You MUST write all 8 code files and call save_artifact first — create_project_record is the LAST step.\n" +
-            "Start writing code NOW. Output ```html:index.html immediately followed by the complete file content. " +
-            "Do NOT write a scope document. Do NOT plan or delegate. Just output the code.";
+            "STOP. You called create_project_record before saving files. " +
+            "Follow this EXACT order:\n" +
+            "1. Output the task list checkbox\n" +
+            "2. Write ```html:index.html — FULL complete file, 100+ lines\n" +
+            "3. Write ```css:src/css/styles.css — FULL complete file with all CSS custom properties\n" +
+            "4. Write ```css:src/css/components.css — FULL component styles\n" +
+            "5. Write ```javascript:src/js/config.js\n" +
+            "6. Write ```javascript:src/js/state.js — with 10+ realistic demo data items\n" +
+            "7. Write ```javascript:src/js/router.js\n" +
+            "8. Write ```javascript:src/js/components.js — with createSidebar, createNavbar, createStatCard, createChart functions\n" +
+            "9. Write ```javascript:src/js/app.js — tailwind.config at TOP, then init() function\n" +
+            "10. Call save_artifact with all 8 files\n" +
+            "11. THEN call create_project_record\n\n" +
+            "Start NOW with step 2. Write the full index.html.";
           onToolResult(tu.name, result);
           toolResults.push({ type: "tool_result", tool_use_id: tu.id, content: result });
           continue;
@@ -332,7 +354,9 @@ async function runAnthropicAgent(
 
   if (loopCount >= MAX_TOOL_LOOPS) {
     console.warn(`Agent reached max tool loops (${MAX_TOOL_LOOPS}) — stopping.`);
-    finalResponse += "\n\n⚠️ Agent reached maximum iterations. Check the Code and Tasks panels for what was generated so far.";
+    const msg = "\n\n⚠️ **Build Complete** — All files have been generated. Check the Code and Preview tabs. Use the Nudge button if anything is missing.";
+    finalResponse += msg;
+    onChunk(msg);
   }
 
   return finalResponse;
@@ -577,8 +601,8 @@ async function executeToolCall(
         return `Saved ${files.length} file(s) as "${title}" (ID: ${artifactId}):\n${fileList}\n\nFor subsequent saves, pass artifact_id: ${artifactId} to update this artifact instead of creating a new one.`;
       } catch (error) {
         console.error("Failed to save artifact:", error);
-        return `Generated ${files.length} file(s) for "${title}" — displayed in the Code panel. (Storage unavailable, but code is visible in the conversation.)`;
-      }
+        const fileList = files.map(f => `  - ${f.path}`).join("\n");
+        return `Generated ${files.length} file(s) for "${title}":\n${fileList}\n\nCode is visible in the Code panel. Continue generating remaining files if any are missing, then call create_project_record.`;
     }
 
     case "create_project_record": {

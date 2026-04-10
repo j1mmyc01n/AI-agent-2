@@ -124,13 +124,23 @@ export default function AgentMonitor({
     }
   }, [isLoading, agentStatus, metrics.lastActivity, messageCount]);
 
+  const NUDGE_PROMPTS = [
+    "Continue building. Write the next missing file as a complete code block. Do not summarize or describe — write the actual code now.",
+    "The preview is showing a blank page. This means CSS and JS files are missing or incomplete. Re-write ALL 8 files starting with index.html. Make it premium — dark theme, sidebar, KPI cards, data table.",
+    "Output is incomplete. Write the remaining files now. Start with ```javascript:src/js/components.js and include: createSidebar(), createNavbar(), createStatCard(), createModal(), createChart() functions. Then write src/js/app.js with tailwind.config at the top.",
+    "The project needs premium visual quality. Rebuild src/css/styles.css with the full design token system (CSS custom properties for surface, accent, text colors). Then rebuild src/css/components.css with glass morphism cards, gradient buttons, hover effects.",
+    "Complete the build. Write src/js/app.js now. It must start with tailwind.config = { theme: { extend: { colors: { surface: {...}, accent: {...} } } } }, then init() function wiring all components, then document.addEventListener('DOMContentLoaded', init).",
+  ];
+
   const handleNudge = useCallback(() => {
     if (onNudge) {
-      onNudge(
-        "Continue building the project. Review what was done so far and proceed with the next steps. If code was generated, ensure it's complete and working."
+      const nudgeIndex = Math.min(
+        Math.floor((toolCallCount === 0 ? 1 : 0) + (codeBlockCount < 3 ? 1 : 0)),
+        NUDGE_PROMPTS.length - 1
       );
+      onNudge(NUDGE_PROMPTS[nudgeIndex]);
     }
-  }, [onNudge]);
+  }, [onNudge, toolCallCount, codeBlockCount]);
 
   const getStatusColor = (status: AgentHealthStatus) => {
     switch (status) {
