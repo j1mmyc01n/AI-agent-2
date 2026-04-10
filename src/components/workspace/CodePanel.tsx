@@ -78,7 +78,7 @@ export default function CodePanel({ codeBlocks = [], isGenerating = false }: Cod
     if (!codeBlocks || codeBlocks.length === 0) return;
     const zip = new JSZip();
     for (const block of codeBlocks) {
-      const filename = block.filename ? getCleanFilename(block) : `snippet.${block.language}`;
+      const filename = block.filename ? getCleanFilename(block) : `snippet.${(block.language || "txt").replace(/[^a-zA-Z0-9]/g, "")}`;
       if (filename && block.content) {
         zip.file(filename, block.content);
       }
