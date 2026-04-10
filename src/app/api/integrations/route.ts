@@ -167,6 +167,18 @@ export async function POST(req: NextRequest) {
   if (getDatabaseUrl()) {
     try {
       await db.user.update({ where: { id: userId }, data: updateData });
+      // Also sync keys to Blobs so /api/chat can read them even without DB
+      try {
+        const existing = await getBlobKeys(userId);
+        const merged = { ...existing, ...updateData };
+        for (const k of Object.keys(merged)) {
+          if (merged[k] === null) delete merged[k];
+        }
+        await saveBlobKeys(userId, merged);
+      } catch (blobErr) {
+        console.warn("Failed to sync keys to Blobs:", blobErr);
+        // Non-fatal — DB save succeeded
+      }
       return NextResponse.json({ success: true });
     } catch (error) {
       console.error("Database error in POST /api/integrations, falling back to Blobs:", error);

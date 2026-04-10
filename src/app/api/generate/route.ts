@@ -168,7 +168,7 @@ export async function GET(req: NextRequest) {
 }
 
 // ──────────────────────────────────────────────
-// POST /api/generate – run a generation
+// POST /api/generate – run a generation (SSE streaming)
 // ──────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -240,7 +240,13 @@ export async function POST(req: NextRequest) {
   const anthropicKey = userKeys.anthropicKey ?? process.env.ANTHROPIC_API_KEY;
 
   // Auto-detect provider: prefer Anthropic (always available via Netlify AI Gateway)
-  let activeProvider = provider || (anthropicKey ? "anthropic" : openaiKey ? "openai" : "anthropic");
+  // Sanitize provider to only allowed values
+  const safeProvider = provider === "openai" ? "openai" : "anthropic";
+  let activeProvider: "openai" | "anthropic" = safeProvider === "anthropic" && anthropicKey ? "anthropic"
+    : safeProvider === "openai" && openaiKey ? "openai"
+    : anthropicKey ? "anthropic"
+    : openaiKey ? "openai"
+    : "anthropic";
   if (activeProvider === "openai" && !openaiKey && anthropicKey) {
     activeProvider = "anthropic";
   } else if (activeProvider === "anthropic" && !anthropicKey && openaiKey) {
@@ -250,103 +256,121 @@ export async function POST(req: NextRequest) {
   const tmpl = TEMPLATES[template];
   const fullPrompt = `${tmpl.userPromptPrefix}\n\n${prompt.trim()}`;
 
-  let output = "";
   let usedModel = model;
 
-  // Try generation with primary provider, fall back to alternate on failure
-  const tryGenerate = async (useProvider: "anthropic" | "openai", useModel?: string): Promise<string> => {
-    if (useProvider === "anthropic") {
-      const key = userKeys.anthropicKey ?? process.env.ANTHROPIC_API_KEY;
-      if (!key) throw new Error("No Anthropic key available");
-      const anthropic = new Anthropic();
-      const m = useModel ?? "claude-sonnet-4-5";
-      usedModel = m;
-      const response = await anthropic.messages.create({
-        model: m,
-        max_tokens: 4096,
-        system: tmpl.systemPrompt,
-        messages: [{ role: "user", content: fullPrompt }],
-      });
-      return response.content
-        .filter((c) => c.type === "text")
-        .map((c) => (c as { type: "text"; text: string }).text)
-        .join("");
-    } else {
-      const key = userKeys.openaiKey ?? process.env.OPENAI_API_KEY;
-      if (!key) throw new Error("No OpenAI key available");
-      const openai = new OpenAI();
-      const m = useModel ?? "gpt-4o";
-      usedModel = m;
-      const response = await openai.chat.completions.create({
-        model: m,
-        max_tokens: 4096,
-        messages: [
-          { role: "system", content: tmpl.systemPrompt },
-          { role: "user", content: fullPrompt },
-        ],
-      });
-      return response.choices[0]?.message?.content ?? "";
-    }
-  };
+  // SSE streaming response
+  const stream = new ReadableStream({
+    async start(controller) {
+      const encoder = new TextEncoder();
+      let fullOutput = "";
 
-  try {
-    output = await tryGenerate(activeProvider, model ?? undefined);
-  } catch (primaryErr) {
-    console.error(`Primary provider ${activeProvider} failed:`, primaryErr);
-    // Try fallback provider
-    const fallback = activeProvider === "openai" ? "anthropic" : "openai";
-    const fallbackModel = fallback === "anthropic" ? "claude-sonnet-4-5" : "gpt-4o";
-    try {
-      output = await tryGenerate(fallback, fallbackModel);
-    } catch (fallbackErr) {
-      console.error(`Fallback provider ${fallback} also failed:`, fallbackErr);
-      const err = primaryErr;
-      const message =
-        err instanceof Error ? err.message : "AI generation failed";
-      const safe =
-        message.includes("API key") || message.includes("Incorrect API key")
-          ? "Invalid API key. Please check your key in Settings > AI Models."
-          : message.includes("rate limit") || message.includes("429")
-          ? "Rate limit reached. Please wait a moment and try again."
-          : message.includes("quota") || message.includes("insufficient_quota")
-          ? "API quota exceeded. Please check your billing on the provider dashboard."
-          : message.includes("404") || message.includes("Not Found")
-          ? "Model not available. Try switching to a different model."
-          : "AI generation failed. Please try again.";
-      return NextResponse.json({ error: safe }, { status: 502 });
-    }
-  }
+      const enqueue = (data: Record<string, unknown>) => {
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+      };
 
-  // Persist to database if available
-  let savedGeneration: { id: string } | null = null;
-  if (getDatabaseUrl()) {
-    try {
-      savedGeneration = await db.generation.create({
-        data: {
-          userId,
-          projectId: projectId ?? null,
-          template,
-          prompt: prompt.trim(),
-          output,
-          status: "completed",
-          model: usedModel ?? null,
-        },
-        select: { id: true },
-      });
-    } catch (err) {
-      console.error("Failed to save generation:", err);
-      // Non-fatal – return the output regardless
-    }
-  }
+      const tryStreamGenerate = async (useProvider: "anthropic" | "openai", useModel?: string): Promise<void> => {
+        if (useProvider === "anthropic") {
+          const key = userKeys.anthropicKey ?? process.env.ANTHROPIC_API_KEY;
+          if (!key) throw new Error("No Anthropic key available");
+          const anthropic = new Anthropic();
+          const m = useModel ?? "claude-sonnet-4-5-20250514";
+          usedModel = m;
+          const response = await anthropic.messages.create({
+            model: m,
+            max_tokens: 4096,
+            system: tmpl.systemPrompt,
+            messages: [{ role: "user", content: fullPrompt }],
+            stream: true,
+          });
+          for await (const event of response) {
+            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+              const text = event.delta.text;
+              fullOutput += text;
+              enqueue({ type: "text", content: text });
+            }
+          }
+        } else {
+          const key = userKeys.openaiKey ?? process.env.OPENAI_API_KEY;
+          if (!key) throw new Error("No OpenAI key available");
+          const openai = new OpenAI();
+          const m = useModel ?? "gpt-4o";
+          usedModel = m;
+          const response = await openai.chat.completions.create({
+            model: m,
+            max_tokens: 4096,
+            messages: [
+              { role: "system", content: tmpl.systemPrompt },
+              { role: "user", content: fullPrompt },
+            ],
+            stream: true,
+          });
+          for await (const chunk of response) {
+            const text = chunk.choices[0]?.delta?.content;
+            if (text) {
+              fullOutput += text;
+              enqueue({ type: "text", content: text });
+            }
+          }
+        }
+      };
 
-  return NextResponse.json(
-    {
-      id: savedGeneration?.id ?? null,
-      template,
-      prompt: prompt.trim(),
-      output,
-      model: usedModel,
+      try {
+        try {
+          await tryStreamGenerate(activeProvider, model ?? undefined);
+        } catch (primaryErr) {
+          console.error(`Primary provider ${activeProvider} failed:`, primaryErr);
+          // Try fallback provider
+          const fallback = activeProvider === "openai" ? "anthropic" : "openai";
+          const fallbackModel = fallback === "anthropic" ? "claude-sonnet-4-5-20250514" : "gpt-4o";
+          fullOutput = "";
+          await tryStreamGenerate(fallback, fallbackModel);
+        }
+
+        // Persist to database if available
+        if (getDatabaseUrl()) {
+          try {
+            await db.generation.create({
+              data: {
+                userId,
+                projectId: projectId ?? null,
+                template,
+                prompt: prompt.trim(),
+                output: fullOutput,
+                status: "completed",
+                model: usedModel ?? null,
+              },
+            });
+          } catch (err) {
+            console.error("Failed to save generation:", err);
+          }
+        }
+
+        enqueue({ type: "done" });
+      } catch (err) {
+        console.error("Generation streaming failed:", err);
+        const message = err instanceof Error ? err.message : "AI generation failed";
+        const safe =
+          message.includes("API key") || message.includes("Incorrect API key")
+            ? "Invalid API key. Please check your key in Settings > AI Models."
+            : message.includes("rate limit") || message.includes("429")
+            ? "Rate limit reached. Please wait a moment and try again."
+            : message.includes("quota") || message.includes("insufficient_quota")
+            ? "API quota exceeded. Please check your billing on the provider dashboard."
+            : message.includes("404") || message.includes("Not Found")
+            ? "Model not available. Try switching to a different model."
+            : "AI generation failed. Please try again.";
+        enqueue({ type: "error", content: safe });
+      } finally {
+        controller.close();
+      }
     },
-    { status: 201 }
-  );
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
+  });
 }

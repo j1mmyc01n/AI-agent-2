@@ -8,7 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { getDatabaseUrl } from "@/lib/db";
-import { Settings as SettingsIcon, Key, Plug, Database, CheckCircle2, AlertCircle } from "lucide-react";
+import { Settings as SettingsIcon, Key, Plug, Database, CheckCircle2, AlertCircle, CreditCard } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 
 export default async function SettingsPage() {
   const session = await getServerSession(authOptions);
@@ -36,7 +38,7 @@ export default async function SettingsPage() {
           <SettingsClient />
 
           <Tabs defaultValue="ai-models" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="ai-models" className="gap-2">
                 <Key className="h-4 w-4" />
                 <span className="hidden sm:inline">AI Models</span>
@@ -51,6 +53,11 @@ export default async function SettingsPage() {
                 <Database className="h-4 w-4" />
                 <span className="hidden sm:inline">Storage</span>
                 <span className="sm:hidden">DB</span>
+              </TabsTrigger>
+              <TabsTrigger value="billing" className="gap-2">
+                <CreditCard className="h-4 w-4" />
+                <span className="hidden sm:inline">Billing</span>
+                <span className="sm:hidden">Pay</span>
               </TabsTrigger>
             </TabsList>
 
@@ -189,6 +196,45 @@ export default async function SettingsPage() {
                   <IntegrationsPanel filter="connectivity" />
                 </div>
               </div>
+            </TabsContent>
+
+            <TabsContent value="billing" className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="h-5 w-5" />
+                    Billing & Plan
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your subscription and usage
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between p-4 rounded-lg border bg-card">
+                    <div>
+                      <p className="font-medium">Free Plan</p>
+                      <p className="text-sm text-muted-foreground">
+                        Unlimited projects · Bring your own API keys · Netlify Blobs storage
+                      </p>
+                    </div>
+                    <Badge variant="secondary">Current Plan</Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-4 rounded-lg border border-primary/30 bg-primary/5">
+                    <div>
+                      <p className="font-medium">Pro Plan</p>
+                      <p className="text-sm text-muted-foreground">
+                        $12/month · Team workspace · API key vault · Priority support
+                      </p>
+                    </div>
+                    <Button size="sm" disabled>
+                      Coming Soon
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Stripe billing will be enabled in a future update. Your data and projects are always yours.
+                  </p>
+                </CardContent>
+              </Card>
             </TabsContent>
           </Tabs>
         </div>

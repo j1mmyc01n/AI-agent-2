@@ -28,9 +28,8 @@ export const AI_PROVIDERS: { id: AIProvider; name: string; icon: React.ReactNode
     name: "Claude",
     icon: <Cpu className="h-4 w-4" />,
     models: [
-      { id: "claude-haiku-4-5", name: "Claude Haiku 4.5", provider: "anthropic", description: "Fast & cheap (default)" },
-      { id: "claude-sonnet-4-5", name: "Claude Sonnet 4.5", provider: "anthropic", description: "Best for coding" },
-      { id: "claude-sonnet-4-0", name: "Claude Sonnet 4", provider: "anthropic", description: "Reliable" },
+      { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5", provider: "anthropic", description: "Fast & efficient" },
+      { id: "claude-sonnet-4-5-20250514", name: "Claude Sonnet 4.5", provider: "anthropic", description: "Balanced performance" },
       { id: "claude-opus-4-5", name: "Claude Opus 4.5", provider: "anthropic", description: "Most capable" },
     ],
   },

@@ -127,14 +127,44 @@ export default function GeneratePage() {
         body: JSON.stringify({ template: selectedTemplate, prompt: prompt.trim() }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
+        const data = await res.json();
         setError(data.error ?? "Generation failed. Please try again.");
         return;
       }
 
-      setOutput(data.output ?? "");
+      const reader = res.body?.getReader();
+      if (!reader) {
+        setError("Streaming not supported by browser.");
+        return;
+      }
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          try {
+            const data = JSON.parse(line.slice(6));
+            if (data.type === "text" && data.content) {
+              setOutput(prev => prev + data.content);
+            } else if (data.type === "error") {
+              setError(data.content || "Generation failed.");
+            }
+            // type "done" — just let the loop finish
+          } catch {
+            // Ignore malformed SSE lines
+          }
+        }
+      }
     } catch (err) {
       console.error("Generation request failed:", err);
       setError("An unexpected error occurred. Please try again.");
