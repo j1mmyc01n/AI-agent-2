@@ -95,7 +95,10 @@ function buildInlinedSrcDoc(codeBlocks: CodeBlock[]): string {
       const content =
         fileMap.get(cleanHref) ||
         fileMap.get(cleanHref.split("/").pop() || cleanHref);
-      return content ? `<style>\n/* inlined: ${cleanHref} */\n${content}\n</style>` : "";
+      if (!content) return "";
+      // Escape </style> in content to prevent breaking out of the style block
+      const safeContent = content.replace(/<\/style/gi, "<\\/style");
+      return `<style>\n/* inlined: ${cleanHref} */\n${safeContent}\n</style>`;
     }
   );
 
@@ -109,14 +112,15 @@ function buildInlinedSrcDoc(codeBlocks: CodeBlock[]): string {
       const content =
         fileMap.get(cleanSrc) ||
         fileMap.get(cleanSrc.split("/").pop() || cleanSrc);
+      if (!content) return "";
+      // Escape </script> in content to prevent breaking out of the script block
+      const safeContent = content.replace(/<\/script/gi, "<\\/script");
       // Strip `src` and `defer` from inlined script tag attrs
       const cleanAttrs = (attrs || "")
         .replace(/\bsrc=["'][^"']*["']/g, "")
         .replace(/\bdefer\b/g, "")
         .trim();
-      return content
-        ? `<script${cleanAttrs ? " " + cleanAttrs : ""}>\n/* inlined: ${cleanSrc} */\n${content}\n<\/script>`
-        : "";
+      return `<script${cleanAttrs ? " " + cleanAttrs : ""}>\n/* inlined: ${cleanSrc} */\n${safeContent}\n<\/script>`;
     }
   );
 

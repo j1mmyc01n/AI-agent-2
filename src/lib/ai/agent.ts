@@ -603,6 +603,7 @@ async function executeToolCall(
         console.error("Failed to save artifact:", error);
         const fileList = files.map(f => `  - ${f.path}`).join("\n");
         return `Generated ${files.length} file(s) for "${title}":\n${fileList}\n\nCode is visible in the Code panel. Continue generating remaining files if any are missing, then call create_project_record.`;
+      }
     }
 
     case "create_project_record": {
