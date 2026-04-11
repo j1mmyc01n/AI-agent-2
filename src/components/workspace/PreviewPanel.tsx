@@ -56,15 +56,18 @@ function buildInlinedSrcDoc(codeBlocks: CodeBlock[]): string {
   );
 
   if (!htmlBlock) {
-    // No HTML — wrap all CSS + JS in a minimal shell
+    // No HTML — wrap all CSS + JS in a minimal shell.
+    // Sort JS blocks by dependency order using sortJsBlocks() (config → state → router →
+    // components → app) so each file can safely reference symbols from the files loaded
+    // before it. This mirrors the <script> tag order the AI outputs in index.html.
     const css = codeBlocks
       .filter((b) => b.language === "css")
       .map((b) => b.content)
       .join("\n");
-    const js = codeBlocks
-      .filter((b) => b.language === "javascript" || b.language === "js")
-      .map((b) => b.content)
-      .join("\n\n");
+    const jsBlocks = sortJsBlocks(
+      codeBlocks.filter((b) => b.language === "javascript" || b.language === "js")
+    );
+    const js = jsBlocks.map((b) => b.content).join("\n\n");
     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body><script>${js}<\/script></body></html>`;
   }
 

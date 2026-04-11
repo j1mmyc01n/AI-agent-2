@@ -134,10 +134,26 @@ export default function AgentMonitor({
 
   const handleNudge = useCallback(() => {
     if (onNudge) {
-      const nudgeIndex = Math.min(
-        Math.floor((toolCallCount === 0 ? 1 : 0) + (codeBlockCount < 3 ? 1 : 0)),
-        NUDGE_PROMPTS.length - 1
-      );
+      // Pick nudge based on agent progress — more code blocks / tool calls → higher index.
+      // This cycles through increasingly specific nudges as the build progresses:
+      //   0: nothing generated yet — gentle "write the next file" nudge
+      //   1: a few blocks but preview blank — aggressive full-rebuild nudge
+      //   2: mid-build — targeted "write components.js" nudge
+      //   3: late stage — "rebuild CSS with design tokens" nudge
+      //   4: nearly done — "write app.js and wrap up" nudge
+      let nudgeIndex: number;
+      if (codeBlockCount === 0 && toolCallCount < 2) {
+        nudgeIndex = 0;
+      } else if (codeBlockCount < 3) {
+        nudgeIndex = 1;
+      } else if (codeBlockCount < 6) {
+        nudgeIndex = 2;
+      } else if (codeBlockCount < 8) {
+        nudgeIndex = 3;
+      } else {
+        nudgeIndex = 4;
+      }
+      nudgeIndex = Math.min(nudgeIndex, NUDGE_PROMPTS.length - 1);
       onNudge(NUDGE_PROMPTS[nudgeIndex]);
     }
   }, [onNudge, toolCallCount, codeBlockCount]);
