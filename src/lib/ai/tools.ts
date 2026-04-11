@@ -116,7 +116,7 @@ export const tools: ChatCompletionTool[] = [
     function: {
       name: "save_artifact",
       description:
-        "Save generated code files as a persistent artifact using the proper 8-file folder structure. Call this after writing EACH file (or group of files) to save progress incrementally. Pass ALL files generated so far each time you call it. If you received an artifact_id from a previous call, pass it as artifact_id to update the existing artifact instead of creating a new one. Files are stored and available across sessions.",
+        "Save generated code files as a persistent artifact using the proper 8-file folder structure. Call this after writing EACH file (or group of files) to save progress incrementally. Pass ALL files generated so far each time you call it. If you received an artifact_id from a previous call, pass it as artifact_id to update the existing artifact instead of creating a new one. Files are stored and available across sessions. When all 8 files are saved, the response will contain 'ALL_FILES_COMPLETE' — at that point, call create_project_record and STOP. Do not regenerate files after this signal.",
       parameters: {
         type: "object",
         properties: {

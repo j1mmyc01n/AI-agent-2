@@ -113,11 +113,23 @@ async function runOpenAIAgent(
   let finalResponse = "";
   let continueLoop = true;
   let artifactSaved = false; // tracks whether save_artifact was successfully called before create_project_record
+  let allFilesSaved = false; // tracks whether all 8 canonical files have been saved
+  let projectRecordCreated = false; // tracks whether create_project_record has been called
   let loopCount = 0;
   const MAX_TOOL_LOOPS = 20;
 
   while (continueLoop && loopCount < MAX_TOOL_LOOPS) {
     loopCount++;
+
+    // If all 8 files are saved AND project record is created, stop the loop immediately.
+    // This prevents the agent from re-generating files or making redundant API calls.
+    if (allFilesSaved && projectRecordCreated) {
+      const doneMsg = "\n\n✅ **Build Complete** — All 8 files saved and project recorded. Check the Code and Preview tabs.";
+      finalResponse += doneMsg;
+      onChunk(doneMsg);
+      break;
+    }
+
     const stream = await openai.chat.completions.create({
       model,
       messages: allMessages as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -207,6 +219,15 @@ async function runOpenAIAgent(
         // Mark that files have been successfully saved so create_project_record is now allowed.
         if (toolName === "save_artifact" && (toolResult.startsWith("Saved ") || toolResult.startsWith("Updated "))) {
           artifactSaved = true;
+          // Check if all 8 canonical files are now saved
+          if (toolResult.includes("ALL_FILES_COMPLETE")) {
+            allFilesSaved = true;
+          }
+        }
+
+        // Track project record creation
+        if (toolName === "create_project_record" && !toolResult.startsWith("Error")) {
+          projectRecordCreated = true;
         }
 
         onToolResult(toolName, toolResult);
@@ -257,11 +278,22 @@ async function runAnthropicAgent(
   let finalResponse = "";
   let continueLoop = true;
   let artifactSaved = false; // tracks whether save_artifact was successfully called before create_project_record
+  let allFilesSaved = false; // tracks whether all 8 canonical files have been saved
+  let projectRecordCreated = false; // tracks whether create_project_record has been called
   let loopCount = 0;
   const MAX_TOOL_LOOPS = 20;
 
   while (continueLoop && loopCount < MAX_TOOL_LOOPS) {
     loopCount++;
+
+    // If all 8 files are saved AND project record is created, stop the loop immediately.
+    if (allFilesSaved && projectRecordCreated) {
+      const doneMsg = "\n\n✅ **Build Complete** — All 8 files saved and project recorded. Check the Code and Preview tabs.";
+      finalResponse += doneMsg;
+      onChunk(doneMsg);
+      break;
+    }
+
     const stream = await anthropic.messages.create({
       model,
       system: systemPrompt,
@@ -343,6 +375,15 @@ async function runAnthropicAgent(
         // Mark that files have been successfully saved so create_project_record is now allowed.
         if (tu.name === "save_artifact" && !result.startsWith("ERROR:")) {
           artifactSaved = true;
+          // Check if all 8 canonical files are now saved
+          if (result.includes("ALL_FILES_COMPLETE")) {
+            allFilesSaved = true;
+          }
+        }
+
+        // Track project record creation
+        if (tu.name === "create_project_record" && !result.startsWith("Error")) {
+          projectRecordCreated = true;
         }
 
         onToolResult(tu.name, result);
@@ -546,6 +587,16 @@ async function executeToolCall(
         return "No real code files provided to save (empty/placeholder files were skipped).";
       }
 
+      // Determine whether ALL 8 canonical files are now present
+      const savedPaths = new Set(files.map(f => f.path));
+      const allComplete = CANONICAL_BUILD_PATHS.size === savedPaths.size &&
+        [...CANONICAL_BUILD_PATHS].every(p => savedPaths.has(p));
+      const completionTag = allComplete ? "\n\n🏁 ALL_FILES_COMPLETE — All 8 files are saved. Now call create_project_record with type=\"saas\" to finish. Do NOT regenerate any files." : "";
+      const missingFiles = allComplete ? [] : [...CANONICAL_BUILD_PATHS].filter(p => !savedPaths.has(p));
+      const missingHint = missingFiles.length > 0
+        ? `\n\nMissing files (${missingFiles.length}): ${missingFiles.join(", ")}. Write these next, then call save_artifact again with ALL files.`
+        : "";
+
       try {
         const store = getStore("artifacts");
         const indexKey = `user:${config.userId}`;
@@ -567,7 +618,7 @@ async function executeToolCall(
               if (entry) entry.fileCount = files.length;
               await store.setJSON(indexKey, indexArr);
               const fileList = files.map(f => `  - ${f.path}`).join("\n");
-              return `Updated artifact "${title}" (ID: ${existingArtifactId}) with ${files.length} file(s):\n${fileList}\n\nKeep using artifact_id: ${existingArtifactId} for subsequent saves.`;
+              return `Updated artifact "${title}" (ID: ${existingArtifactId}) with ${files.length} file(s):\n${fileList}${completionTag}${missingHint}\n\nKeep using artifact_id: ${existingArtifactId} for subsequent saves.`;
             }
           } catch (upsertErr) {
             console.error("Failed to update existing artifact, will create new one:", upsertErr);
@@ -598,11 +649,11 @@ async function executeToolCall(
         await store.setJSON(indexKey, existingArr);
 
         const fileList = files.map(f => `  - ${f.path}`).join("\n");
-        return `Saved ${files.length} file(s) as "${title}" (ID: ${artifactId}):\n${fileList}\n\nFor subsequent saves, pass artifact_id: ${artifactId} to update this artifact instead of creating a new one.`;
+        return `Saved ${files.length} file(s) as "${title}" (ID: ${artifactId}):\n${fileList}${completionTag}${missingHint}\n\nFor subsequent saves, pass artifact_id: ${artifactId} to update this artifact instead of creating a new one.`;
       } catch (error) {
         console.error("Failed to save artifact:", error);
         const fileList = files.map(f => `  - ${f.path}`).join("\n");
-        return `Generated ${files.length} file(s) for "${title}":\n${fileList}\n\nCode is visible in the Code panel. Continue generating remaining files if any are missing, then call create_project_record.`;
+        return `Generated ${files.length} file(s) for "${title}":\n${fileList}${completionTag}${missingHint}\n\nCode is visible in the Code panel. Continue generating remaining files if any are missing, then call create_project_record.`;
       }
     }
 

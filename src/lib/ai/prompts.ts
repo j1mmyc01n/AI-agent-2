@@ -340,7 +340,7 @@ Then **immediately** write \`\`\`html:index.html. No scope document. No analysis
 
 - **Build Mode (always):** \`index.html\` + \`src/css/styles.css\` + \`src/css/components.css\` + \`src/js/config.js\` + \`src/js/state.js\` + \`src/js/router.js\` + \`src/js/components.js\` + \`src/js/app.js\`
 - **Reference (Next.js SaaS, for architecture discussions):** \`src/app/\`, \`src/components/ui/\`, \`src/hooks/\`, \`src/lib/\`, \`src/store/\`, \`src/types/\`
-- Every page in the navigation must have a corresponding route or hash route — no dead links
+- Every page in the navigation must have a corresponding hash route in \`router.js\` — no dead links. In Build Mode, use \`registerRoute('#page', renderFn)\` for every sidebar/navbar item
 - All imports use \`@/\` path aliases in Next.js; relative paths in HTML/JS projects
 
 ### The 4-Layer Feature Stack (for Next.js apps)
@@ -351,7 +351,7 @@ When building Next.js apps (GitHub/Vercel deployment), every feature must be wir
 3. **Custom Hook** — Fetches from API route, exposes loading/error/data + mutation functions
 4. **Component** — Uses the hook; handles loading, error, empty, and data states
 
-For HTML/CSS/JS builds: use \`state.js\` for data, \`components.js\` for UI, \`router.js\` for navigation.
+For HTML/CSS/JS builds: use \`state.js\` for data + localStorage persistence, \`components.js\` for UI factory functions + page renderers, \`router.js\` for hash-based SPA navigation with \`registerRoute()\` for every menu item.
 
 ### Database Standards
 
@@ -380,6 +380,8 @@ For HTML/CSS/JS builds: use \`state.js\` for data, \`components.js\` for UI, \`r
 - **Unclear feature?** Pick the simplest reasonable interpretation and add \`// Simplified version — extend as needed\`
 - **Task too large?** Split into: schema → API → hook → component → page, one layer at a time
 - **Something broken?** Fix it before writing new files
+- **save_artifact returned "ALL_FILES_COMPLETE"?** STOP generating code. Call create_project_record and you are DONE. Do NOT regenerate files that are already saved.
+- **Already saved all 8 files?** Do NOT rewrite them. Call create_project_record if you haven't, then stop.
 
 **NEVER:**
 - Leave a component without a complete return statement
@@ -647,20 +649,106 @@ analytics: {
 For CRM/client apps use: contacts with deal values like $47,200 and $128,500 (not round numbers).
 For invoice apps use: real service descriptions like "Brand Identity Design – 40hrs @ $125/hr".
 
-**\`src/js/router.js\`** — SPA router:
-- \`function navigate(hash) { ... }\`, route guards, animated view transitions
-- \`window.addEventListener('hashchange', ...)\`
-- Page transition: fade out old, fade in new
+**\`src/js/router.js\`** — SPA router with smart navigation:
+- Hash-based routing: \`window.addEventListener('hashchange', handleRoute)\`
+- \`function navigate(hash) { window.location.hash = hash; }\` — programmatic navigation
+- Route registry: \`const routes = {}\` mapping hash paths to render functions
+- \`function registerRoute(hash, renderFn) { routes[hash] = renderFn; }\` — route registration
+- \`function handleRoute() { ... }\` — looks up current hash, calls render function, handles 404
+- Route guards: check auth state before rendering protected pages
+- Animated view transitions: fade out old content, fade in new content
+- Default route: if hash is empty, navigate to \`#dashboard\` or \`#home\`
 
-**\`src/js/components.js\`** — Premium UI factory functions:
-- \`function createNavbar() { ... }\` — sticky navbar with logo, nav links, user avatar dropdown, mobile hamburger
-- \`function createSidebar() { ... }\` — collapsible sidebar with icons + labels, section groupings, active states
+CRITICAL ROUTER PATTERN — Copy this exact structure:
+
+\`\`\`
+const routes = {};
+let currentRoute = null;
+
+function registerRoute(hash, renderFn) {
+  routes[hash] = renderFn;
+}
+
+function navigate(hash) {
+  window.location.hash = hash;
+}
+
+function handleRoute() {
+  const hash = window.location.hash || '#dashboard';
+  const contentArea = document.getElementById('main-content');
+  if (!contentArea) return;
+  
+  // Fade out transition
+  contentArea.style.opacity = '0';
+  contentArea.style.transform = 'translateY(8px)';
+  
+  setTimeout(function() {
+    const renderFn = routes[hash];
+    if (renderFn) {
+      contentArea.innerHTML = renderFn();
+      currentRoute = hash;
+    } else {
+      contentArea.innerHTML = '<div class="p-8"><h2>Page not found</h2></div>';
+    }
+    // Fade in transition
+    contentArea.style.opacity = '1';
+    contentArea.style.transform = 'translateY(0)';
+    
+    // Update active state in sidebar
+    document.querySelectorAll('[data-nav-item]').forEach(function(item) {
+      item.classList.toggle('active', item.getAttribute('data-nav-item') === hash);
+    });
+  }, 150);
+}
+
+window.addEventListener('hashchange', handleRoute);
+\`\`\`
+
+Every sidebar/navbar menu item MUST:
+1. Have a corresponding \`registerRoute('#page-name', renderPageFunction)\` call
+2. Use \`onclick="navigate('#page-name')"\` or \`href="#page-name"\` in the link
+3. Have a render function that returns real HTML with data from state.js
+4. Never be a dead link — every menu item must load a unique, content-rich page
+
+**\`src/js/components.js\`** — Premium UI factory functions with smart navigation:
+- \`function createNavbar() { ... }\` — sticky navbar with logo, nav links, user avatar dropdown, mobile hamburger. Links use \`onclick="navigate('#page')"\`
+- \`function createSidebar(activeHash) { ... }\` — collapsible sidebar with icons + labels, section groupings, active states. Each item MUST use \`data-nav-item="#hash"\` and \`onclick="navigate('#hash')"\`. Active item highlighted with accent left-border
 - \`function createModal(config) { ... }\` — accessible modal with backdrop, close button, slide-in animation
 - \`function createToast(msg, type) { ... }\` — auto-dismiss toast with icon variants (success/error/info)
-- \`function createDataTable(data, columns) { ... }\` — sortable table with pagination
+- \`function createDataTable(data, columns) { ... }\` — sortable, searchable table with pagination, row hover, action buttons
 - \`function createChart(data, type) { ... }\` — visual chart using CSS/SVG (no Chart.js needed)
 - \`function createStatCard(label, value, trend, icon) { ... }\` — KPI metric card with trend indicator
+- Page-specific render functions: \`function renderDashboard()\`, \`function renderProjects()\`, \`function renderSettings()\`, etc. — one for EACH sidebar menu item
 - All functions use \`function\` declarations — NO \`const\` functions
+
+SIDEBAR NAVIGATION WIRING — This is MANDATORY:
+Every sidebar item must have a matching route. Use this pattern in components.js:
+\`\`\`
+function createSidebar() {
+  var currentHash = window.location.hash || '#dashboard';
+  var items = [
+    { hash: '#dashboard', icon: '⊞', label: 'Dashboard' },
+    { hash: '#projects', icon: '◫', label: 'Projects' },
+    { hash: '#analytics', icon: '📊', label: 'Analytics' },
+    { hash: '#team', icon: '👥', label: 'Team' },
+    { hash: '#settings', icon: '⚙', label: 'Settings' },
+  ];
+  return '<nav class="sidebar">' + items.map(function(item) {
+    var active = currentHash === item.hash ? ' active' : '';
+    return '<a data-nav-item="' + item.hash + '" onclick="navigate(\\'' + item.hash + '\\')" class="nav-item' + active + '">' +
+      '<span>' + item.icon + '</span><span>' + item.label + '</span></a>';
+  }).join('') + '</nav>';
+}
+\`\`\`
+And in router.js, register EVERY sidebar route:
+\`\`\`
+registerRoute('#dashboard', renderDashboard);
+registerRoute('#projects', renderProjects);
+registerRoute('#analytics', renderAnalytics);
+registerRoute('#team', renderTeam);
+registerRoute('#settings', renderSettings);
+\`\`\`
+⛔ NEVER create a sidebar item without a corresponding registerRoute() + render function.
 
 **\`src/js/app.js\`** — Application bootstrap:
 tailwind.config MUST be the FIRST thing in app.js (before any function calls):
@@ -695,10 +783,63 @@ tailwind.config = {
 };
 
 - Wire all components: render navbar, sidebar, route views
-- \`function init() { ... }\` — full initialization sequence
+- \`function init() { ... }\` — full initialization sequence:
+  1. Set tailwind.config at top of file
+  2. Register ALL routes: \`registerRoute('#dashboard', renderDashboard)\`, etc.
+  3. Render the sidebar into the sidebar container
+  4. Call \`handleRoute()\` to render the initial page based on current hash
+  5. Set up event delegation for dynamic elements (buttons, forms, modals)
 - \`document.addEventListener('DOMContentLoaded', init)\`
 - Populate dashboard with realistic sample data from state
 - All interactive elements have working event handlers
+- Re-render sidebar on hashchange so active state updates
+
+CRITICAL INIT PATTERN:
+\`\`\`
+function init() {
+  // Register all routes (MUST match every sidebar item)
+  registerRoute('#dashboard', renderDashboard);
+  registerRoute('#projects', renderProjects);
+  registerRoute('#analytics', renderAnalytics);
+  registerRoute('#team', renderTeam);
+  registerRoute('#settings', renderSettings);
+
+  // Render layout shell
+  var app = document.getElementById('app');
+  app.innerHTML = createSidebar() + '<main id="main-content" class="main-content"></main>';
+
+  // Initial route
+  handleRoute();
+
+  // Re-render sidebar active state on navigation
+  window.addEventListener('hashchange', function() {
+    document.querySelector('.sidebar').outerHTML = createSidebar();
+  });
+}
+document.addEventListener('DOMContentLoaded', init);
+\`\`\`
+
+---
+
+### 🔄 DYNAMIC INTERACTIVITY REQUIREMENTS (MANDATORY)
+
+Every project MUST be interactive and dynamic — not a static mockup. These are hard requirements:
+
+1. **State-driven rendering** — All pages read data from \`store.getState()\` and render dynamically. No hardcoded HTML tables — use \`createDataTable(state.items, columns)\`
+2. **CRUD operations** — At least one entity (tasks, projects, contacts, etc.) must support Create, Read, Update, Delete via state.js dispatch actions + localStorage persistence
+3. **Search and filter** — Data tables and lists MUST have a working search/filter input that filters displayed items in real-time
+4. **Form interactions** — Add/edit modals with working form submission that updates state and re-renders the page
+5. **localStorage persistence** — State changes persist across page reloads via \`localStorage.setItem()\` in the store's dispatch
+6. **Active navigation states** — Sidebar highlights current page, updates on every route change
+7. **Page-specific content** — Every routed page shows unique, meaningful content:
+   - Dashboard: KPI cards + chart + data table + activity feed
+   - Projects/Items: filterable list with status badges, add/edit buttons
+   - Analytics: charts with data from state, period selectors
+   - Settings: tabbed form with profile, notifications, preferences sections
+   - Team: member cards/list with role badges
+8. **Toast notifications** — Operations (save, delete, update) show toast feedback
+9. **Empty states** — When a list is empty, show a helpful CTA ("No projects yet — create your first one")
+10. **Loading skeletons** — Use shimmer/pulse animations on initial render before data populates
 
 ---
 
@@ -786,8 +927,15 @@ tailwind.config = {
 12. ✅ No React, TypeScript, React Native, or any framework code
 13. ✅ Called \`save_artifact\` incrementally (after each file or every 2–3 files), passing the same \`artifact_id\` each time
 14. ✅ After ALL 8 files, called \`create_project_record\` with type="saas"
+15. ✅ **NAVIGATION:** Every sidebar menu item has a matching \`registerRoute()\` + render function — NO dead links
+16. ✅ **DYNAMIC:** Pages render data from state.js, not hardcoded HTML. Tables are searchable/filterable
+17. ✅ **INTERACTIVITY:** At least one CRUD flow (add/edit/delete) that updates state and re-renders
+18. ✅ **PERSISTENCE:** State persists to localStorage — data survives page reload
+19. ✅ **COMPLETION:** After save_artifact returns "ALL_FILES_COMPLETE", immediately call create_project_record and STOP — do NOT regenerate files
 
 **⚠️ COMPLETION RULE: Generate every one of the 8 files before stopping. If running low on output space, make each remaining file shorter — but ALWAYS output a complete, closed code block for every file. NEVER end mid-file. NEVER skip a file. The system will auto-prompt you to continue if files are missing, but complete everything in one pass.**
+
+**🛑 STOP RULE: When save_artifact returns a message containing "ALL_FILES_COMPLETE", ALL 8 files are saved. Your ONLY remaining action is to call create_project_record and then STOP. Do NOT write any more code blocks. Do NOT call save_artifact again. The build is done.**
 `;
 
 const SAAS_UPGRADE_INSTRUCTIONS = `
@@ -839,6 +987,15 @@ project-name/
 - Auth flows: login/register modal or hash-routed pages
 - Dashboard: collapsible sidebar, 4 KPI stat cards, SVG chart, sortable data table, activity feed
 - Settings: tabbed interface with profile, notifications, billing sections
+- **Every sidebar menu item MUST have a corresponding route in router.js + render function in components.js — NO dead links**
+
+### SMART NAVIGATION & DYNAMIC INTERACTIVITY
+- **router.js**: Hash-based SPA router with \`registerRoute(hash, renderFn)\`, \`navigate(hash)\`, \`handleRoute()\`
+- **Every sidebar item** must use \`onclick="navigate('#page')"\` and have a matching \`registerRoute('#page', renderFn)\`
+- **Pages render from state**: All data comes from \`store.getState()\` — never hardcoded HTML
+- **CRUD operations**: At least one entity supports add/edit/delete with state dispatch + localStorage
+- **Search/filter**: Data tables have real-time search filtering
+- **Active nav states**: Sidebar highlights current page on every route change
 
 ### PREMIUM VISUAL REQUIREMENTS
 - **Color system in app.js**: \`tailwind.config = { theme: { extend: { colors: { surface: { DEFAULT: '#080810', secondary: '#0f0f1a', card: '#14142a', hover: '#1c1c35' }, accent: { DEFAULT: '#6366f1', hover: '#818cf8', muted: '#6366f133', glow: 'rgba(99,102,241,0.25)' } } } } }\`
@@ -850,12 +1007,14 @@ project-name/
 
 ### ARCHITECTURE
 - **config.js** — \`const APP_CONFIG = { theme: {...}, features: {...}, storage: {...} }\`
-- **state.js** — \`function createStore()\`, subscribe/dispatch/getState, realistic demo data
-- **router.js** — \`function navigate(hash)\`, route guards, fade transitions
-- **components.js** — \`function createSidebar()\`, \`function createNavbar()\`, \`function createModal()\`, \`function createStatCard()\`, \`function createChart()\`
-- **app.js** — \`tailwind.config\` at top, \`function init()\`, \`document.addEventListener('DOMContentLoaded', init)\`
+- **state.js** — \`function createStore()\`, subscribe/dispatch/getState, realistic demo data, localStorage persistence
+- **router.js** — \`registerRoute(hash, renderFn)\`, \`navigate(hash)\`, \`handleRoute()\`, hashchange listener, route guards, fade transitions
+- **components.js** — \`function createSidebar()\` with \`data-nav-item\` + \`onclick="navigate(...)"\`, \`function createNavbar()\`, \`function createModal()\`, \`function createStatCard()\`, \`function createChart()\`, page render functions for EVERY route
+- **app.js** — \`tailwind.config\` at top, register ALL routes, \`function init()\`, \`document.addEventListener('DOMContentLoaded', init)\`
 
 Generate ALL 8 files with complete working code. After ALL 8 files, call \`save_artifact\` with all paths (or incrementally with the same artifact_id) and then call \`create_project_record\`.
+
+**🛑 STOP RULE: When save_artifact returns "ALL_FILES_COMPLETE", call create_project_record and STOP. Do NOT regenerate files.**
 `;
 
 const CHAT_MODE_INSTRUCTIONS = `
