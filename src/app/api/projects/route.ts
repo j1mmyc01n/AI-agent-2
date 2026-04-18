@@ -90,6 +90,20 @@ export async function POST(req: NextRequest) {
   // Try database first
   if (getDatabaseUrl()) {
     try {
+      const duplicateWindowStart = new Date(Date.now() - 1000 * 60 * 60 * 6);
+      const existingProject = await db.project.findFirst({
+        where: {
+          userId,
+          name,
+          type: type || "saas",
+          updatedAt: { gte: duplicateWindowStart },
+        },
+        orderBy: { updatedAt: "desc" },
+      });
+      if (existingProject) {
+        return NextResponse.json(existingProject, { status: 200 });
+      }
+
       const project = await db.project.create({
         data: {
           name,
@@ -110,6 +124,17 @@ export async function POST(req: NextRequest) {
 
   // Fallback to Netlify Blobs
   try {
+    const duplicateWindowStart = Date.now() - 1000 * 60 * 60 * 6;
+    const existing = await getBlobProjects(userId);
+    const duplicate = existing.find((p) =>
+      p.name === name &&
+      p.type === (type || "saas") &&
+      Date.parse(p.updatedAt) >= duplicateWindowStart
+    );
+    if (duplicate) {
+      return NextResponse.json(duplicate, { status: 200 });
+    }
+
     const newProject: BlobProject = {
       id: `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
       name,
@@ -123,7 +148,6 @@ export async function POST(req: NextRequest) {
       updatedAt: new Date().toISOString(),
     };
 
-    const existing = await getBlobProjects(userId);
     existing.unshift(newProject);
     await saveBlobProjects(userId, existing);
 
