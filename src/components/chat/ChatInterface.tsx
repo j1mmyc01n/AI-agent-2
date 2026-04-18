@@ -63,6 +63,31 @@ const CANONICAL_BUILD_PATHS = new Set([
   "src/js/app.js",
 ]);
 
+const BUILD_BASENAME_TO_CANONICAL: Record<string, string> = {
+  "index.html": "index.html",
+  "styles.css": "src/css/styles.css",
+  "components.css": "src/css/components.css",
+  "config.js": "src/js/config.js",
+  "state.js": "src/js/state.js",
+  "router.js": "src/js/router.js",
+  "components.js": "src/js/components.js",
+  "app.js": "src/js/app.js",
+};
+
+function normalizeBuildFilePath(filename: string | undefined): string | null {
+  if (!filename) return null;
+  const clean = filename
+    .replace(/\s*\(generating\.\.\.\)\s*/i, "")
+    .replace(/^\.\//, "")
+    .replace(/\\/g, "/")
+    .toLowerCase()
+    .trim();
+  if (!clean) return null;
+  if (CANONICAL_BUILD_PATHS.has(clean)) return clean;
+  const basename = clean.split("/").pop() || clean;
+  return BUILD_BASENAME_TO_CANONICAL[basename] ?? null;
+}
+
 function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlock[] {
   const blocks: CodeBlock[] = [];
   // Match fenced code blocks: ```lang:filename\n...content...```
@@ -125,14 +150,16 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
   const normalize = (name: string) =>
     name.replace(/\s*\(generating\.\.\.\)\s*/i, "").toLowerCase().trim();
 
+  const isBuildLikeOutput = blocks.some((b) => normalizeBuildFilePath(b.filename) !== null);
+
   // Pass 1: record the last index for each canonical filename
   const lastCanonicalIdx = new Map<string, number>();
   for (let i = 0; i < blocks.length; i++) {
     const block = blocks[i];
     if (!block.filename) continue;
-    const clean = normalize(block.filename);
-    if (CANONICAL_BUILD_PATHS.has(clean)) {
-      lastCanonicalIdx.set(clean, i);
+    const canonical = normalizeBuildFilePath(block.filename);
+    if (canonical) {
+      lastCanonicalIdx.set(canonical, i);
     }
   }
 
@@ -140,23 +167,31 @@ function extractCodeBlocks(messages: Message[], includePartial = false): CodeBlo
   return blocks.filter((block, i) => {
     if (!block.filename) return true; // keep unnamed snippets
 
-    const clean = normalize(block.filename);
+    const clean = normalize(block.filename).replace(/\\/g, "/");
+    const canonical = normalizeBuildFilePath(block.filename);
 
     // Drop empty placeholder files
     if (clean.endsWith(".gitkeep") || clean.endsWith(".keep")) return false;
 
+    // In build-like output, keep ONLY canonical 8-file entries.
+    if (isBuildLikeOutput && !canonical) return false;
+
     // Drop wrong-path files (has "/" but not a canonical path)
-    if (clean.includes("/") && !CANONICAL_BUILD_PATHS.has(clean)) return false;
+    if (!isBuildLikeOutput && clean.includes("/") && !CANONICAL_BUILD_PATHS.has(clean)) return false;
 
     // Drop "file.txt" entries — these are tool-call log artifacts, not real code files
     if (clean === "file.txt" || clean.endsWith("/file.txt")) return false;
 
     // For canonical files: keep only the last occurrence
-    if (CANONICAL_BUILD_PATHS.has(clean)) {
-      return lastCanonicalIdx.get(clean) === i;
+    if (canonical) {
+      return lastCanonicalIdx.get(canonical) === i;
     }
 
     return true;
+  }).map((block) => {
+    if (!block.filename) return block;
+    const canonical = normalizeBuildFilePath(block.filename);
+    return canonical ? { ...block, filename: canonical } : block;
   });
 }
 
@@ -295,8 +330,8 @@ function getMissingBuildFiles(streamContent: string): string[] {
   const completedBlockRe = /```(?:\w+)?:([^\n]+)\n[\s\S]*?```/g;
   let m: RegExpExecArray | null;
   while ((m = completedBlockRe.exec(streamContent)) !== null) {
-    const filePath = m[1].trim().replace(/\s*\(generating\.\.\.\)\s*/i, '').trim();
-    if (filePath) generatedFiles.add(filePath);
+    const canonicalPath = normalizeBuildFilePath(m[1]);
+    if (canonicalPath) generatedFiles.add(canonicalPath);
   }
   return REQUIRED_BUILD_FILES.filter(f => !generatedFiles.has(f));
 }
@@ -551,6 +586,18 @@ export default function ChatInterface({
       `- src/js/components.js: Reusable UI component factory functions (Modal, Toast, Dropdown, DataTable, Chart, etc.)\n` +
       `- src/js/app.js: App bootstrap — imports modules, wires event listeners, initializes router, renders initial view\n\n` +
       `Required features for this ${typeLabel}:\n${features}\n\n` +
+      `Premium visual requirements (non-negotiable):\n` +
+      `- Background: #080810\n` +
+      `- Surface cards: rgba(255,255,255,0.03) with 1px rgba(255,255,255,0.08) borders\n` +
+      `- Accent color: #6366f1 for all primary actions/highlights\n` +
+      `- Gradient headline text: linear-gradient(135deg, #fff, #a5b4fc)\n` +
+      `- Dashboard sections must include sidebar + 4 KPI cards + chart + data table\n` +
+      `- Landing sections must include hero + 6 features + 3-tier pricing + testimonials\n` +
+      `- Use realistic, non-rounded demo values (e.g. 47,291 and 23.4%)\n\n` +
+      `File rules (strict):\n` +
+      `- Generate ONLY these 8 paths; do not create extra files\n` +
+      `- Do not regenerate completed files; only output missing files on continuation\n` +
+      `- No .gitkeep/.keep or placeholder files\n\n` +
       `Architecture requirements:\n` +
       `- All state changes go through state.js dispatch; no direct DOM mutation for data\n` +
       `- Router handles all view transitions; each route renders a complete view\n` +
@@ -572,12 +619,12 @@ export default function ChatInterface({
     const openFenceRe = /```[a-z]+:([^\n`]+)\n/gi;
     let match: RegExpExecArray | null;
     while ((match = openFenceRe.exec(content)) !== null) {
-      const raw = match[1].trim().replace(/\s*\(generating\.\.\.\)\s*/i, "").trim();
-      if (!raw) continue;
+      const canonical = normalizeBuildFilePath(match[1]);
+      if (!canonical) continue;
       const afterOpen = content.slice(match.index + match[0].length);
       const closingFence = /^`{3,}\s*$/m;
       const done = closingFence.test(afterOpen);
-      files.push({ filename: raw, done });
+      files.push({ filename: canonical, done });
     }
     // Deduplicate by filename, keeping last occurrence
     const seen = new Map<string, { filename: string; done: boolean }>();
@@ -869,18 +916,14 @@ export default function ChatInterface({
 
     // Extract named code blocks from the stream content
     const codeRegex = /```(\w+)?:([^\n]+)\n([\s\S]*?)```/g;
-    const files: { path: string; content: string }[] = [];
+    const fileMap = new Map<string, string>();
     let match: RegExpExecArray | null;
-    const seen = new Set<string>();
     while ((match = codeRegex.exec(streamContent)) !== null) {
-      const filePath = match[2].trim().replace(/\s*\(generating\.\.\.\)\s*/i, "").trim();
-      // Skip empty placeholder scaffold files
-      if (!filePath || filePath.endsWith(".gitkeep") || filePath.endsWith(".keep")) continue;
-      if (!seen.has(filePath)) {
-        seen.add(filePath);
-        files.push({ path: filePath, content: match[3].trim() });
-      }
+      const canonicalPath = normalizeBuildFilePath(match[2]);
+      if (!canonicalPath) continue;
+      fileMap.set(canonicalPath, match[3].trim());
     }
+    const files = [...fileMap.entries()].map(([path, content]) => ({ path, content }));
 
     if (files.length === 0) return;
 
@@ -1138,7 +1181,10 @@ export default function ChatInterface({
                   if (missingFiles.length > 0) {
                     buildContinuationCountRef.current += 1;
                     const continuationPrompt =
-                      `Continue building — output the remaining files right now with NO preamble or explanation. Start immediately with the first missing file's code block:\n` +
+                      `Continue building — output ONLY the remaining missing files right now with NO preamble or explanation. ` +
+                      `Do NOT rewrite completed files. Do NOT create extra files. Use only canonical paths. ` +
+                      `Preserve premium styling: #080810 background, #6366f1 accents, glass cards rgba(255,255,255,0.03) with rgba(255,255,255,0.08) border, and gradient headlines (#fff → #a5b4fc).\n\n` +
+                      `Start immediately with the first missing file's code block:\n` +
                       missingFiles.map(f => `- \`${f}\``).join('\n') +
                       `\n\nRules: complete, closed code block for every file listed. No "continuing..." text. Just code. After all files, call save_artifact with ALL generated files (including previously generated ones).`;
                     // Small delay lets React flush state updates (isStreaming, conversationId)

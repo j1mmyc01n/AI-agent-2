@@ -41,25 +41,56 @@ export async function POST(req: NextRequest) {
 
   try {
     const store = getStore("artifacts");
-    const artifactId = `art_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    const indexKey = `user:${userId}`;
+    const nowIso = new Date().toISOString();
+    const artifactTitle = title || "Untitled Project";
+    const existing = (await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] | null) || [];
+    const existingArr = Array.isArray(existing) ? existing : [];
+
+    // Reuse an existing artifact for the same project/title when possible.
+    let artifactId = "";
+    let updatedExisting = false;
+    const desiredProjectId = projectId || null;
+    for (const entry of existingArr.slice(0, 20)) {
+      if (entry.title !== artifactTitle) continue;
+      const candidate = await store.get(entry.id, { type: "json" }) as { projectId?: string | null; createdAt?: string } | null;
+      if (!candidate) continue;
+      if ((candidate.projectId ?? null) === desiredProjectId) {
+        artifactId = entry.id;
+        updatedExisting = true;
+        break;
+      }
+    }
+
+    if (!artifactId) {
+      artifactId = `art_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+    }
+
+    const existingArtifact = updatedExisting
+      ? await store.get(artifactId, { type: "json" }) as Record<string, unknown> | null
+      : null;
+
     const artifact = {
       id: artifactId,
       userId,
-      projectId: projectId || null,
-      title: title || "Untitled Project",
+      projectId: desiredProjectId,
+      title: artifactTitle,
       type: "code",
       files,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: (existingArtifact?.createdAt as string) || nowIso,
+      updatedAt: nowIso,
     };
 
     await store.setJSON(artifactId, artifact);
 
-    // Add to user's artifact index
-    const indexKey = `user:${userId}`;
-    const existing = await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] || [];
-    existing.unshift({ id: artifactId, title: artifact.title, fileCount: files.length, createdAt: artifact.createdAt });
-    await store.setJSON(indexKey, existing);
+    const existingIndexEntry = existingArr.find((e) => e.id === artifactId);
+    if (existingIndexEntry) {
+      existingIndexEntry.fileCount = files.length;
+      existingIndexEntry.title = artifactTitle;
+    } else {
+      existingArr.unshift({ id: artifactId, title: artifactTitle, fileCount: files.length, createdAt: artifact.createdAt });
+    }
+    await store.setJSON(indexKey, existingArr);
 
     return NextResponse.json({ id: artifactId, fileCount: files.length });
   } catch (error) {

@@ -491,6 +491,8 @@ const CANONICAL_BUILD_PATHS = new Set([
   "src/js/app.js",
 ]);
 
+const DUPLICATE_DETECTION_WINDOW_MS = 1000 * 60 * 60 * 6;
+
 async function executeToolCall(
   toolName: string,
   args: Record<string, unknown>,
@@ -600,25 +602,47 @@ async function executeToolCall(
       try {
         const store = getStore("artifacts");
         const indexKey = `user:${config.userId}`;
+        let artifactIdToUpdate = existingArtifactId;
 
-        if (existingArtifactId) {
+        // If no artifact_id was provided, try reusing an existing artifact for this
+        // project/title to prevent duplicate artifacts from retries/continuations.
+        if (!artifactIdToUpdate) {
+          try {
+            const indexArr = (await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] | null) || [];
+            const desiredProjectId = artifactProjectId || config.projectContext?.currentProjectId || null;
+            for (const idxEntry of indexArr.slice(0, 20)) {
+              if (idxEntry.title !== title) continue;
+              const candidate = await store.get(idxEntry.id, { type: "json" }) as { projectId?: string | null } | null;
+              if (!candidate) continue;
+              const candidateProjectId = candidate.projectId ?? null;
+              if ((desiredProjectId && candidateProjectId === desiredProjectId) || (!desiredProjectId && candidateProjectId === null)) {
+                artifactIdToUpdate = idxEntry.id;
+                break;
+              }
+            }
+          } catch (reuseErr) {
+            console.warn("save_artifact: failed to find reusable artifact, creating new one:", reuseErr);
+          }
+        }
+
+        if (artifactIdToUpdate) {
           // Upsert: update existing artifact with new file list (save-as-you-go)
           try {
-            const existing = await store.get(existingArtifactId, { type: "json" }) as Record<string, unknown> | null;
+            const existing = await store.get(artifactIdToUpdate, { type: "json" }) as Record<string, unknown> | null;
             if (existing) {
               const updated = {
                 ...existing,
                 files,
                 updatedAt: new Date().toISOString(),
               };
-              await store.setJSON(existingArtifactId, updated);
+              await store.setJSON(artifactIdToUpdate, updated);
               // Update file count in index
               const indexArr = (await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] | null) || [];
-              const entry = indexArr.find(e => e.id === existingArtifactId);
+              const entry = indexArr.find(e => e.id === artifactIdToUpdate);
               if (entry) entry.fileCount = files.length;
               await store.setJSON(indexKey, indexArr);
               const fileList = files.map(f => `  - ${f.path}`).join("\n");
-              return `Updated artifact "${title}" (ID: ${existingArtifactId}) with ${files.length} file(s):\n${fileList}${completionTag}${missingHint}\n\nKeep using artifact_id: ${existingArtifactId} for subsequent saves.`;
+              return `Updated artifact "${title}" (ID: ${artifactIdToUpdate}) with ${files.length} file(s):\n${fileList}${completionTag}${missingHint}\n\nKeep using artifact_id: ${artifactIdToUpdate} for subsequent saves.`;
             }
           } catch (upsertErr) {
             console.error("Failed to update existing artifact, will create new one:", upsertErr);
@@ -659,6 +683,10 @@ async function executeToolCall(
 
     case "create_project_record": {
       const projectName = args.name as string;
+      if (config.projectContext?.currentProjectId) {
+        return `Project '${projectName}' is already linked to this chat (ID: ${config.projectContext.currentProjectId}). Skipping duplicate project record creation.`;
+      }
+
       const projectData = {
         name: projectName,
         description: args.description as string,
@@ -672,6 +700,20 @@ async function executeToolCall(
       // Try database first
       if (getDatabaseUrl()) {
         try {
+          const duplicateWindowStart = new Date(Date.now() - DUPLICATE_DETECTION_WINDOW_MS);
+          const existingProject = await db.project.findFirst({
+            where: {
+              userId: config.userId,
+              name: projectData.name,
+              type: projectData.type,
+              updatedAt: { gte: duplicateWindowStart },
+            },
+            orderBy: { updatedAt: "desc" },
+          });
+          if (existingProject) {
+            return `Project '${existingProject.name}' already exists (ID: ${existingProject.id}). Reusing existing project record to avoid duplicates.`;
+          }
+
           const project = await db.project.create({ data: projectData });
           return `Project '${project.name}' has been saved to your dashboard with ID: ${project.id}`;
         } catch (error) {
@@ -683,6 +725,18 @@ async function executeToolCall(
       // Fallback to Netlify Blobs
       try {
         const store = getStore("projects");
+        const duplicateWindowStart = Date.now() - DUPLICATE_DETECTION_WINDOW_MS;
+        const existing = await store.get(`user:${config.userId}`, { type: "json" }) as Array<{ id: string; name: string; type: string; updatedAt?: string }> | null;
+        const existingArr = Array.isArray(existing) ? existing : [];
+        const matching = existingArr.find((p) =>
+          p.name === projectName &&
+          p.type === projectData.type &&
+          (!!p.updatedAt && Date.parse(p.updatedAt) >= duplicateWindowStart)
+        );
+        if (matching) {
+          return `Project '${projectName}' already exists (ID: ${matching.id}). Reusing existing project record to avoid duplicates.`;
+        }
+
         const newProject = {
           id: `proj_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
           ...projectData,
@@ -692,9 +746,8 @@ async function executeToolCall(
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
-        const existing = await store.get(`user:${config.userId}`, { type: "json" }) as unknown[] || [];
-        (existing as unknown[]).unshift(newProject);
-        await store.setJSON(`user:${config.userId}`, existing);
+        existingArr.unshift(newProject);
+        await store.setJSON(`user:${config.userId}`, existingArr);
         return `Project '${projectName}' has been saved to your dashboard with ID: ${newProject.id}`;
       } catch (error) {
         console.error("Failed to create project in Blobs:", error);
