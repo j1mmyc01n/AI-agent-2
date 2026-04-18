@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     const indexKey = `user:${userId}`;
     const nowIso = new Date().toISOString();
     const artifactTitle = title || "Untitled Project";
-    const existing = await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] || [];
+    const existing = (await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] | null) || [];
     const existingArr = Array.isArray(existing) ? existing : [];
 
     // Reuse an existing artifact for the same project/title when possible.

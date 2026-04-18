@@ -1182,7 +1182,8 @@ export default function ChatInterface({
                     buildContinuationCountRef.current += 1;
                     const continuationPrompt =
                       `Continue building — output ONLY the remaining missing files right now with NO preamble or explanation. ` +
-                      `Do NOT rewrite completed files. Do NOT create extra files. Use only canonical paths and preserve the premium dark startup design requirements.\n\n` +
+                      `Do NOT rewrite completed files. Do NOT create extra files. Use only canonical paths. ` +
+                      `Preserve premium styling: #080810 background, #6366f1 accents, glass cards rgba(255,255,255,0.03) with rgba(255,255,255,0.08) border, and gradient headlines (#fff → #a5b4fc).\n\n` +
                       `Start immediately with the first missing file's code block:\n` +
                       missingFiles.map(f => `- \`${f}\``).join('\n') +
                       `\n\nRules: complete, closed code block for every file listed. No "continuing..." text. Just code. After all files, call save_artifact with ALL generated files (including previously generated ones).`;

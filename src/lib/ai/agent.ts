@@ -491,6 +491,8 @@ const CANONICAL_BUILD_PATHS = new Set([
   "src/js/app.js",
 ]);
 
+const DUPLICATE_DETECTION_WINDOW_MS = 1000 * 60 * 60 * 6;
+
 async function executeToolCall(
   toolName: string,
   args: Record<string, unknown>,
@@ -606,7 +608,7 @@ async function executeToolCall(
         // project/title to prevent duplicate artifacts from retries/continuations.
         if (!artifactIdToUpdate) {
           try {
-            const indexArr = (await store.get(indexKey, { type: "json" }) as { id: string; title: string }[] | null) || [];
+            const indexArr = (await store.get(indexKey, { type: "json" }) as { id: string; title: string; fileCount: number; createdAt: string }[] | null) || [];
             const desiredProjectId = artifactProjectId || config.projectContext?.currentProjectId || null;
             for (const idxEntry of indexArr.slice(0, 20)) {
               if (idxEntry.title !== title) continue;
@@ -698,7 +700,7 @@ async function executeToolCall(
       // Try database first
       if (getDatabaseUrl()) {
         try {
-          const duplicateWindowStart = new Date(Date.now() - 1000 * 60 * 60 * 6);
+          const duplicateWindowStart = new Date(Date.now() - DUPLICATE_DETECTION_WINDOW_MS);
           const existingProject = await db.project.findFirst({
             where: {
               userId: config.userId,
@@ -723,7 +725,7 @@ async function executeToolCall(
       // Fallback to Netlify Blobs
       try {
         const store = getStore("projects");
-        const duplicateWindowStart = Date.now() - 1000 * 60 * 60 * 6;
+        const duplicateWindowStart = Date.now() - DUPLICATE_DETECTION_WINDOW_MS;
         const existing = await store.get(`user:${config.userId}`, { type: "json" }) as Array<{ id: string; name: string; type: string; updatedAt?: string }> | null;
         const existingArr = Array.isArray(existing) ? existing : [];
         const matching = existingArr.find((p) =>
