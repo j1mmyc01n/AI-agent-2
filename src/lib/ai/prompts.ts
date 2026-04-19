@@ -11,7 +11,8 @@ export function buildSystemPrompt(context?: {
   hasDatabase?: boolean;
   hasAnthropicKey?: boolean;
   hasOpenaiKey?: boolean;
-  isNetlifyGateway?: boolean;
+  isNetlifyGateway?: boolean; // legacy — kept for backward compat
+  isEnvKey?: boolean;         // true when key comes from deployment env var, not user's own key
   mode?: "chat" | "build" | "saas-upgrade";
 }): string {
   let prompt = SYSTEM_PROMPT;
@@ -34,15 +35,15 @@ export function buildSystemPrompt(context?: {
   const hasDatabase = context?.hasDatabase ?? false;
   const hasAnthropicKey = context?.hasAnthropicKey ?? false;
   const hasOpenaiKey = context?.hasOpenaiKey ?? false;
-  const isNetlifyGateway = context?.isNetlifyGateway ?? false;
+  const isEnvKey = context?.isNetlifyGateway ?? context?.isEnvKey ?? false;
 
   prompt += "\n\n## Platform Integration Status\n";
   prompt += "The following integrations are currently connected on this platform:\n";
 
   // AI providers
   if (hasAnthropicKey) {
-    prompt += isNetlifyGateway
-      ? "\n- **Anthropic (Claude)**: ✅ Connected via Netlify AI Gateway (auto-provided, no user key needed)"
+    prompt += isEnvKey
+      ? "\n- **Anthropic (Claude)**: ✅ Connected (deployment env var key)"
       : "\n- **Anthropic (Claude)**: ✅ Connected (user API key)";
   } else {
     prompt += "\n- **Anthropic (Claude)**: ❌ Not connected — no API key set";

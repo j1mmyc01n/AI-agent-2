@@ -399,8 +399,7 @@ export default function ConnectivityPage() {
           </div>
 
           <p className="text-xs text-muted-foreground text-center mt-8">
-            Keys are encrypted and stored securely. AI works without keys via
-            Netlify AI Gateway.
+            Keys are encrypted and stored securely per user account.
           </p>
         </div>
       </div>

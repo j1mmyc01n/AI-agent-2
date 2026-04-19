@@ -61,18 +61,17 @@ function toAnthropicTools(): Anthropic.Tool[] {
 }
 
 /**
- * Detect available AI provider based on environment variables.
- * Netlify AI Gateway auto-injects ANTHROPIC_API_KEY/ANTHROPIC_BASE_URL
- * and OPENAI_API_KEY/OPENAI_BASE_URL — no user API keys required.
+ * Detect available AI provider based on config keys and environment variables.
+ * User-provided keys take priority; env vars serve as a deployment-level fallback.
  */
 function detectAvailableProvider(config: AgentConfig): { provider: AIProvider; apiKey?: string; baseURL?: string } | null {
-  // Check Anthropic (preferred - available via Netlify AI Gateway)
+  // Check Anthropic (preferred)
   const anthropicKey = config.anthropicKey || process.env.ANTHROPIC_API_KEY;
   if (anthropicKey) {
     return { provider: "anthropic", apiKey: anthropicKey, baseURL: process.env.ANTHROPIC_BASE_URL };
   }
 
-  // Check OpenAI (also available via Netlify AI Gateway)
+  // Check OpenAI
   const openaiKey = config.openaiKey || process.env.OPENAI_API_KEY;
   if (openaiKey) {
     return { provider: "openai", apiKey: openaiKey, baseURL: process.env.OPENAI_BASE_URL };
@@ -90,13 +89,12 @@ async function runOpenAIAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use user's own API key directly when provided (bypasses Netlify AI Gateway = cheaper).
-  // Fall back to zero-config gateway constructor when only env vars are present.
+  // Use user's own API key directly when provided; fall back to env-var key if available.
   const envKey = process.env.OPENAI_API_KEY;
   const envBase = process.env.OPENAI_BASE_URL;
   const hasUserKey = !!config.openaiKey && config.openaiKey !== envKey;
-  const useGateway = !hasUserKey && !!(envKey && envBase);
-  const openai = useGateway
+  const useEnvBase = !hasUserKey && !!(envKey && envBase);
+  const openai = useEnvBase
     ? new OpenAI()
     : new OpenAI({ apiKey: hasUserKey ? config.openaiKey : apiKey, ...(hasUserKey ? {} : baseURL ? { baseURL } : {}) });
 
@@ -255,17 +253,16 @@ async function runAnthropicAgent(
   apiKey: string,
   baseURL?: string
 ): Promise<string> {
-  // Use user's own API key directly when provided (bypasses Netlify AI Gateway = cheaper).
-  // Fall back to zero-config gateway constructor when only env vars are present.
+  // Use user's own API key directly when provided; fall back to env-var key if available.
   const envKey = process.env.ANTHROPIC_API_KEY;
   const envBase = process.env.ANTHROPIC_BASE_URL;
   const hasUserKey = !!config.anthropicKey && config.anthropicKey !== envKey;
-  const useGateway = !hasUserKey && !!(envKey && envBase);
-  const anthropic = useGateway
+  const useEnvBase = !hasUserKey && !!(envKey && envBase);
+  const anthropic = useEnvBase
     ? new Anthropic()
     : new Anthropic({ apiKey: hasUserKey ? config.anthropicKey : apiKey, ...(hasUserKey ? {} : baseURL ? { baseURL } : {}) });
 
-  const model = config.model || "claude-haiku-4-5-20251001";
+  const model = config.model || "claude-sonnet-4-5-20250514";
   const anthropicTools = toAnthropicTools();
 
   const systemPrompt = buildSystemPrompt(config.projectContext);
@@ -473,8 +470,7 @@ export async function runAgent(
   }
 
   throw new Error(
-    "No AI provider available. Netlify AI Gateway provides Claude and GPT automatically — no API keys needed. " +
-    "If this error persists, the site may need a production deploy to activate AI Gateway."
+    "No AI provider configured. Please add your Anthropic or OpenAI API key in Settings → Integrations."
   );
 }
 

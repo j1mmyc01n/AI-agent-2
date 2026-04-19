@@ -46,7 +46,7 @@ const SETUP_STEPS: SetupStep[] = [
     title: "Connect Claude AI",
     service: "Anthropic (Claude)",
     icon: <Cpu className="h-6 w-6" />,
-    description: "Powers the AI agent with Claude models. Also available through Netlify AI Gateway — you can skip this if you don't have a key.",
+    description: "Powers the AI agent with Claude models. Add your own API key for dedicated access.",
     keyField: "anthropicKey",
     placeholder: "sk-ant-...",
     helpUrl: "https://console.anthropic.com/settings/keys",

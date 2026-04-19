@@ -47,7 +47,7 @@ export const AI_PROVIDERS: { id: AIProvider; name: string; icon: React.ReactNode
   },
 ];
 
-export const DEFAULT_MODEL: AIModel = AI_PROVIDERS[0].models[0];
+export const DEFAULT_MODEL: AIModel = AI_PROVIDERS[0].models[1]; // Claude Sonnet 4.5
 
 interface ModelSelectorProps {
   selectedModel: AIModel;

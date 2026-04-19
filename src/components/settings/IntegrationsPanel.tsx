@@ -49,6 +49,8 @@ interface IntegrationStatus {
   defaultProvider: string | null;
   gatewayAnthropic?: boolean;
   gatewayOpenai?: boolean;
+  envAnthropic?: boolean;
+  envOpenai?: boolean;
 }
 
 type StatusKey = keyof Pick<
@@ -104,7 +106,7 @@ const integrations: Integration[] = [
   {
     id: "anthropicKey",
     title: "Anthropic (Claude)",
-    description: "Powers Claude Sonnet 4.5, Claude Haiku and more. Also available via Netlify AI Gateway.",
+    description: "Powers Claude Sonnet 4.5, Claude Haiku and more. Add your own key for full control.",
     icon: <Cpu className="h-5 w-5" />,
     placeholder: "sk-ant-...",
     helpUrl: "https://console.anthropic.com/settings/keys",
@@ -360,16 +362,16 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
 
   return (
     <div className="space-y-6">
-      {/* Netlify AI Gateway notice */}
-      {(status?.gatewayAnthropic || status?.gatewayOpenai) && (
+      {/* Env-key notice — shown when keys come from deployment env vars rather than user's own keys */}
+      {(status?.gatewayAnthropic || status?.gatewayOpenai || status?.envAnthropic || status?.envOpenai) && (
         <div className="flex items-start gap-2.5 rounded-lg border border-blue-500/20 bg-blue-500/5 px-3 py-2.5">
           <CheckCircle2 className="h-4 w-4 text-blue-400 mt-0.5 shrink-0" />
           <p className="text-xs text-blue-300">
-            <span className="font-semibold">Netlify AI Gateway detected.</span>{" "}
-            {status?.gatewayAnthropic && "Anthropic (Claude) "}
-            {status?.gatewayAnthropic && status?.gatewayOpenai && "and "}
-            {status?.gatewayOpenai && "OpenAI "}
-            {(status?.gatewayAnthropic || status?.gatewayOpenai) && "are available automatically — no API key needed."}
+            <span className="font-semibold">Deployment-level API key detected.</span>{" "}
+            {(status?.gatewayAnthropic || status?.envAnthropic) && "Anthropic (Claude) "}
+            {(status?.gatewayAnthropic || status?.envAnthropic) && (status?.gatewayOpenai || status?.envOpenai) && "and "}
+            {(status?.gatewayOpenai || status?.envOpenai) && "OpenAI "}
+            {((status?.gatewayAnthropic || status?.envAnthropic) || (status?.gatewayOpenai || status?.envOpenai)) && "are available via deployment env vars. Add your own key above for dedicated access."}
           </p>
         </div>
       )}
@@ -391,9 +393,9 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
         {filteredIntegrations.map((integration) => {
           const isConnected = status?.[integration.statusKey] || false;
           const isDefault = status?.defaultProvider === integration.defaultProvider && !!integration.defaultProvider;
-          const isGateway =
-            (integration.id === "anthropicKey" && status?.gatewayAnthropic) ||
-            (integration.id === "openaiKey" && status?.gatewayOpenai);
+          const isEnvKey =
+            (integration.id === "anthropicKey" && (status?.gatewayAnthropic || status?.envAnthropic)) ||
+            (integration.id === "openaiKey" && (status?.gatewayOpenai || status?.envOpenai));
           return (
             <Card key={integration.id} className={isDefault ? "ring-2 ring-primary/30" : ""}>
               <CardHeader className="pb-3">
@@ -417,12 +419,12 @@ export default function IntegrationsPanel({ filter }: IntegrationsPanelProps) {
                   </div>
                   <Badge
                     variant={isConnected ? "default" : "outline"}
-                    className={isConnected ? (isGateway ? "bg-blue-500" : "bg-green-500") : ""}
+                    className={isConnected ? (isEnvKey ? "bg-blue-500" : "bg-green-500") : ""}
                   >
                     {isConnected ? (
                       <>
                         <CheckCircle2 className="h-3 w-3 mr-1" />
-                        {isGateway ? "Via Gateway" : "Connected"}
+                        {isEnvKey ? "Env Key" : "Connected"}
                       </>
                     ) : (
                       "Not set"
