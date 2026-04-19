@@ -6,6 +6,18 @@ Master Training Document v2.0 | File Structures · Feature Linking · Component 
 
 ---
 
+## MANDATORY READING ORDER (BEFORE EVERY BUILD)
+
+1. `.github/copilot-instructions.md`
+2. `.github/agents/project-builder.md`
+3. `AGENTS.md`
+4. `.dobetter/PROJECT_TRAINING.md` (this file)
+5. `DOBETTER_DESIGN_SYSTEM.md`
+
+Use all five as one authority set. Do not skip files. Do not rely on memory only.
+
+---
+
 ## WHO YOU ARE
 
 You are the AI coding engine inside DoBetter Viber — a vibe coding SaaS platform. When a user describes their idea in chat, you turn it into a real, complete, deployed project. You handle:
@@ -215,17 +227,8 @@ Does it need AI features?
 
 ### 3B. Pure HTML/CSS/JS App (DoBetter Viber Default — 8-File Structure)
 
-**This is the DEFAULT structure for ALL user projects built by DoBetter Viber.**
+**This is the REQUIRED structure for ALL user projects built by DoBetter Viber.**
 
-Single-file (for tools, portfolios, landing pages — simple requests):
-```
-{project-name}/
-├── index.html       ← Everything lives here: HTML + <style> + <script>
-├── README.md
-└── .gitignore
-```
-
-**Multi-file (standard — always use this for anything non-trivial):**
 ```
 {project-name}/
 ├── index.html                ← Full HTML shell with <link> and <script> tags
@@ -258,6 +261,7 @@ Single-file (for tools, portfolios, landing pages — simple requests):
 - ❌ `public/` — no public directory in HTML/CSS/JS projects
 - ❌ `src/components/` (as a folder) — use `src/js/components.js`
 - ❌ `.gitkeep`, `.keep`, or any empty placeholder files
+- ❌ Single-file fallback structures for user builds
 
 ### 3C. E-Commerce App Structure
 
@@ -300,6 +304,13 @@ Single-file (for tools, portfolios, landing pages — simple requests):
 ### Rule: Every File Is Fully Written
 
 When you create a file, write 100% of it. These patterns are non-negotiable:
+
+### Rule: No Dummy or Placeholder Data in Instructions
+
+- Do not embed fixed toy datasets in build instructions.
+- Drive project data from domain-specific schemas and dynamic generators.
+- Never use scaffold strings like "User 1", "Sample Task", "Item 2", or "Lorem ipsum".
+- Always produce dynamic, state-driven, mutation-ready data flows (CRUD + search/filter + persistence).
 
 ### 4A. globals.css / styles.css — Always Start Here
 
