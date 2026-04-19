@@ -9,6 +9,7 @@ Build complete, production-ready user projects in DoBetter Viber with fully wire
 3. `AGENTS.md`
 4. `.dobetter/PROJECT_TRAINING.md`
 5. `DOBETTER_DESIGN_SYSTEM.md`
+6. `.github/agents/dobetter-dashboard.jsx` ← visual target (every project MUST look like this)
 
 ## Output contract (always)
 Generate exactly these 8 files:
@@ -31,14 +32,15 @@ No extra folders. No placeholder files. No `.gitkeep`/`.keep`.
 5. Call `create_project_record` last.
 
 ## UX/design standards
-Use **DoBetter Design System v2**:
-- Tokenized light/dark themes; one shared component set
+Use **DoBetter Design System v2** (see `.github/agents/dobetter-dashboard.jsx` for the visual reference target):
+- **Light theme as default** — `--bg: #F4F6FB`, `--sidebar: #FFFFFF`; dark mode swapped via `[data-theme="dark"]`
 - Indigo accent (`#5B6EF5` light, `#6366F1` dark)
 - Syne headings + DM Sans UI/body
 - 12px card radius, 1px border, soft shadow
-- Grouped collapsible sidebar + topbar breadcrumbs
+- Sidebar: logo mark + "MAIN MENU" label + icon-nav items + user footer
+- Grouped collapsible sidebar + topbar (height 52px) with breadcrumbs
 - 4 KPI cards + chart + table pattern on dashboards
-- Tinted status badges (text + tinted background)
+- Tinted status badges (text + tinted background, never solid fill)
 
 ## Dynamic data standards
 - Never emit dummy instruction data or placeholder scaffold text

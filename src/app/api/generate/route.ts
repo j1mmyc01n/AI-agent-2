@@ -260,7 +260,7 @@ export async function POST(req: NextRequest) {
   const openaiKey = userKeys.openaiKey ?? process.env.OPENAI_API_KEY;
   const anthropicKey = userKeys.anthropicKey ?? process.env.ANTHROPIC_API_KEY;
 
-  // Auto-detect provider: prefer Anthropic (always available via Netlify AI Gateway)
+  // Auto-detect provider: prefer Anthropic, fall back to OpenAI
   // Sanitize provider to only allowed values
   const safeProvider = provider === "openai" ? "openai" : "anthropic";
   let activeProvider: "openai" | "anthropic" = safeProvider === "anthropic" && anthropicKey ? "anthropic"

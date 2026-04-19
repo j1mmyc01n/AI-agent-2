@@ -501,7 +501,8 @@ export default function ChatInterface({
         }
 
         if (data.hasAnthropicKey) {
-          setSelectedModel(AI_PROVIDERS.find(p => p.id === "anthropic")!.models[0]);
+          // Default to Sonnet (index 1) — more capable than Haiku for project builds
+          setSelectedModel(AI_PROVIDERS.find(p => p.id === "anthropic")!.models[1]);
         } else if (data.hasOpenaiKey) {
           setSelectedModel(AI_PROVIDERS.find(p => p.id === "openai")!.models[0]);
         }
@@ -586,14 +587,15 @@ export default function ChatInterface({
       `- src/js/components.js: Reusable UI component factory functions (Modal, Toast, Dropdown, DataTable, Chart, etc.)\n` +
       `- src/js/app.js: App bootstrap — imports modules, wires event listeners, initializes router, renders initial view\n\n` +
       `Required features for this ${typeLabel}:\n${features}\n\n` +
-      `Premium visual requirements (non-negotiable):\n` +
-      `- Background: #080810\n` +
-      `- Surface cards: rgba(255,255,255,0.03) with 1px rgba(255,255,255,0.08) borders\n` +
-      `- Accent color: #6366f1 for all primary actions/highlights\n` +
-      `- Gradient headline text: linear-gradient(135deg, #fff, #a5b4fc)\n` +
-      `- Dashboard sections must include sidebar + 4 KPI cards + chart + data table\n` +
+      `Premium visual requirements (DoBetter Design System v2 — non-negotiable):\n` +
+      `- Background: #F4F6FB (--bg), Sidebar: #FFFFFF (--sidebar)\n` +
+      `- Accent color: #5B6EF5 for all primary actions/highlights\n` +
+      `- Card radius: 12px, 1px border, soft box-shadow — no heavy shadows, no pill cards\n` +
+      `- Sidebar structure: logo block + "MAIN MENU" section label + icon nav items + user footer\n` +
+      `- Dashboard sections must include sidebar + 4 KPI stat cards (Syne value, trend arrow, sparkline) + SVG chart + data table\n` +
       `- Landing sections must include hero + 6 features + 3-tier pricing + testimonials\n` +
-      `- Use realistic, non-rounded demo values (e.g. 47,291 and 23.4%)\n\n` +
+      `- Typography: Syne (700–900) for headings/KPI values, DM Sans (400–700) for body/UI\n` +
+      `- Use realistic, non-rounded demo values (e.g. 47,291 and $2,847.63)\n\n` +
       `File rules (strict):\n` +
       `- Generate ONLY these 8 paths; do not create extra files\n` +
       `- Do not regenerate completed files; only output missing files on continuation\n` +
@@ -607,7 +609,7 @@ export default function ChatInterface({
       `- Loading skeletons for async operations\n` +
       `- Keyboard navigation (Escape to close modals, arrow keys for lists)\n` +
       `- Responsive layout with mobile-first breakpoints\n\n` +
-      `Use the dark premium color system (--color-surface, --color-accent tokens), Tailwind CDN for utility classes, ` +
+      `Use the DoBetter Design System v2 light tokens (--bg: #F4F6FB, --sidebar: #FFFFFF, accent: #5B6EF5), Tailwind CDN for utility classes, ` +
       `and function declarations throughout. Make it fully functional with working navigation, forms, and interactions. ` +
       `After generating all files, call save_artifact with the full folder paths and create_project_record with type="${type ?? "saas"}".`
     );

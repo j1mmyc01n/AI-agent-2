@@ -161,7 +161,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Resolve API keys - Netlify AI Gateway auto-injects these env vars, no user keys needed
+    // Resolve API keys — user-provided keys take priority; env vars are a deployment-level fallback
     const openaiKey = user?.openaiKey || process.env.OPENAI_API_KEY;
     const anthropicKey = user?.anthropicKey || process.env.ANTHROPIC_API_KEY;
 
@@ -173,10 +173,10 @@ export async function POST(req: NextRequest) {
       activeProvider = openaiKey ? "openai" : "anthropic";
     }
 
-    // Netlify AI Gateway provides keys automatically - only error if truly nothing available
+    // Require at least one AI provider key
     if (!openaiKey && !anthropicKey) {
       return NextResponse.json(
-        { error: "No AI provider available. Netlify AI Gateway should provide Claude and GPT automatically. If this persists, the site may need a production deploy to activate AI Gateway." },
+        { error: "No AI provider configured. Please add your Anthropic or OpenAI API key in Settings → Integrations." },
         { status: 400 }
       );
     }
@@ -298,8 +298,8 @@ export async function POST(req: NextRequest) {
       hasDatabase: hasDb,
       hasAnthropicKey: !!anthropicKey,
       hasOpenaiKey: !!openaiKey,
-      // Netlify AI Gateway auto-injects env keys — flag if gateway is providing the key (not the user)
-      isNetlifyGateway: !user?.anthropicKey && !!process.env.ANTHROPIC_API_KEY,
+      // True when the key comes from env var (deploy-level) rather than user's own key
+      isEnvKey: !user?.anthropicKey && !!process.env.ANTHROPIC_API_KEY,
       mode: mode || "chat",
     };
 

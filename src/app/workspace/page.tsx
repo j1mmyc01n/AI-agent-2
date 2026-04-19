@@ -149,7 +149,7 @@ export default async function WorkspacePage() {
     }
   }
 
-  // Check Netlify AI Gateway env keys too (auto-provided, count as connected)
+  // Check available AI keys (user-provided or deployment env vars)
   const hasAnthropicConnected = !!(user?.anthropicKey || process.env.ANTHROPIC_API_KEY);
   const hasOpenaiConnected = !!(user?.openaiKey || process.env.OPENAI_API_KEY);
 
@@ -193,7 +193,7 @@ export default async function WorkspacePage() {
                     <CardDescription className="text-xs sm:text-sm">
                       Data is stored in Netlify Blobs. Set <code className="bg-muted px-1 rounded text-xs">DATABASE_URL</code> (Neon PostgreSQL) in your Netlify environment variables to enable full persistence across devices and sessions.{" "}
                       {hasAnthropicConnected && (
-                        <span className="text-green-400">✓ AI is powered by Netlify AI Gateway — no API keys needed.</span>
+                        <span className="text-green-400">✓ AI provider is configured and ready.</span>
                       )}
                     </CardDescription>
                   </div>

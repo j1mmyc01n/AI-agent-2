@@ -1,9 +1,26 @@
 # DOBETTER DESIGN SYSTEM
 
-Version: 2.0.0  
+Version: 2.1.0  
 Last Updated: 2026-04-19
 
 This is the canonical DoBetter Viber UX/design authority for generated projects.
+
+## Visual reference target
+**Every generated project MUST visually match `.github/agents/dobetter-dashboard.jsx`.**
+That file is a fully annotated JSX component showing the exact layout, color tokens,
+typography, card structure, sidebar, topbar, KPI cards, charts, and data table that
+all build-mode HTML/CSS/JS projects must replicate.
+
+Key design goals from the reference:
+- **Light theme by default** — white sidebar (#FFFFFF), light gray background (#F4F6FB)
+- Sidebar: "DB" logo mark + "DoBetter" Syne wordmark + hamburger + "MAIN MENU" section label
+- Sidebar nav items: icon + label, active item has indigo tint background + indigo text
+- Sidebar footer: user avatar circle + name + role
+- Topbar: page title (Syne 700) + greeting + breadcrumb trail + search icon
+- KPI row: 4 cards, each with UPPERCASE label + Syne value + trend arrow + sparkline
+- Charts: SVG bar chart or line graph (no external libraries)
+- Data table: compact uppercase headers + subtle row borders + badge status cells
+- Badges: tinted background + colored text — NEVER solid fills
 
 ## Mandatory build protocol
 Before generating any project, read in order:
@@ -12,14 +29,16 @@ Before generating any project, read in order:
 3. `AGENTS.md`
 4. `.dobetter/PROJECT_TRAINING.md`
 5. `DOBETTER_DESIGN_SYSTEM.md`
+6. `.github/agents/dobetter-dashboard.jsx` ← visual target reference
 
 ## Design philosophy
-- Clean, information-dense, modern interfaces
+- Clean, information-dense, modern interfaces — matches the dobetter-dashboard reference
+- **Light theme as default** (`--bg: #F4F6FB`, `--sidebar: #FFFFFF`); dark mode via `[data-theme="dark"]` token swap
 - 12px card radius; never pill-shaped cards
 - 1px card borders + soft shadows; avoid heavy shadows
-- Single accent family (indigo) with semantic status colors
+- Single accent family (indigo `#5B6EF5`) with semantic status colors
 - One component set with tokenized light/dark themes
-- Grouped collapsible sidebar navigation
+- Grouped collapsible sidebar navigation with "MAIN MENU" section label
 - Topbar breadcrumbs reflecting current route path
 
 ## Color tokens
@@ -94,6 +113,32 @@ Apply the matching template spec for:
 5. Booking App
 6. Static/Landing
 7. PWA/Mobile-first
+
+## Sidebar structure (required)
+Every generated dashboard sidebar MUST include:
+1. **Logo block** — icon mark (32–36px, indigo bg, white Syne initials) + wordmark (Syne 700/800)
+2. **Section label** — `MAIN MENU` (10px, 700, uppercase, tracked, `--sub` color)
+3. **Nav items** — icon + label, `data-nav-item` attribute, `onclick="navigate('#hash')"`
+   - Active item: `background: var(--al)`, `color: var(--accent)`, `font-weight: 600`
+   - Inactive: transparent background, `color: var(--text)`
+   - Hover: `background: var(--bg)`
+4. **User footer** — avatar circle (Syne initials, `--accent` background) + name + role
+
+Canonical sidebar sections (adapt labels per domain):
+- **MAIN MENU**: Dashboard, Analytics, [primary domain feature 1], [primary domain feature 2]
+- **MANAGEMENT**: [entity list], Users, Calendar, Messages
+- **SYSTEM**: Settings
+
+## HTML shell pattern
+```html
+<div id="app" style="display:flex;height:100vh;overflow:hidden;">
+  <aside id="sidebar" style="width:230px;min-height:100vh;..."></aside>
+  <div id="main-wrapper" style="flex:1;display:flex;flex-direction:column;min-width:0;">
+    <header id="topbar" style="height:52px;..."></header>
+    <main id="main-content" style="flex:1;overflow-y:auto;padding:24px;..."></main>
+  </div>
+</div>
+```
 
 ## Data/content rules
 - Do not use dummy/placeholder scaffold content in generated instructions

@@ -59,14 +59,14 @@ function buildResponse(userKeys: Record<string, string | null>) {
     result[key] = maskSecret(userVal);
     result[STATUS_KEY_MAP[key]] = !!userVal;
   }
-  // Also check env vars (Netlify AI Gateway auto-injects these)
+  // Also check env vars — deployment-level fallback keys (not user-specific)
   if (!result.hasAnthropicKey && process.env.ANTHROPIC_API_KEY) {
     result.hasAnthropicKey = true;
-    result.gatewayAnthropic = true;
+    result.envAnthropic = true; // key is from env, not user's own
   }
   if (!result.hasOpenaiKey && process.env.OPENAI_API_KEY) {
     result.hasOpenaiKey = true;
-    result.gatewayOpenai = true;
+    result.envOpenai = true; // key is from env, not user's own
   }
   // Include user preferences
   result.defaultModel = userKeys.defaultModel || null;
