@@ -287,7 +287,7 @@ export default function MessageInput({
         )}
 
         <p className="text-[10px] text-muted-foreground/60 text-center mt-1">
-          DoBetter Viber uses your own API keys. Keys are stored securely and never shared.
+          DoBetter Viber uses API keys from your account or deployment environment. Keys are stored securely and never shared.
         </p>
       </div>
     </div>

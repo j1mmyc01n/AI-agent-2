@@ -798,7 +798,7 @@ tailwind.config = {
       colors: {
         accent: {
           DEFAULT: '#5B6EF5',
-          dark: '#6366F1',
+          darkMode: '#6366F1',  // accent for dark-mode swap
           muted: 'rgba(91,110,245,0.12)',
           light: '#EEF0FE',
         },

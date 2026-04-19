@@ -47,10 +47,14 @@ interface IntegrationStatus {
   netlifyToken: string | null;
   defaultModel: string | null;
   defaultProvider: string | null;
-  gatewayAnthropic?: boolean;
-  gatewayOpenai?: boolean;
+  /** true when Anthropic key is detected from deployment env var rather than user's own key */
   envAnthropic?: boolean;
+  /** true when OpenAI key is detected from deployment env var rather than user's own key */
   envOpenai?: boolean;
+  /** @deprecated use envAnthropic */
+  gatewayAnthropic?: boolean;
+  /** @deprecated use envOpenai */
+  gatewayOpenai?: boolean;
 }
 
 type StatusKey = keyof Pick<
