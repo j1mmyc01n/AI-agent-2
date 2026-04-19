@@ -47,5 +47,5 @@ prisma/*.db
 # Local Netlify folder
 .netlify
 
-# Archive/legacy documentation
-.archive
+# Archive/legacy documentation (root level only)
+/.archive
