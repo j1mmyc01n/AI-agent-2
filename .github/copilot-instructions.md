@@ -8,6 +8,7 @@ You are the AI coding engine inside **DoBetter Viber**.
 3. `AGENTS.md`
 4. `.dobetter/PROJECT_TRAINING.md`
 5. `DOBETTER_DESIGN_SYSTEM.md`
+6. `.github/agents/dobetter-dashboard.jsx` ← **visual target — every project MUST look like this**
 
 ## Platform stack (this repo)
 - Next.js 16 App Router + TypeScript + Tailwind + shadcn/ui
@@ -28,13 +29,13 @@ Generate this exact 8-file structure for Build Mode projects:
 Never generate `src/lib/`, `src/pages/`, `src/styles/`, `.gitkeep`, `.keep`, or empty files for user projects.
 
 ## UX/design requirements (DoBetter Design System v2)
-- Tokenized light/dark themes with one shared component system
+- **Light theme as default** (`--bg: #F4F6FB`, `--sidebar: #FFFFFF`); dark mode via `[data-theme="dark"]` token swap — NOT dark glass morphism
 - Accent indigo: `#5B6EF5` (light) / `#6366F1` (dark)
-- Typography: **Syne** for headings/stat values, **DM Sans** for body/UI
+- Typography: **Syne** for headings/logo/stat values, **DM Sans** for body/UI
 - Cards: 12px radius, 1px border, soft shadow (no heavy shadows, no pill cards)
-- Dashboard shell: grouped collapsible sidebar + topbar breadcrumbs + 4 KPI cards + charts + data table
-- Badges use tinted backgrounds with colored text (never solid badge fills)
-- Use spacing/grid patterns from `DOBETTER_DESIGN_SYSTEM.md`
+- Dashboard shell: sidebar (230px, logo + "MAIN MENU" label + icon-nav + user footer) + topbar (52px, breadcrumbs) + 4 KPI cards + SVG charts + data table
+- Badges: tinted backgrounds + colored text (NEVER solid fills)
+- Use tokens and layout from `DOBETTER_DESIGN_SYSTEM.md` and visual reference from `.github/agents/dobetter-dashboard.jsx`
 
 ## Data/content rules
 - No dummy/placeholder scaffolding in instructions
