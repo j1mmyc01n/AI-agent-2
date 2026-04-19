@@ -13,8 +13,11 @@ Master Training Document v2.0 | File Structures · Feature Linking · Component 
 3. `AGENTS.md`
 4. `.dobetter/PROJECT_TRAINING.md` (this file)
 5. `DOBETTER_DESIGN_SYSTEM.md`
+6. `.github/agents/dobetter-dashboard.jsx` ← **visual target** — every project MUST look like this
 
-Use all five as one authority set. Do not skip files. Do not rely on memory only.
+Use all six as one authority set. Do not skip files. Do not rely on memory only.
+
+> **⚠️ VISUAL TARGET:** Every generated project MUST visually match `.github/agents/dobetter-dashboard.jsx`. That JSX file shows the exact canonical layout: **light sidebar (#FFFFFF)**, **light background (#F4F6FB)**, "MAIN MENU" nav label, 4 KPI stat cards, SVG charts, data table, and user footer. CSS tokens are defined in `DOBETTER_DESIGN_SYSTEM.md`. **Dark glass morphism (#080810 surface, rgba glass cards) is ABSOLUTELY WRONG** and must never be generated.
 
 ---
 
@@ -348,14 +351,25 @@ Every build uses these EXACT CSS custom properties in styles.css. Do not invent 
 }
 ```
 
-In app.js, ALWAYS set tailwind.config with surface/accent color extensions FIRST (before any function calls):
+In app.js, ALWAYS set tailwind.config with the DoBetter Design System light tokens FIRST (before any function calls):
 ```js
 tailwind.config = {
   theme: { extend: { colors: {
-    surface: { DEFAULT: '#080810', secondary: '#0f0f1a', card: '#14142a', hover: '#1c1c35', border: 'rgba(255,255,255,0.06)' },
-    accent: { DEFAULT: '#6366f1', hover: '#818cf8', muted: 'rgba(99,102,241,0.15)', glow: 'rgba(99,102,241,0.3)' },
-  }, fontFamily: { sans: ['DM Sans','sans-serif'], heading: ['Syne','sans-serif'] } } }
+    accent: { DEFAULT: '#5B6EF5', dark: '#6366F1', muted: 'rgba(91,110,245,0.12)', light: '#EEF0FE' },
+    success: { DEFAULT: '#22C55E', light: '#DCFCE7' },
+    warning: { DEFAULT: '#F59E0B', light: '#FEF3C7' },
+    danger:  { DEFAULT: '#EF4444', light: '#FEE2E2' },
+    border:  { DEFAULT: '#E8ECF4' },
+    sub:     { DEFAULT: '#6B7280' },
+  }, fontFamily: { sans: ['DM Sans','sans-serif'], heading: ['Syne','sans-serif'] }, borderRadius: { md: '12px' } } }
 };
+```
+
+⛔ **NEVER USE THESE — they are dark glass morphism and are WRONG:**
+- `surface: { DEFAULT: '#080810', ... }` — WRONG
+- `card: '#14142a'` — WRONG
+- `rgba(255,255,255,0.03)` glass cards — WRONG
+- `#6366f1` as the only accent (no surface/card) — only correct as dark-mode accent
 ```
 
 ### 4A. globals.css / styles.css — Always Start Here

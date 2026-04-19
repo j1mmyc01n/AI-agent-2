@@ -1190,7 +1190,7 @@ export default function ChatInterface({
                       `1. Output each missing file as a complete, closed code block using the exact canonical path\n` +
                       `2. Do NOT rewrite already-completed files\n` +
                       `3. Use ONLY these exact paths: index.html, src/css/styles.css, src/css/components.css, src/js/config.js, src/js/state.js, src/js/router.js, src/js/components.js, src/js/app.js\n` +
-                      `4. Premium design: #080810 background, #6366f1 accent, Syne headings, DM Sans body, glass cards rgba(255,255,255,0.03)/rgba(255,255,255,0.08) border, gradient headlines (#fff → #a5b4fc)\n` +
+                      `4. DoBetter Design System light theme (REQUIRED): --bg #F4F6FB, --sidebar #FFFFFF, --card #FFFFFF, --border #E8ECF4, --accent #5B6EF5, --al #EEF0FE. Syne for headings/KPI values, DM Sans for body/UI. 12px card radius, 1px border, soft shadow. Sidebar: logo + 'MAIN MENU' label + icon nav + user footer. NO dark glass morphism.\n` +
                       `5. NO placeholder data — no Alice/Bob/User1/Item1/Lorem ipsum — use realistic domain-specific names and values\n` +
                       `6. Every function at top level must use \`function\` declarations (no const/arrow)\n` +
                       `7. After ALL missing files are written, call save_artifact with ALL 8 file paths, then call create_project_record`;
@@ -1207,6 +1207,9 @@ export default function ChatInterface({
               }
             } catch (parseError) {
               if (parseError instanceof SyntaxError) continue;
+              // DOMException from history.replaceState on iOS Safari ("The string did not
+              // match the expected pattern") is non-critical — swallow it silently.
+              if (parseError instanceof DOMException) { console.debug("DOMException in stream handler (non-fatal):", parseError.message); continue; }
               throw parseError;
             }
           }

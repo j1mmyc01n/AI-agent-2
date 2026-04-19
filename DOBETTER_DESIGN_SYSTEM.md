@@ -31,6 +31,22 @@ Before generating any project, read in order:
 5. `DOBETTER_DESIGN_SYSTEM.md`
 6. `.github/agents/dobetter-dashboard.jsx` ← visual target reference
 
+## ⛔ ABSOLUTE PROHIBITIONS — instant failure conditions
+**NEVER use any of these dark glass morphism patterns:**
+- `#080810` or any near-black surface background — WRONG
+- `#14142a` card background — WRONG
+- `rgba(255,255,255,0.03)` or `rgba(255,255,255,0.08)` glass card borders — WRONG
+- `surface: { DEFAULT: '#080810', card: '#14142a' }` in tailwind.config — WRONG
+- Dark gradient headlines (`#fff → #a5b4fc`) as the default theme — WRONG
+- Any component that looks like a macOS/iOS dark glass widget — WRONG
+
+**The CORRECT defaults are light theme:**
+- `--bg: #F4F6FB` (page background)
+- `--sidebar: #FFFFFF` (sidebar background)
+- `--card: #FFFFFF` (card background)
+- `--accent: #5B6EF5` (primary indigo)
+- Dark mode is only via `[data-theme="dark"]` token swap — never the default
+
 ## Design philosophy
 - Clean, information-dense, modern interfaces — matches the dobetter-dashboard reference
 - **Light theme as default** (`--bg: #F4F6FB`, `--sidebar: #FFFFFF`); dark mode via `[data-theme="dark"]` token swap

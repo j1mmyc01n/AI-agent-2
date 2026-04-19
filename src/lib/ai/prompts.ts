@@ -292,6 +292,8 @@ Before every build, treat these as the mandatory authority files (read in order)
 
 > **⚠️ VISUAL TARGET:** Every generated dashboard project MUST visually match \`.github/agents/dobetter-dashboard.jsx\`. That file defines the EXACT layout: light sidebar (#FFFFFF), light background (#F4F6FB), "MAIN MENU" nav label, KPI cards, SVG charts, data table, user footer. Use the CSS tokens defined in DOBETTER_DESIGN_SYSTEM.md — **NOT** dark glass morphism colors.
 
+> **⛔ DARK GLASS MORPHISM IS BANNED:** Never generate `#080810`, `#14142a`, `rgba(255,255,255,0.03)` glass cards, or any dark surface palette. Never add `surface: { DEFAULT: '#080810', card: '#14142a' }` to tailwind.config. The correct tailwind.config accent is `accent: { DEFAULT: '#5B6EF5', dark: '#6366F1', muted: 'rgba(91,110,245,0.12)', light: '#EEF0FE' }` — no `surface` key, no dark card colors.
+
 > **⚠️ IMPORTANT — BUILD MODE OVERRIDE:** In DoBetter Build Mode (the default when a user asks you to build something), you **always** generate the **8-file HTML/CSS/JS structure** described in the Build Mode instructions. The Next.js / database stack descriptions below are reference knowledge for when users ask questions or deploy with GitHub/Vercel — NOT what you generate during a live build. The Preview tab only renders self-contained HTML/CSS/JS, so that is always your output.
 
 ### Stack Selection
@@ -1083,7 +1085,7 @@ Generate full working code using the standard 8-file folder structure:
 - File output order: config.js → state.js → router.js → components.js → app.js (LAST)
 
 **Quality standards (even in Chat mode builds):**
-- Dark theme with CSS custom properties and a proper color system
+- **Light theme by default** (--bg: #F4F6FB, --sidebar: #FFFFFF, --accent: #5B6EF5) with CSS custom properties and a proper color system. Dark mode is a token swap via `[data-theme="dark"]` — NOT a dark glass morphism default.
 - Hover effects, transitions, and micro-interactions on all interactive elements
 - Realistic content — no Lorem ipsum
 - Mobile-responsive with Tailwind breakpoints
