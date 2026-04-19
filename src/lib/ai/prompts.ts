@@ -233,7 +233,7 @@ When helping users build SaaS products or MVPs:
 2b. **Auth flows must feel functional** — Login/register modals MUST update localStorage state so the user can interact with the authenticated dashboard. Use a stub pattern: \`if (email && password && password.length >= 6) { state.dispatch({ type: 'LOGIN', user: { email, name: email.split('@')[0], avatar: email[0].toUpperCase() } }); navigate('#dashboard'); }\` — this makes the demo feel real without a real backend.
 3. **Always build web-based SaaS** — ALWAYS generate web-based HTML/CSS/JS projects. NEVER generate React Native, Flutter, Expo, or mobile-native code. Even if the user asks for a "mobile app", build a mobile-responsive web app so the Preview tab works.
 4. **Always use multi-file SaaS format** — ALWAYS split projects into 8 files: index.html, src/css/styles.css, src/css/components.css, src/js/config.js, src/js/state.js, src/js/router.js, src/js/components.js, src/js/app.js. Use function declarations (not arrow functions) for top-level JS so the preview renders correctly.
-5. **Premium visual quality** — Every build must match the DoBetter Design System: light theme (#F4F6FB bg, #FFFFFF sidebar), indigo accent (#5B6EF5), Syne headings + DM Sans body, 12px card radius, smooth micro-interactions, realistic copy. See `.github/agents/dobetter-dashboard.jsx` for the visual target.
+5. **Premium visual quality** — Every build must match the DoBetter Design System: light theme (#F4F6FB bg, #FFFFFF sidebar), indigo accent (#5B6EF5), Syne headings + DM Sans body, 12px card radius, smooth micro-interactions, realistic copy. See \`.github/agents/dobetter-dashboard.jsx\` for the visual target.
 6. **Preview instantly** — Generate complete HTML/CSS/JS code so users see a live preview immediately in the Preview tab. This is the default and primary way to show work — no external services needed.
 7. **Output code in code blocks** — Always output code in fenced markdown code blocks with the language and path specified (e.g. \`\`\`html:index.html, \`\`\`css:src/css/styles.css, \`\`\`javascript:src/js/app.js). This makes the code appear in the Code tab for easy copying.
 8. **Save as you go** — Call save_artifact after writing each file (or every 2–3 files). Pass ALL files generated so far each time. On the first save, note the returned artifact_id and pass it in all subsequent save_artifact calls so the same artifact is updated instead of creating duplicates.
@@ -1025,10 +1025,10 @@ project-name/
 - **Active nav states**: Sidebar highlights current page on every route change
 
 ### PREMIUM VISUAL REQUIREMENTS
-- **Visual target**: Match `.github/agents/dobetter-dashboard.jsx` — light theme, white sidebar, indigo accent
+- **Visual target**: Match \`.github/agents/dobetter-dashboard.jsx\` — light theme, white sidebar, indigo accent
 - **Color system in app.js** (DoBetter Design System light tokens):
   \`tailwind.config = { theme: { extend: { colors: { accent: { DEFAULT: '#5B6EF5', dark: '#6366F1', muted: 'rgba(91,110,245,0.12)', light: '#EEF0FE' }, success: { DEFAULT: '#22C55E', light: '#DCFCE7' }, warning: { DEFAULT: '#F59E0B', light: '#FEF3C7' }, danger: { DEFAULT: '#EF4444', light: '#FEE2E2' } }, fontFamily: { sans: ['DM Sans', 'sans-serif'], heading: ['Syne', 'sans-serif'] } } } }\`
-- **Light theme default** (`--bg: #F4F6FB`, `--sidebar: #FFFFFF`) with dark mode token swap on `[data-theme="dark"]`
+- **Light theme default** (\`--bg: #F4F6FB\`, \`--sidebar: #FFFFFF\`) with dark mode token swap on \`[data-theme="dark"]\`
 - **Micro-interactions**: hover lift on cards, glow on buttons, focus rings, smooth transitions
 - **Typography**: Syne for headings/KPI values, DM Sans for body/UI; gradient text on hero headlines
 - **Realistic content**: real-looking names, metrics, copy — never Lorem ipsum
