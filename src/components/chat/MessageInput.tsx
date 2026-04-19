@@ -33,7 +33,7 @@ const BUILD_IDEAS = [
   {
     label: "SaaS Dashboard",
     prompt:
-      "Build me a modern SaaS analytics dashboard with sidebar navigation, stat cards, charts, and activity feed. Premium dark theme, smooth animations.",
+      "Build a premium SaaS analytics dashboard using DoBetter Design System v2. Dark theme: #080810 background, #6366f1 accent, Syne headings + DM Sans body. Collapsible sidebar with 5 routes (Dashboard, Projects, Analytics, Team, Settings), 4 KPI stat cards with trend arrows, SVG bar chart, sortable searchable data table with 10+ realistic rows, activity feed with avatars and timestamps. State-driven with localStorage persistence, CRUD on projects, toast notifications, loading skeletons. Every route must show unique content-rich pages. No placeholder names — use domain-specific realistic data.",
     icon: BarChart3,
     color: "text-blue-400",
     bg: "bg-blue-500/10 hover:bg-blue-500/15 border-blue-500/20",
@@ -41,7 +41,7 @@ const BUILD_IDEAS = [
   {
     label: "Landing Page",
     prompt:
-      "Build a premium startup landing page with gradient hero, feature grid, testimonials, 3-tier pricing, FAQ, and CTA. Modern style like Linear or Vercel.",
+      "Build a premium SaaS landing page using DoBetter Design System v2 tokens. Dark theme: #080810 background, gradient headline (#fff → #a5b4fc), #6366f1 accent. Animated hero with gradient text, sub-headline, 2 CTA buttons. 6 feature cards with icons (12px radius, 1px border, hover lift). 3-tier pricing with highlighted Pro plan and feature checklist. Testimonials from 3 named professionals with realistic quotes. Stats bar with 3 impressive metrics. FAQ accordion. Sticky nav with smooth scroll. All sections fully populated with domain-specific realistic copy — zero placeholder text.",
     icon: Layout,
     color: "text-violet-400",
     bg: "bg-violet-500/10 hover:bg-violet-500/15 border-violet-500/20",
@@ -49,58 +49,58 @@ const BUILD_IDEAS = [
   {
     label: "E-Commerce",
     prompt:
-      "Build a modern e-commerce product page with image gallery, size/color selectors, cart, description tabs, reviews, and recommendations. Premium fashion brand style.",
+      "Build a premium e-commerce store using DoBetter Design System v2. Dark theme with #080810 bg, #6366f1 accent. Routes: Shop (product grid 12+ items with filters/search), Product Detail (image gallery, variant selectors, add to cart), Cart (items list, totals, checkout), Orders (history table), Account (profile/settings tabs). State-driven cart with CRUD, real-time quantity updates, localStorage persistence. Realistic product catalog: specific names, prices like $49.99, actual descriptions — no 'Product 1' filler. Toast on add/remove. Responsive grid layout.",
     icon: ShoppingCart,
     color: "text-emerald-400",
     bg: "bg-emerald-500/10 hover:bg-emerald-500/15 border-emerald-500/20",
   },
   {
-    label: "Chat App",
-    prompt:
-      "Build a real-time chat UI with contacts sidebar, message bubbles, typing indicators, emoji picker, and status indicators. Discord/Slack style.",
-    icon: ChatIcon,
-    color: "text-orange-400",
-    bg: "bg-orange-500/10 hover:bg-orange-500/15 border-orange-500/20",
-  },
-  {
-    label: "Portfolio",
-    prompt:
-      "Build a stunning creative portfolio with animated hero, project showcase grid with hover effects, about section, skills, and contact form. Premium artistic feel.",
-    icon: Palette,
-    color: "text-pink-400",
-    bg: "bg-pink-500/10 hover:bg-pink-500/15 border-pink-500/20",
-  },
-  {
-    label: "Blog / CMS",
-    prompt:
-      "Build a modern blog platform with featured post hero, post grid with thumbnails, sidebar with tags and newsletter signup, clean reading view. Medium/Substack style.",
-    icon: FileText,
-    color: "text-rose-400",
-    bg: "bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/20",
-  },
-  {
-    label: "Music Player",
-    prompt:
-      "Build a premium music player app UI with album art, playback controls, playlist sidebar, progress bar, queue, and equalizer visualization. Spotify-inspired.",
-    icon: Music,
-    color: "text-green-400",
-    bg: "bg-green-500/10 hover:bg-green-500/15 border-green-500/20",
-  },
-  {
     label: "AI Tool",
     prompt:
-      "Build an AI-powered writing assistant tool with a clean minimal UI, prompt input area, output display, tone selector, word count, and copy functionality.",
+      "Build a premium AI writing assistant tool using DoBetter Design System v2. Dark theme: #080810 bg, #6366f1 accent, Syne headings. Routes: Generator (prompt input + output display + tone/length/format controls), History (list of past runs with search/filter, delete), Templates (preset prompt library with categories), Settings (model preferences, API key placeholder). State-driven with localStorage persistence for history (10+ example entries). Copy-to-clipboard, word count badge, character counter, export button. Streaming output simulation with loading pulse animation. No dummy text — realistic AI tool domain copy.",
     icon: Lightbulb,
     color: "text-amber-400",
     bg: "bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/20",
   },
   {
-    label: "Social Network",
+    label: "Project Manager",
     prompt:
-      "Build a social media feed page with post cards, like/comment buttons, stories bar, user profiles, trending sidebar, and create post modal. Instagram-inspired.",
+      "Build a premium project management SaaS using DoBetter Design System v2. Dark theme: #080810 bg, #6366f1 accent. Routes: Board (Kanban with 4 columns: Backlog/In Progress/Review/Done, drag-drop simulation via click), Projects (card grid with progress bars and status badges), Timeline (Gantt-style bar chart), Team (member cards with roles and avatars), Reports (KPI cards + bar chart). State-driven CRUD: add/edit/delete tasks and projects. Each task has title, assignee, priority badge, due date, status. 15+ realistic tasks across projects. No 'Task 1' placeholders — use real project management domain language.",
+    icon: FileText,
+    color: "text-rose-400",
+    bg: "bg-rose-500/10 hover:bg-rose-500/15 border-rose-500/20",
+  },
+  {
+    label: "Blog / CMS",
+    prompt:
+      "Build a premium blog/CMS platform using DoBetter Design System v2. Dark theme: #080810 bg, #6366f1 accent, gradient headlines. Routes: Home (featured hero post + post grid 8+ cards with thumbnails, tags, read-time), Article View (full reading layout with author bio, share buttons, related posts), Editor (rich textarea with toolbar: bold/italic/heading/link/image), Dashboard (post list with status badges: Draft/Published/Scheduled, CRUD actions), Categories (tag manager). State-driven with localStorage. 8+ realistic posts with titles, excerpts, author names, dates, categories. No Lorem ipsum.",
     icon: Globe,
     color: "text-cyan-400",
     bg: "bg-cyan-500/10 hover:bg-cyan-500/15 border-cyan-500/20",
+  },
+  {
+    label: "Booking App",
+    prompt:
+      "Build a premium booking/scheduling SaaS using DoBetter Design System v2. Dark theme: #080810 bg, #6366f1 accent. Routes: Calendar (monthly/weekly view with booked slots highlighted), Book Now (service selector, date/time picker, client info form, confirmation), Appointments (upcoming/past list with status badges: Confirmed/Pending/Cancelled, cancel/reschedule actions), Services (CRUD: name, duration, price, description), Clients (searchable list with booking history). State-driven with localStorage. 10+ realistic appointments with specific services, client names, dates, times. Domain-specific copy (salon, clinic, or fitness studio).",
+    icon: Music,
+    color: "text-green-400",
+    bg: "bg-green-500/10 hover:bg-green-500/15 border-green-500/20",
+  },
+  {
+    label: "Finance Tracker",
+    prompt:
+      "Build a premium personal finance tracker using DoBetter Design System v2. Dark theme: #080810 bg, #6366f1 accent, Syne headings. Routes: Overview (net worth card + income/expense KPIs + SVG donut chart + monthly bar chart), Transactions (searchable/filterable table 20+ entries with category badges, amounts, dates, add/delete), Budget (category budget cards with progress bars, set limits modal), Goals (savings goal cards with progress, target dates), Reports (monthly trend line chart, category breakdown). State-driven CRUD, localStorage persistence. Realistic financial data: specific dollar amounts, merchant names, categories — no 'Transaction 1' fillers.",
+    icon: Palette,
+    color: "text-pink-400",
+    bg: "bg-pink-500/10 hover:bg-pink-500/15 border-pink-500/20",
+  },
+  {
+    label: "Social Network",
+    prompt:
+      "Build a premium social media app using DoBetter Design System v2. Dark theme: #080810 bg, #6366f1 accent. Routes: Feed (post cards with like/comment/share counts, stories bar at top, create post modal), Explore (trending posts grid + hashtag chips + search), Profile (bio card, stats: posts/followers/following, post grid), Notifications (grouped activity list: likes/comments/follows with timestamps), Messages (conversation list + chat thread view with message bubbles). State-driven with localStorage: like/unlike, post CRUD, follow/unfollow. 12+ realistic posts with specific content, user handles, timestamps. No 'User 1' placeholders.",
+    icon: ChatIcon,
+    color: "text-orange-400",
+    bg: "bg-orange-500/10 hover:bg-orange-500/15 border-orange-500/20",
   },
 ];
 

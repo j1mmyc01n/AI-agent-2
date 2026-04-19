@@ -1176,20 +1176,25 @@ export default function ChatInterface({
                 // Auto-continue if in build mode and some required files are still missing.
                 // This handles the common case of token-limit truncation where the AI finishes
                 // its response but hasn't yet output all 8 required project files.
-                if (shouldBuild && buildContinuationCountRef.current < 3) {
+                if (shouldBuild && buildContinuationCountRef.current < 5) {
                   const missingFiles = getMissingBuildFiles(streamingContentRef.current);
                   if (missingFiles.length > 0) {
                     buildContinuationCountRef.current += 1;
                     const continuationPrompt =
-                      `Continue building — output ONLY the remaining missing files right now with NO preamble or explanation. ` +
-                      `Do NOT rewrite completed files. Do NOT create extra files. Use only canonical paths. ` +
-                      `Preserve premium styling: #080810 background, #6366f1 accents, glass cards rgba(255,255,255,0.03) with rgba(255,255,255,0.08) border, and gradient headlines (#fff → #a5b4fc).\n\n` +
-                      `Start immediately with the first missing file's code block:\n` +
+                      `Continue building — output ONLY the remaining missing files RIGHT NOW. No preamble. No explanation. No task list. Start immediately with the first code block.\n\n` +
+                      `MISSING FILES (${missingFiles.length}):\n` +
                       missingFiles.map(f => `- \`${f}\``).join('\n') +
-                      `\n\nRules: complete, closed code block for every file listed. No "continuing..." text. Just code. After all files, call save_artifact with ALL generated files (including previously generated ones).`;
+                      `\n\nRULES:\n` +
+                      `1. Output each missing file as a complete, closed code block using the exact canonical path\n` +
+                      `2. Do NOT rewrite already-completed files\n` +
+                      `3. Use ONLY these exact paths: index.html, src/css/styles.css, src/css/components.css, src/js/config.js, src/js/state.js, src/js/router.js, src/js/components.js, src/js/app.js\n` +
+                      `4. Premium design: #080810 background, #6366f1 accent, Syne headings, DM Sans body, glass cards rgba(255,255,255,0.03)/rgba(255,255,255,0.08) border, gradient headlines (#fff → #a5b4fc)\n` +
+                      `5. NO placeholder data — no Alice/Bob/User1/Item1/Lorem ipsum — use realistic domain-specific names and values\n` +
+                      `6. Every function at top level must use \`function\` declarations (no const/arrow)\n` +
+                      `7. After ALL missing files are written, call save_artifact with ALL 8 file paths, then call create_project_record`;
                     // Small delay lets React flush state updates (isStreaming, conversationId)
                     // before the continuation request is dispatched.
-                    const AUTO_CONTINUATION_DELAY_MS = 400;
+                    const AUTO_CONTINUATION_DELAY_MS = 600;
                     setTimeout(() => {
                       sendMessageToAgent(continuationPrompt, model, shouldUpgrade, shouldBuild, true);
                     }, AUTO_CONTINUATION_DELAY_MS);

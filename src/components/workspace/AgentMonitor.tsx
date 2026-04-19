@@ -125,11 +125,11 @@ export default function AgentMonitor({
   }, [isLoading, agentStatus, metrics.lastActivity, messageCount]);
 
   const NUDGE_PROMPTS = [
-    "Continue building. Write the next missing file as a complete code block. Do not summarize or describe — write the actual code now.",
-    "The preview is showing a blank page. This means CSS and JS files are missing or incomplete. Re-write ALL 8 files starting with index.html. Make it premium — dark theme, sidebar, KPI cards, data table.",
-    "Output is incomplete. Write the remaining files now. Start with ```javascript:src/js/components.js and include: createSidebar(), createNavbar(), createStatCard(), createModal(), createChart() functions. Then write src/js/app.js with tailwind.config at the top.",
-    "The project needs premium visual quality. Rebuild src/css/styles.css with the full design token system (CSS custom properties for surface, accent, text colors). Then rebuild src/css/components.css with glass morphism cards, gradient buttons, hover effects.",
-    "Complete the build. Write src/js/app.js now. It must start with tailwind.config = { theme: { extend: { colors: { surface: {...}, accent: {...} } } } }, then init() function wiring all components, then document.addEventListener('DOMContentLoaded', init).",
+    "Continue building. Write the next missing file as a complete code block using its canonical path. Do not summarize or describe — write the actual code now. Use #080810 bg, #6366f1 accent, Syne headings, DM Sans body.",
+    "The preview is showing minimal or blank content. This means files are missing or contain placeholder data. Re-write ALL 8 files starting with index.html. Requirements: dark theme (#080810 bg), sidebar with 5 routes, 4 KPI cards, SVG chart, data table. NO Alice/Bob/User1/Item1/Lorem ipsum — use realistic domain-specific data.",
+    "Output is incomplete. Write the remaining missing files now. Start with ```javascript:src/js/components.js — include createSidebar(), createNavbar(), createStatCard(), createChart(), createModal(), createDataTable(), renderDashboard(), and a renderXxx() function for EVERY sidebar route. Then write src/js/app.js with tailwind.config at the top.",
+    "The project needs premium visual quality and real data. Rebuild src/css/styles.css with the complete DoBetter Design System token baseline (--bg, --sidebar, --card, --border, --text, --sub, --accent, --shadow etc.). Rebuild src/css/components.css with glass cards, gradient buttons, sidebar active states, hover transitions. Then rebuild src/js/state.js with 12+ realistic domain-specific data records (no placeholder names or round numbers).",
+    "Complete the build now. Write src/js/app.js immediately. It MUST start with: tailwind.config = { theme: { extend: { colors: { surface: { DEFAULT: '#080810', card: '#14142a' }, accent: { DEFAULT: '#6366f1' } }, fontFamily: { sans: ['DM Sans', 'sans-serif'], heading: ['Syne', 'sans-serif'] } } } }; Then init() function registering ALL routes (one per sidebar item), rendering layout shell, calling handleRoute(). End with document.addEventListener('DOMContentLoaded', init). After writing it, call save_artifact with ALL 8 files, then create_project_record.",
   ];
 
   const handleNudge = useCallback(() => {

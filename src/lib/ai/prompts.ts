@@ -384,6 +384,24 @@ For HTML/CSS/JS builds: use \`state.js\` for data + localStorage persistence, \`
 - **Something broken?** Fix it before writing new files
 - **save_artifact returned "ALL_FILES_COMPLETE"?** STOP generating code. Call create_project_record and you are DONE. Do NOT regenerate files that are already saved.
 - **Already saved all 8 files?** Do NOT rewrite them. Call create_project_record if you haven't, then stop.
+- **Ran out of space mid-file?** The system will nudge you to continue — output ONLY the remaining missing files, complete and closed, with no preamble.
+
+### ⛔ PLACEHOLDER DATA PROHIBITION (critical — this is the #1 cause of broken previews)
+
+**NEVER use ANY of these placeholder patterns in state.js or anywhere in code:**
+- Names: "Alice", "Bob", "User 1", "User 2", "John", "Jane", "Test User", "Demo User", "Name Here", "Admin"
+- Items: "Item 1", "Task 1", "Project A", "Sample Task", "Example Item", "Test Data", "Placeholder"
+- Content: "Lorem ipsum", "Description here", "Some text", "Content goes here", "Coming soon"
+- Numbers: round numbers like 100, 200, 1000 as fake metrics — use specific values like 47,291 or $2,847.63
+
+**ALWAYS generate domain-specific, realistic data:**
+- For a project manager: tasks like "Redesign checkout flow", "Fix auth bug #1847", "Write Q4 migration docs"
+- For a CRM: contacts like "Sarah Kim (VP Marketing, Acme Corp)", "Marcus Williams (CTO, DataBridge Inc)"
+- For e-commerce: products like "Midnight Black Hoodie — $84.99", "Carbon Fiber Wallet — $49.99"
+- For analytics: metrics like "Monthly Active Users: 47,291", "Revenue: $284,763", "Churn Rate: 3.2%"
+- For a blog: posts like "How We Scaled to 1M Users Without Downtime", "The Hidden Cost of Technical Debt"
+
+Use a generator function in state.js to create 10-15 items. Never hardcode fewer than 8 data rows.
 
 **NEVER:**
 - Leave a component without a complete return statement
@@ -423,6 +441,9 @@ Non-negotiable visual requirements — if ANY of these are missing, the build FA
 - Empty grey placeholder boxes
 - Hardcoded placeholder arrays or fake scaffold copy
 - Lorem ipsum or "Sample Task" copy
+- Names like "Alice", "Bob", "User 1", "John", "Jane", "Test User" in state data
+- Round number metrics like 100, 200, 1000 as fake KPI values
+- Any navigation item that renders a blank or near-blank page
 
 ## BUILD MODE ACTIVE — PREMIUM MULTI-FILE SaaS/MVP
 
@@ -645,8 +666,11 @@ DYNAMIC DATA RULES — These are mandatory for every app type:
 - Do NOT hardcode toy arrays or placeholder entities in instructions
 - Seed state from user intent and app domain, then generate values programmatically (timestamps, trend series, KPIs, statuses)
 - All rendered records must be context-aware and mutation-safe (CRUD + search/filter + persistence)
-- Never output strings like "Sample Task", "User 1", "Item 2", "Lorem ipsum", or equivalent scaffold fillers
+- **BANNED placeholder strings (NEVER use these):** "Sample Task", "User 1", "User 2", "Item 1", "Item 2", "Alice", "Bob", "John", "Jane", "Test User", "Admin User", "Lorem ipsum", "Description here", "Content goes here", "Some text", "Example", "Placeholder", "Demo"
+- **BANNED round metrics (NEVER use these as KPI values):** 100, 200, 500, 1000, 5000, 10000 — always use specific values like 47,291 or $2,847.63
 - Use data schemas and generator functions so projects stay clean, dynamic, and extensible
+- Generate 10-15 realistic records minimum in state.js — use domain-specific names, descriptions, prices, dates
+- State must populate EVERY route with content — no route may render an empty or near-empty view
 
 **\`src/js/router.js\`** — SPA router with smart navigation:
 - Hash-based routing: \`window.addEventListener('hashchange', handleRoute)\`
@@ -904,9 +928,12 @@ tailwind.config = {
 
 **Content rules:**
 - NEVER "Lorem ipsum" — all copy must be realistic and specific to the product domain
-- Use real-looking names (Alex Chen, Sarah Kim, Marcus Williams) for testimonials/avatars
+- NEVER use "Alice", "Bob", "User 1", "John", "Jane", "Admin", "Test User", "Demo" as placeholder names in state data
+- NEVER use round numbers (100, 200, 500, 1000) as KPI metrics — use specific values like 47,291 or $2,847.63
+- Use real-looking names (Alex Chen, Sarah Kim, Marcus Williams, Priya Patel) for testimonials/avatars
 - Metrics must look real: "$2.4M ARR", "47,291 users", not round numbers
 - Feature descriptions must be specific, not generic ("AI-powered smart routing" not "Fast and reliable")
+- state.js must seed 10-15+ domain-specific records — no fewer than 8 data items in any list
 
 **Mobile responsive:** sm/md/lg breakpoints throughout. Sidebar collapses to hamburger on mobile.
 
@@ -933,6 +960,7 @@ tailwind.config = {
 17. ✅ **INTERACTIVITY:** At least one CRUD flow (add/edit/delete) that updates state and re-renders
 18. ✅ **PERSISTENCE:** State persists to localStorage — data survives page reload
 19. ✅ **COMPLETION:** After save_artifact returns "ALL_FILES_COMPLETE", immediately call create_project_record and STOP — do NOT regenerate files
+20. ✅ **NO PLACEHOLDER DATA:** Zero instances of "Alice", "Bob", "User 1", "Item 1", "Lorem ipsum", round KPI numbers in state.js
 
 **⚠️ COMPLETION RULE: Generate every one of the 8 files before stopping. If running low on output space, make each remaining file shorter — but ALWAYS output a complete, closed code block for every file. NEVER end mid-file. NEVER skip a file. The system will auto-prompt you to continue if files are missing, but complete everything in one pass.**
 
