@@ -11,116 +11,137 @@ import Anthropic from "@anthropic-ai/sdk";
 // ──────────────────────────────────────────────
 
 export const TEMPLATES = {
-  "saas-idea": {
-    label: "SaaS Idea Generator",
-    description: "Generate validated SaaS business ideas with market analysis.",
-    systemPrompt: `You are a SaaS idea generation expert. Given a topic or industry, generate 3 compelling SaaS product ideas. For each idea include:
-- **Name**: A catchy product name
-- **Problem**: The specific pain point it solves
-- **Target Market**: Who the ideal customer is
-- **Core Feature**: The single most important feature
-- **Monetisation**: How it makes money (pricing model)
-- **Why Now**: Why this is the right time to build it
-Format each idea clearly with markdown headings.`,
-    userPromptPrefix: "Generate 3 SaaS ideas for the following topic or industry:",
+  "saas-dashboard": {
+    label: "SaaS Dashboard Template",
+    description: "Generate a SaaS dashboard blueprint aligned to DoBetter design and architecture standards.",
+    systemPrompt: `You are a SaaS architecture and UX systems expert.
+Generate a production-ready blueprint for a SaaS dashboard using the DoBetter hierarchy and structure.
+Include:
+- Product scope and key modules
+- File/folder hierarchy (platform + generated project)
+- Route map and sidebar hierarchy
+- Data model and API contract outline
+- Design token usage (light + dark)
+- KPI/dashboard widget strategy
+- Dynamic data and interactivity plan (no dummy placeholders)
+- Build sequence checklist
+Be direct, implementation-ready, and structured with markdown headings.`,
+    userPromptPrefix: "Create a SaaS dashboard template blueprint for:",
   },
-  "mvp-builder": {
-    label: "MVP Feature List",
-    description: "Define the minimum viable product scope for your idea.",
-    systemPrompt: `You are a product manager specialising in MVPs. Given a SaaS product idea, produce a structured MVP scope document with:
-- **Core Features** (must-have for launch, max 5)
-- **Nice-to-Have** (post-launch backlog)
-- **Out of Scope** (explicitly excluded to keep scope tight)
-- **Tech Stack Recommendation** (with brief rationale)
-- **Estimated Build Time** (solo developer)
-- **Key Risks** (top 3 risks and mitigations)
-Be decisive and opinionated. Ruthlessly cut scope.`,
-    userPromptPrefix: "Define the MVP for the following SaaS idea:",
+  ecommerce: {
+    label: "E-Commerce Template",
+    description: "Generate e-commerce architecture and UX blueprint with robust operational flows.",
+    systemPrompt: `You are an e-commerce systems architect.
+Generate a complete e-commerce template blueprint using DoBetter structure standards.
+Include:
+- Catalog, checkout, order, and fulfillment modules
+- Core pages and file hierarchy
+- Data schema (products, orders, customers) and status systems
+- API route map and integration points (payments, webhooks)
+- Dashboard KPI and analytics layout
+- UX rules for tables, badges, filters, and inventory states
+- Dynamic data strategy without placeholder content
+Return clear sections with actionable detail.`,
+    userPromptPrefix: "Create an e-commerce project template for:",
   },
-  "landing-page": {
-    label: "Landing Page Copy",
-    description: "Generate compelling landing page copy for your product.",
-    systemPrompt: `You are an expert SaaS copywriter. Given a product description, write complete landing page copy including:
-- **Headline** (clear, benefit-focused, under 10 words)
-- **Sub-headline** (one sentence expanding on the headline)
-- **Hero CTA** (call-to-action button text + supporting text)
-- **3 Core Benefits** (with icon label, heading, and 1–2 sentence description)
-- **Social Proof Section** (2–3 fictional but realistic testimonials)
-- **Pricing Section** (free/starter/pro tiers with features listed)
-- **FAQ** (5 common questions with answers)
-- **Final CTA Section** (closing headline + CTA)
-Use persuasive, conversion-focused language.`,
-    userPromptPrefix: "Write landing page copy for the following product:",
+  "ai-tool": {
+    label: "AI Tool Template",
+    description: "Generate an AI tool template with streaming UX, model routing, and usage architecture.",
+    systemPrompt: `You are an AI product architect.
+Generate a complete AI-tool template aligned to DoBetter standards.
+Include:
+- Streaming chat/generation UX structure
+- Model routing strategy and provider abstraction
+- Token/cost usage tracking model
+- Conversation/message data model
+- Routes, API endpoints, and state interactions
+- Sidebar/topbar hierarchy and dashboard analytics sections
+- Design-system alignment and accessibility requirements
+- Dynamic, realistic data strategy without static placeholders
+Use concise markdown with implementation-ready sections.`,
+    userPromptPrefix: "Create an AI tool template for:",
   },
-  "tech-stack": {
-    label: "Tech Stack Recommendation",
-    description: "Get a tailored full-stack technology recommendation.",
-    systemPrompt: `You are a senior software architect. Given a SaaS product description and requirements, recommend a complete tech stack with justification. Include:
-- **Frontend** (framework, styling, state management)
-- **Backend** (runtime, framework, API style)
-- **Database** (primary DB + caching if needed)
-- **Authentication** (service or library)
-- **File Storage** (if applicable)
-- **Hosting / Deployment** (with cost estimate at early stage)
-- **Key Libraries** (3–5 essential packages per layer)
-- **Why This Stack** (paragraph summary of the tradeoffs)
-Tailor your recommendation to a small team or solo developer shipping fast.`,
-    userPromptPrefix: "Recommend a tech stack for:",
+  "blog-cms": {
+    label: "Blog / CMS Template",
+    description: "Generate a content platform template with editorial workflows and publishing architecture.",
+    systemPrompt: `You are a CMS platform architect.
+Generate a full Blog/CMS template blueprint.
+Include:
+- Content model (posts, categories, authors, media, subscribers)
+- Editorial workflow and status transitions
+- Page/route hierarchy and admin dashboard structure
+- API routes and validation strategy
+- SEO, analytics, and publishing rules
+- UI/UX layout patterns based on DoBetter design tokens
+- Dynamic data and content rendering rules without placeholder copy
+Return in clear markdown sections.`,
+    userPromptPrefix: "Create a Blog/CMS project template for:",
   },
-  "feature-spec": {
-    label: "Feature Spec Writer",
-    description: "Write detailed feature specifications and user stories.",
-    systemPrompt: `You are a product manager writing feature specifications. Given a feature request, produce a complete spec document:
-- **Feature Overview** (1-paragraph summary)
-- **User Stories** (5–8 stories in "As a … I want … so that …" format)
-- **Acceptance Criteria** (testable criteria for each story)
-- **Edge Cases** (list of edge cases to handle)
-- **UI/UX Notes** (key interface considerations)
-- **API Changes** (endpoints to add/modify, with method, path, request/response shape)
-- **Database Changes** (schema additions/modifications)
-- **Out of Scope** (explicitly excluded to avoid scope creep)`,
-    userPromptPrefix: "Write a feature spec for:",
+  "booking-app": {
+    label: "Booking App Template",
+    description: "Generate booking app architecture with calendar UX and service scheduling logic.",
+    systemPrompt: `You are a booking-product architect.
+Generate a complete booking app template blueprint.
+Include:
+- Service, booking, client, and availability data models
+- Weekly calendar interaction model
+- Routing and page architecture
+- API routes and booking lifecycle/status flow
+- Cancellation, confirmation, and payment integration strategy
+- Dashboard metrics and operational views
+- Design-system component mapping and responsive behavior
+- Dynamic dataset strategy with realistic generated values and no placeholders
+Use markdown headings and practical implementation detail.`,
+    userPromptPrefix: "Create a booking app template for:",
   },
-  "ui-component": {
-    label: "UI Component Generator",
-    description: "Generate React component code with Tailwind CSS styling.",
-    systemPrompt: `You are a React/Tailwind CSS expert. Given a component description, generate production-ready React TypeScript code. Include:
-- Full TypeScript interface for props
-- Responsive design using Tailwind CSS
-- Proper accessibility attributes (aria-*, role, etc.)
-- Loading and empty states where applicable
-- Dark mode support via Tailwind dark: classes
-- A brief usage example at the end
-Output only the component code in a single tsx code block, followed by the usage example.`,
-    userPromptPrefix: "Generate a React component for:",
+  "static-landing": {
+    label: "Static / Landing Template",
+    description: "Generate a high-conversion static/marketing template with performance and analytics structure.",
+    systemPrompt: `You are a marketing site systems designer.
+Generate a static/landing template blueprint that follows DoBetter standards.
+Include:
+- Page hierarchy and conversion funnel sections
+- Hero/features/pricing/testimonial/CTA structure
+- Lead capture and source attribution model
+- Analytics schema and reporting views
+- SEO/performance requirements
+- Design token usage and responsive section patterns
+- Content quality rules (real copy only, no placeholder text)
+Return as structured markdown.`,
+    userPromptPrefix: "Create a static/landing template for:",
   },
-  "prd": {
-    label: "PRD / Product Brief",
-    description: "Create a full Product Requirements Document.",
-    systemPrompt: `You are a senior product manager. Given a product idea, write a complete Product Requirements Document (PRD) with:
-- **Executive Summary** (2–3 sentences)
-- **Problem Statement** (the specific pain being solved)
-- **Goals & Success Metrics** (3–5 measurable KPIs)
-- **Target Users** (primary and secondary personas)
-- **Scope** (in-scope and out-of-scope)
-- **User Flows** (2–3 key user journeys described step-by-step)
-- **Functional Requirements** (numbered list)
-- **Non-Functional Requirements** (performance, security, scalability)
-- **Open Questions** (unresolved decisions)
-- **Timeline** (rough milestones)`,
-    userPromptPrefix: "Write a PRD for:",
+  "pwa-mobile": {
+    label: "PWA / Mobile-First Template",
+    description: "Generate a mobile-first PWA architecture with offline and push capabilities.",
+    systemPrompt: `You are a PWA architect.
+Generate a production-ready PWA/mobile-first template blueprint.
+Include:
+- App shell and responsive navigation architecture
+- Manifest and service worker strategy
+- Offline cache and sync model
+- Push notification data model and routes
+- Dashboard/usage pages for mobile operations
+- Touch-first UX and accessibility constraints
+- Design-system usage for compact/mobile layouts
+- Dynamic data behavior with no dummy placeholders
+Provide concise implementation-ready sections.`,
+    userPromptPrefix: "Create a PWA/mobile-first template for:",
   },
-  "bug-fixer": {
-    label: "Bug Fixer",
-    description: "Diagnose and fix code bugs with detailed explanations.",
-    systemPrompt: `You are an expert debugging assistant. Given buggy code and/or an error message:
-1. **Diagnose** the root cause clearly
-2. **Explain** why the bug occurs
-3. **Provide the fixed code** in a code block
-4. **Explain** what changed and why
-5. **Suggest** any related improvements to prevent similar bugs
-Be precise and educational.`,
-    userPromptPrefix: "Debug and fix the following code/error:",
+  "design-system": {
+    label: "DoBetter Design System Template",
+    description: "Generate a complete UI system spec for project builds aligned to DoBetter Design System v2.",
+    systemPrompt: `You are a design-system architect.
+Generate a DoBetter-compliant UI system spec for the requested product context.
+Include:
+- Color/token system (light and dark)
+- Typography rules (Syne + DM Sans)
+- Sidebar/topbar/page-grid hierarchy
+- Component specs (cards, KPI stats, badges, tables, buttons, progress, charts)
+- Responsive behavior and spacing scale
+- Rules for dynamic content rendering (no placeholder/dummy content)
+- Mapping from UI tokens to the 8-file build architecture
+Output structured markdown with clear, reusable sections.`,
+    userPromptPrefix: "Create a DoBetter design-system template for:",
   },
 } as const;
 
