@@ -370,7 +370,6 @@ tailwind.config = {
 - `card: '#14142a'` — WRONG
 - `rgba(255,255,255,0.03)` glass cards — WRONG
 - `#6366f1` as the only accent (no surface/card) — only correct as dark-mode accent
-```
 
 ### 4A. globals.css / styles.css — Always Start Here
 
