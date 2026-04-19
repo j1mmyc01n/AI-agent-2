@@ -305,12 +305,58 @@ Does it need AI features?
 
 When you create a file, write 100% of it. These patterns are non-negotiable:
 
-### Rule: No Dummy or Placeholder Data in Instructions
+### Rule: No Dummy or Placeholder Data — ZERO TOLERANCE
 
-- Do not embed fixed toy datasets in build instructions.
-- Drive project data from domain-specific schemas and dynamic generators.
-- Never use scaffold strings like "User 1", "Sample Task", "Item 2", or "Lorem ipsum".
-- Always produce dynamic, state-driven, mutation-ready data flows (CRUD + search/filter + persistence).
+**BANNED — Never appear in any generated code:**
+- Names: "Alice", "Bob", "User 1", "User 2", "John", "Jane", "Admin", "Test User", "Demo User"
+- Items: "Item 1", "Item 2", "Task 1", "Sample Task", "Project A", "Example", "Placeholder", "Content here"
+- Metrics: round numbers as KPIs (100, 200, 500, 1000, 5000) — always use specific values (47,291 or $2,847.63)
+- Text: "Lorem ipsum", "Description here", "Some text", "Coming soon", "TODO"
+
+**REQUIRED — Always use domain-specific realistic data:**
+- Project manager: tasks like "Redesign checkout flow #247", "Resolve auth token expiration bug", "Migrate users to v3 API"
+- CRM: "Sarah Kim — VP Marketing at Acme Corp", "Marcus Williams — CTO at DataBridge Inc"
+- E-commerce: "Midnight Black Hoodie — $84.99", "Carbon Fiber Minimalist Wallet — $49.99"
+- Analytics: KPIs like "Monthly Active Users: 47,291", "MRR: $284,763", "Churn: 3.2%"
+- Blog: posts like "How We Scaled to 1M Users Without Downtime", "The Hidden Cost of Technical Debt in SaaS"
+
+Generate 10-15+ realistic items in state.js. Never fewer than 8 data rows in any list.
+
+### Rule: Use DoBetter Design System v2 Token Baseline (Always)
+
+Every build uses these EXACT CSS custom properties in styles.css. Do not invent different token names.
+
+```css
+:root {
+  --bg: #F4F6FB; --sidebar: #FFFFFF; --card: #FFFFFF; --border: #E8ECF4;
+  --text: #1A1D23; --sub: #6B7280;
+  --shadow: 0 1px 3px rgba(0,0,0,.06), 0 2px 10px rgba(0,0,0,.04);
+  --shadow-hover: 0 4px 16px rgba(91,110,245,.18);
+  --accent: #5B6EF5; --al: #EEF0FE;
+  --success: #22C55E; --sl: #DCFCE7;
+  --warning: #F59E0B; --wl: #FEF3C7;
+  --danger: #EF4444; --dl: #FEE2E2;
+  --purple: #8B5CF6; --pl: #EDE9FE;
+  --radius-md: 12px;
+}
+[data-theme="dark"] {
+  --bg: #0F172A; --sidebar: #1E293B; --card: #1E293B; --border: #334155;
+  --text: #F1F5F9; --sub: #94A3B8;
+  --shadow: 0 1px 3px rgba(0,0,0,.4), 0 2px 10px rgba(0,0,0,.25);
+  --shadow-hover: 0 4px 16px rgba(99,102,241,.28);
+  --accent: #6366F1; --al: #1E1B4B;
+}
+```
+
+In app.js, ALWAYS set tailwind.config with surface/accent color extensions FIRST (before any function calls):
+```js
+tailwind.config = {
+  theme: { extend: { colors: {
+    surface: { DEFAULT: '#080810', secondary: '#0f0f1a', card: '#14142a', hover: '#1c1c35', border: 'rgba(255,255,255,0.06)' },
+    accent: { DEFAULT: '#6366f1', hover: '#818cf8', muted: 'rgba(99,102,241,0.15)', glow: 'rgba(99,102,241,0.3)' },
+  }, fontFamily: { sans: ['DM Sans','sans-serif'], heading: ['Syne','sans-serif'] } } }
+};
+```
 
 ### 4A. globals.css / styles.css — Always Start Here
 
