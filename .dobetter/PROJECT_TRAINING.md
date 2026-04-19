@@ -314,7 +314,7 @@ When you create a file, write 100% of it. These patterns are non-negotiable:
 - Text: "Lorem ipsum", "Description here", "Some text", "Coming soon", "TODO"
 
 **REQUIRED — Always use domain-specific realistic data:**
-- Project manager: tasks like "Redesign checkout flow #247", "Resolve auth token expiry bug", "Migrate users to v3 API"
+- Project manager: tasks like "Redesign checkout flow #247", "Resolve auth token expiration bug", "Migrate users to v3 API"
 - CRM: "Sarah Kim — VP Marketing at Acme Corp", "Marcus Williams — CTO at DataBridge Inc"
 - E-commerce: "Midnight Black Hoodie — $84.99", "Carbon Fiber Minimalist Wallet — $49.99"
 - Analytics: KPIs like "Monthly Active Users: 47,291", "MRR: $284,763", "Churn: 3.2%"
